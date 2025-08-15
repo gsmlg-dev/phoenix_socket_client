@@ -50,7 +50,7 @@ defmodule PhoenixClient.Transports.Websocket do
   end
 
   def websocket_handle(other_msg, _req, state) do
-    Logger.warn(fn -> "Unknown message #{inspect(other_msg)}" end)
+    Logger.warning(fn -> "Unknown message #{inspect(other_msg)}" end)
     {:ok, state}
   end
 

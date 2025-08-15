@@ -1,6 +1,6 @@
 defmodule PhoenixClientTest do
   use ExUnit.Case, async: false
-  use RouterHelper
+
   import ExUnit.CaptureLog
   import Plug.Conn, except: [assign: 3, push: 3]
 
@@ -118,10 +118,10 @@ defmodule PhoenixClientTest do
       super(conn, opts)
     end
 
-    socket("/ws", UserSocket, websocket: [origins: ["//example.com"], connect_info: [:x_headers]])
+    socket("/ws", UserSocket, websocket: [check_origin: false, connect_info: [:x_headers]])
 
     socket("/ws/admin", UserSocket,
-      websocket: [origins: ["//example.com"], connect_info: [:x_headers]]
+      websocket: [check_origin: false, connect_info: [:x_headers]]
     )
 
     plug(

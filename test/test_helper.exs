@@ -4,7 +4,6 @@ ExUnit.start()
 Logger.configure(level: :error)
 
 # Starts web server applications
-Application.ensure_all_started(:cowboy)
+Application.ensure_all_started(:bandit)
 Application.ensure_all_started(:phoenix)
 
-Code.require_file("../deps/phoenix/test/support/router_helper.exs", __DIR__)
