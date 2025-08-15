@@ -120,9 +120,7 @@ defmodule PhoenixClientTest do
 
     socket("/ws", UserSocket, websocket: [check_origin: false, connect_info: [:x_headers]])
 
-    socket("/ws/admin", UserSocket,
-      websocket: [check_origin: false, connect_info: [:x_headers]]
-    )
+    socket("/ws/admin", UserSocket, websocket: [check_origin: false, connect_info: [:x_headers]])
 
     plug(
       Plug.Parsers,
