@@ -21,9 +21,7 @@ defmodule PhoenixSocketClient.Socket.Channels do
   end
 
   def init(_opts) do
-    DynamicSupervisor.init(
-      strategy: :one_for_one
-    )
+    DynamicSupervisor.init(strategy: :one_for_one)
   end
 
   defp supervisor_name(id) do

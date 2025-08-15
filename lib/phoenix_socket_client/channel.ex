@@ -103,8 +103,7 @@ defmodule PhoenixSocketClient.Channel do
     message = Message.join(topic, params)
     push = Socket.push(socket, message)
 
-    {:noreply,
-      %{state | join_ref: push.ref, caller: pid, pushes: [{from, push} | state.pushes]}}
+    {:noreply, %{state | join_ref: push.ref, caller: pid, pushes: [{from, push} | state.pushes]}}
   end
 
   @impl true

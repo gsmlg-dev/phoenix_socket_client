@@ -87,9 +87,11 @@ defmodule PhoenixSocketClient.Socket.Connection do
     Logger.debug("Connection: closed #{inspect(reason)}")
     state_pid = State.whereis(state.id)
     current_transport_pid = State.get(state_pid, :transport_pid)
+
     if transport_pid == current_transport_pid do
       close(reason, state)
     end
+
     {:noreply, state}
   end
 

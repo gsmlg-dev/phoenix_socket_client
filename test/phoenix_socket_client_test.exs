@@ -245,6 +245,7 @@ defmodule PhoenixSocketClientTest do
   @tag :skip
   test "socket params can be sent" do
     name = :"socket_#{System.unique_integer([:positive])}"
+
     opts =
       @socket_config
       |> Keyword.put(:params, %{"reject" => true})
@@ -259,6 +260,7 @@ defmodule PhoenixSocketClientTest do
   @tag :skip
   test "socket params can be set in url" do
     name = :"socket_#{System.unique_integer([:positive])}"
+
     opts = [
       url: "ws://127.0.0.1:#{@port}/ws/admin/websocket?reject=true",
       serializer: Jason,

@@ -59,6 +59,7 @@ defmodule PhoenixSocketClient.Socket do
     opts = Keyword.merge(opts, genserver_opts)
     id = opts[:id] || __MODULE__
     opts = Keyword.put(opts, :id, id)
+
     children = [
       {State, opts},
       {Channels, opts},
