@@ -1,20 +1,20 @@
 defmodule PhoenixSocketClient.Channel do
   use GenServer
 
-  alias PhoenixSocketClient.{Socket, ChannelSupervisor, Message}
+  alias PhoenixSocketClient.{Socket, Message}
 
   @timeout 5_000
 
   def child_spec({socket, topic, params}) do
     %{
       id: Module.concat(__MODULE__, topic),
-      start: {__MODULE__, :start_link, [socket, topic, params]},
+      start: {__MODULE__, :start_link, [{socket, topic, params}]},
       restart: :temporary
     }
   end
 
   @doc false
-  def start_link(socket, topic, params) do
+  def start_link({socket, topic, params}) do
     GenServer.start_link(__MODULE__, {socket, topic, params})
   end
 
@@ -42,13 +42,9 @@ defmodule PhoenixSocketClient.Channel do
   def join(socket_pid_or_name, topic, params \\ %{}, timeout \\ @timeout)
   def join(nil, _topic, _params, _timeout), do: {:error, :socket_not_started}
 
-  def join(socket_name, topic, params, timeout) when is_atom(socket_name) do
-    join(Process.whereis(socket_name), topic, params, timeout)
-  end
-
-  def join(socket_pid, topic, params, timeout) do
-    if Process.alive?(socket_pid) and Socket.connected?(socket_pid) do
-      case ChannelSupervisor.start_channel(socket_pid, topic, params) do
+  def join(socket_pid_or_name, topic, params, timeout) do
+    if Process.whereis(socket_pid_or_name) |> is_pid() and Socket.connected?(socket_pid_or_name) do
+      case Socket.channel_join(socket_pid_or_name, topic, params) do
         {:ok, pid} -> do_join(pid, timeout)
         error -> error
       end
@@ -63,7 +59,6 @@ defmodule PhoenixSocketClient.Channel do
   @spec leave(pid) :: :ok
   def leave(pid) do
     GenServer.call(pid, :leave)
-    GenServer.stop(pid)
   end
 
   @doc """
@@ -105,19 +100,16 @@ defmodule PhoenixSocketClient.Channel do
         {pid, _ref} = from,
         %{socket: socket, topic: topic, params: params} = state
       ) do
-    case Socket.channel_join(socket, self(), topic, params) do
-      {:ok, push} ->
-        {:noreply,
-         %{state | join_ref: push.ref, caller: pid, pushes: [{from, push} | state.pushes]}}
+    message = Message.join(topic, params)
+    push = Socket.push(socket, message)
 
-      error ->
-        {:reply, error, state}
-    end
+    {:noreply,
+      %{state | join_ref: push.ref, caller: pid, pushes: [{from, push} | state.pushes]}}
   end
 
   @impl true
-  def handle_call(:leave, _from, %{socket: socket, topic: topic} = state) do
-    Socket.channel_leave(socket, self(), topic)
+  def handle_call(:leave, _from, %{socket: socket, topic: _topic} = state) do
+    Socket.channel_leave(socket, self())
     {:reply, :ok, state}
   end
 
