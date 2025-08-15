@@ -120,9 +120,7 @@ defmodule PhoenixClientTest do
 
     socket("/ws", UserSocket, websocket: [check_origin: false, connect_info: [:x_headers]])
 
-    socket("/ws/admin", UserSocket,
-      websocket: [check_origin: false, connect_info: [:x_headers]]
-    )
+    socket("/ws/admin", UserSocket, websocket: [check_origin: false, connect_info: [:x_headers]])
 
     plug(
       Plug.Parsers,
@@ -208,7 +206,7 @@ defmodule PhoenixClientTest do
   test "socket can join a channel" do
     {:ok, socket} = Socket.start_link(@socket_config)
     wait_for_socket(socket)
-    assert {:ok, _, channel} = Channel.join(socket, "rooms:admin-lobby")
+    assert {:ok, _, _channel} = Channel.join(socket, "rooms:admin-lobby")
   end
 
   test "socket cannot join more than one channel of the same topic" do
@@ -301,7 +299,7 @@ defmodule PhoenixClientTest do
     endpoint = context[:endpoint]
     {:ok, socket} = Socket.start_link(@socket_config)
     wait_for_socket(socket)
-    assert {:ok, _, channel} = Channel.join(socket, "rooms:admin-lobby")
+    assert {:ok, _, _channel} = Channel.join(socket, "rooms:admin-lobby")
 
     Process.exit(endpoint, :kill)
     :timer.sleep(10)
@@ -312,7 +310,7 @@ defmodule PhoenixClientTest do
     start_endpoint()
     wait_for_socket(socket)
     :sys.get_state(socket)
-    assert {:ok, _, channel} = Channel.join(socket, "rooms:admin-lobby")
+    assert {:ok, _, _channel} = Channel.join(socket, "rooms:admin-lobby")
   end
 
   test "use async with genserver" do
