@@ -1,4 +1,4 @@
-# PhoenixClient
+# PhoenixSocketClient
 
 Channel client for connecting to Phoenix from Elixir
 
@@ -10,7 +10,7 @@ Add `phoenix_client` and a json library as dependencies in your `mix.exs` file.
 ```elixir
 def deps do
   [
-    {:phoenix_client, "~> 0.3"},
+    {:phoenix_socket_client, "~> 0.3"},
     {:jason, "~> 1.0"}
   ]
 end
@@ -22,7 +22,7 @@ socket options.
 ## Usage
 
 There are two things required to connect to a phoenix server using channels, a
-`PhoenixClient.Socket` and a `PhoenixClient.Channel`. The socket establishes
+`PhoenixSocketClient.Socket` and a `PhoenixSocketClient.Channel`. The socket establishes
 the connection to the remote socket. The channel takes a topic and is used
 to join a remote channel. In the following example we will assume that we are
 attempting to communicate with a locally running phoenix server with a `RoomChannel`
@@ -36,7 +36,7 @@ socket_opts = [
   url: "ws://localhost:4000/socket/websocket"
 ]
 
-{:ok, socket} = PhoenixClient.Socket.start_link(socket_opts)
+{:ok, socket} = PhoenixSocketClient.Socket.start_link(socket_opts)
 ```
 
 The socket will automatically attempt to connect when it starts. If the socket
@@ -50,7 +50,7 @@ You can control how frequently the socket will attempt to reconnect by setting
 Next, we will create a client channel and join the remote.
 
 ```elixir
-{:ok, _response, channel} = PhoenixClient.Channel.join(socket, "rooms:lobby")
+{:ok, _response, channel} = PhoenixSocketClient.Channel.join(socket, "rooms:lobby")
 ```
 
 Now that we have successfully joined the channel, we are ready to push and receive
@@ -73,12 +73,12 @@ callbacks:
 
 ```elixir
 message = %{hello: :world}
-{:ok, ^message} = PhoenixClient.Channel.push(channel, "new:msg", message)
-:ok = PhoenixClient.Channel.push_async(channel, "new:msg_async", message)
+{:ok, ^message} = PhoenixSocketClient.Channel.push(channel, "new:msg", message)
+:ok = PhoenixSocketClient.Channel.push_async(channel, "new:msg_async", message)
 ```
 
 Messages that are pushed or broadcasted to the client channel will be sent to the
-pid that called `join`. Messages will be of the of the struct `%PhoenixClient.Message{}`.
+pid that called `join`. Messages will be of the of the struct `%PhoenixSocketClient.Message{}`.
 
 In this example we will assume the server channel has the following `handle_in`
 callback
@@ -92,10 +92,10 @@ callback
 
 ```elixir
 message = %{hello: :world}
-{:ok, ^message} = PhoenixClient.Channel.push(channel, "new:msg", message)
+{:ok, ^message} = PhoenixSocketClient.Channel.push(channel, "new:msg", message)
 flush
 
-%PhoenixClient.Message{
+%PhoenixSocketClient.Message{
   channel_pid: #PID<0.186.0>,
   event: "incoming:msg",
   payload: %{"hello" => "world"},
@@ -111,10 +111,10 @@ You will need to name the socket so it can be referenced from your channel.
 
 ```elixir
   socket_opts =
-    Application.get_env(:phoenix_client, :socket)
+    Application.get_env(:phoenix_socket_client, :socket)
 
   children = [
-    {PhoenixClient.Socket, {socket_opts, name: PhoenixClient.Socket}}
+    {PhoenixSocketClient.Socket, {socket_opts, name: PhoenixSocketClient.Socket}}
   ]
 ```
 
@@ -123,13 +123,13 @@ for connecting to multiple remote servers.
 
 ```elixir
   socket_1_opts =
-    Application.get_env(:phoenix_client, :socket_1)
+    Application.get_env(:phoenix_socket_client, :socket_1)
   socket_2_opts =
-    Application.get_env(:phoenix_client, :socket_2)
+    Application.get_env(:phoenix_socket_client, :socket_2)
 
   children = [
-    {PhoenixClient.Socket, {socket_1_opts, name: :socket_1, id: :socket_id_1}},
-    {PhoenixClient.Socket, {socket_2_opts, name: :socket_1, id: :socket_id_2}}
+    {PhoenixSocketClient.Socket, {socket_1_opts, name: :socket_1, id: :socket_id_1}},
+    {PhoenixSocketClient.Socket, {socket_2_opts, name: :socket_1, id: :socket_id_2}}
   ]
 ```
 
@@ -140,7 +140,7 @@ example of how this is typically used.
 defmodule MyApp.Worker do
   use GenServer
 
-  alias PhoenixClient.{Socket, Channel, Message}
+  alias PhoenixSocketClient.{Socket, Channel, Message}
 
   # start_link ...
 

@@ -1,7 +1,7 @@
-defmodule PhoenixClient.MessageTest do
+defmodule PhoenixSocketClient.MessageTest do
   use ExUnit.Case, async: false
 
-  alias PhoenixClient.Message
+  alias PhoenixSocketClient.Message
 
   describe "v1 serializer" do
     test "encode" do

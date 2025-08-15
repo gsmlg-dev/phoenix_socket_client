@@ -1,11 +1,11 @@
-defmodule PhoenixClientTest do
+defmodule PhoenixSocketClientTest do
   use ExUnit.Case, async: false
 
   import ExUnit.CaptureLog
   import Plug.Conn, except: [assign: 3, push: 3]
 
   alias __MODULE__.Endpoint
-  alias PhoenixClient.{Socket, Channel, Message}
+  alias PhoenixSocketClient.{Socket, Channel, Message}
 
   @port 5807
 
@@ -168,8 +168,8 @@ defmodule PhoenixClientTest do
 
     @impl true
     def handle_continue(:connect_to_channel, state) do
-      {:ok, socket} = Socket.start_link(PhoenixClientTest.socket_config())
-      PhoenixClientTest.wait_for_socket(socket)
+      {:ok, socket} = Socket.start_link(PhoenixSocketClientTest.socket_config())
+      PhoenixSocketClientTest.wait_for_socket(socket)
       {:ok, _, channel} = Channel.join(socket, "rooms:admin-lobby")
 
       {:noreply, %{state | channel: channel, socket: socket}}

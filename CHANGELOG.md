@@ -1,4 +1,4 @@
-# PhoenixClient
+# PhoenixSocketClient
 
 ## v0.11.1
 
@@ -83,13 +83,13 @@ how to implement this new pattern.
 * Enhancements
   * Removed the requirement to define `Socket` and `Channel` modules that implement
     their respective behaviours. Sockets are now started by calling
-    `PhoenixClient.Socket.start_link` directly.
-    Channels are started by calling `PhoenixClient.Channel`.
-  * Calls to `PhoenixClient.Channel.push` happen synchronously. This helps to
+    `PhoenixSocketClient.Socket.start_link` directly.
+    Channels are started by calling `PhoenixSocketClient.Channel`.
+  * Calls to `PhoenixSocketClient.Channel.push` happen synchronously. This helps to
     reduce callback spaghetti code by making the reply available at the call site.
     If you do not require a response from the server, you can use `push_async`.
   * Non-reply messages that are pushed from the server will be sent to the pid
-    of the process that called join. They will be delivered as `%PhoenixClient.Message{}`.
+    of the process that called join. They will be delivered as `%PhoenixSocketClient.Message{}`.
     See the main readme for an example of this.
 
 ## v0.4.0
@@ -106,14 +106,14 @@ how to implement this new pattern.
 
   * Calls for `join`, `push`, `cancel_push`, and `leave` are no longer injected
     into the channel module. These functions have been moved to the
-    `PhoenixClient` module.
+    `PhoenixSocketClient` module.
 
     For example:
 
     ```elixir
     MyChannel.join()
     # becomes
-    PhoenixClient.join(channel_pid_or_name)
+    PhoenixSocketClient.join(channel_pid_or_name)
     ```
 
 ## v0.3.2

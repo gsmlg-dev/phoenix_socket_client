@@ -1,4 +1,4 @@
-defmodule PhoenixClient.Message do
+defmodule PhoenixSocketClient.Message do
   defstruct topic: nil,
             event: nil,
             payload: nil,

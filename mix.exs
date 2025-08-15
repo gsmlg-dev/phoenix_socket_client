@@ -1,9 +1,9 @@
-defmodule PhoenixClient.Mixfile do
+defmodule PhoenixSocketClient.Mixfile do
   use Mix.Project
 
   def project do
     [
-      app: :phoenix_client,
+      app: :phoenix_socket_client,
       version: "0.11.1",
       elixir: "~> 1.18",
       build_embedded: Mix.env() == :prod,
@@ -18,12 +18,13 @@ defmodule PhoenixClient.Mixfile do
   def application do
     [
       extra_applications: [:logger, :ssl],
-      mod: {PhoenixClient, []}
+      mod: {PhoenixSocketClient, []}
     ]
   end
 
   defp deps do
     [
+      {:jason, "~> 1.2"},
       {:websocket_client, "~> 1.3"},
       {:phoenix, "~> 1.7", only: :test},
       {:plug_cowboy, "~> 2.5", only: :test},
@@ -41,7 +42,7 @@ defmodule PhoenixClient.Mixfile do
   defp package do
     [
       licenses: ["Apache-2.0"],
-      links: %{"GitHub" => "https://github.com/mobileoverlord/phoenix_client"}
+      links: %{"GitHub" => "https://github.com/mobileoverlord/phoenix_socket_client"}
     ]
   end
 end
