@@ -1,13 +1,13 @@
-defmodule PhoenixClient.Socket do
+defmodule PhoenixSocketClient.Socket do
   use GenServer
 
   require Logger
 
   @heartbeat_interval 30_000
   @reconnect_interval 60_000
-  @default_transport PhoenixClient.Transports.Websocket
+  @default_transport PhoenixSocketClient.Transports.Websocket
 
-  alias PhoenixClient.Message
+  alias PhoenixSocketClient.Message
 
   def child_spec({opts, genserver_opts}) do
     %{

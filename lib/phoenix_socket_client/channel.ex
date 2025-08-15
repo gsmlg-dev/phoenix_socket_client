@@ -1,7 +1,7 @@
-defmodule PhoenixClient.Channel do
+defmodule PhoenixSocketClient.Channel do
   use GenServer
 
-  alias PhoenixClient.{Socket, ChannelSupervisor, Message}
+  alias PhoenixSocketClient.{Socket, ChannelSupervisor, Message}
 
   @timeout 5_000
 

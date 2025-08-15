@@ -1,5 +1,5 @@
-defmodule PhoenixClient.Message.V1 do
-  alias PhoenixClient.Message
+defmodule PhoenixSocketClient.Message.V1 do
+  alias PhoenixSocketClient.Message
 
   def decode!(msg) do
     %Message{

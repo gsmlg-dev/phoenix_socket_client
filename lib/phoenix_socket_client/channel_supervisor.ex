@@ -1,7 +1,7 @@
-defmodule PhoenixClient.ChannelSupervisor do
+defmodule PhoenixSocketClient.ChannelSupervisor do
   use DynamicSupervisor
 
-  alias PhoenixClient.Channel
+  alias PhoenixSocketClient.Channel
 
   def start_link(opts \\ []) do
     DynamicSupervisor.start_link(__MODULE__, opts, name: __MODULE__)
