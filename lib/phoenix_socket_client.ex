@@ -10,7 +10,6 @@ defmodule PhoenixSocketClient do
     children = [
       # Starts a worker by calling: PhoenixSocketClient.Worker.start_link(arg)
       # {PhoenixSocketClient.Worker, arg}
-      PhoenixSocketClient.ChannelSupervisor
     ]
 
     # See https://hexdocs.pm/elixir/Supervisor.html
