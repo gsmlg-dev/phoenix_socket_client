@@ -7,12 +7,8 @@ defmodule PhoenixSocketClient.SocketState do
   @reconnect_interval 60_000
   @default_transport PhoenixSocketClient.Transports.Websocket
 
-  def start_link(opts) do
-    Agent.start_link(fn -> init(opts) end, name: agent_name(opts[:id]))
-  end
-
-  def whereis(id) do
-    Process.whereis(agent_name(id))
+  def start_link({server_pid, opts}) do
+    Agent.start_link(fn -> init(opts) end)
   end
 
   def get(pid, key) do
@@ -31,15 +27,6 @@ defmodule PhoenixSocketClient.SocketState do
     Agent.get_and_update(pid, fn state ->
       to_send = state.to_send_r |> Enum.reverse()
       {to_send, %{state | to_send_r: []}}
-    end)
-  end
-
-  def push_message(pid, message) do
-    Agent.get_and_update(pid, fn state ->
-      ref = state.ref + 1
-      push = %{message | ref: to_string(ref)}
-      state = %{state | ref: ref, to_send_r: [push | state.to_send_r]}
-      {push, state}
     end)
   end
 
@@ -96,9 +83,5 @@ defmodule PhoenixSocketClient.SocketState do
       to_send_r: [],
       ref: 0
     }
-  end
-
-  defp agent_name(id) do
-    Module.concat(__MODULE__, id)
   end
 end

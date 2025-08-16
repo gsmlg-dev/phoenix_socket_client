@@ -7,31 +7,45 @@ defmodule PhoenixSocketClient do
   alias PhoenixSocketClient.Socket
 
   def start_link(opts) do
-    Supervisor.start_link(__MODULE__, opts, name: __MODULE__)
+    Supervisor.start_link(__MODULE__, opts)
   end
 
   @impl true
   def init(opts) do
+    server_pid = self()
+
     children = [
-      {PhoenixSocketClient.SocketState, opts},
-      {Socket, opts},
-      {ChannelManager, []}
+      {PhoenixSocketClient.SocketState, {server_pid, opts}}
+      |> Supervisor.child_spec(id: :socket_state),
+      {PhoenixSocketClient.Socket, {server_pid, opts}}
+      |> Supervisor.child_spec(id: :socket),
+      {PhoenixSocketClient.ChannelManager, {server_pid, opts}}
+      |> Supervisor.child_spec(id: :channel_manager)
     ]
 
     Supervisor.init(children, strategy: :one_for_one)
   end
 
-  @doc """
-  Starts a new socket connection.
-  """
-  def start_socket(supervisor, opts) do
-    id = Keyword.fetch!(opts, :id)
+  def get_process_pid(supervisor, name) do
+    try do
+      case Process.alive?(supervisor) do
+        false ->
+          nil
 
-    spec = %{
-      id: id,
-      start: {Socket, :start_link, [opts, [name: id]]}
-    }
+        true ->
+          supervisor
+          |> Supervisor.which_children()
+          |> Enum.find_value(fn
+            {process_name, process_pid, _, _} when is_pid(process_pid) and process_name == name ->
+              process_pid
 
-    Supervisor.start_child(supervisor, spec)
+            _ ->
+              nil
+          end)
+      end
+    rescue
+      ArgumentError -> nil
+      _ -> nil
+    end
   end
 end

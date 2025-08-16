@@ -6,8 +6,8 @@ defmodule PhoenixSocketClient.Socket do
   alias PhoenixSocketClient.SocketState
   alias PhoenixSocketClient.ChannelManager
 
-  def start_link(opts) do
-    GenServer.start_link(__MODULE__, opts, name: connection_name(opts[:id]))
+  def start_link({server_pid, opts}) do
+    GenServer.start_link(__MODULE__, {server_pid, opts})
   end
 
   def whereis(id) do
@@ -15,16 +15,16 @@ defmodule PhoenixSocketClient.Socket do
   end
 
   @impl true
-  def init(opts) do
+  def init({server_pid, opts}) do
     Logger.debug("Connection init: #{inspect(opts)}")
     send(self(), :connect)
-    {:ok, %{id: opts[:id]}}
+    {:ok, %{server_pid: server_pid}}
   end
 
   @impl true
-  def handle_info(:connect, state) do
+  def handle_info(:connect, %{server_pid: server_pid} = state) do
     Logger.debug("Connection: connecting")
-    state_pid = SocketState.whereis(state.id)
+    state_pid = PhoenixSocketClient.get_process_pid(server_pid, :socket_state)
     transport = SocketState.get(state_pid, :transport)
     url = SocketState.get(state_pid, :url)
     transport_opts = SocketState.get(state_pid, :transport_opts) |> Keyword.put(:sender, self())
