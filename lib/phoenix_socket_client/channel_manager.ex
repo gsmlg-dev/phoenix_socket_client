@@ -3,12 +3,19 @@ defmodule PhoenixSocketClient.ChannelManager do
 
   alias PhoenixSocketClient.Channel
 
-  def start_link(opts) do
-    DynamicSupervisor.start_link(__MODULE__, opts, name: supervisor_name(opts[:id]))
+  def start_link({_server_pid, opts}) do
+    DynamicSupervisor.start_link(__MODULE__, opts)
   end
 
-  def whereis(id) do
-    Process.whereis(supervisor_name(id))
+  def whereis(id) when is_atom(id) do
+    case Process.whereis(id) do
+      nil -> nil
+      server_pid -> PhoenixSocketClient.get_process_pid(server_pid, :channel_manager)
+    end
+  end
+
+  def whereis(server_pid) when is_pid(server_pid) do
+    PhoenixSocketClient.get_process_pid(server_pid, :channel_manager)
   end
 
   def start_channel(pid, socket, topic, params) do
@@ -31,7 +38,4 @@ defmodule PhoenixSocketClient.ChannelManager do
     DynamicSupervisor.init(strategy: :one_for_one)
   end
 
-  defp supervisor_name(id) do
-    Module.concat(__MODULE__, id)
-  end
 end

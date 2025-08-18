@@ -162,8 +162,7 @@ defmodule PhoenixSocketClientTest do
     name = :"socket_#{System.unique_integer([:positive])}"
 
     {:ok, _pid} =
-      PhoenixSocketClient.start_socket(
-        PhoenixSocketClient,
+      PhoenixSocketClient.start_link(
         Keyword.put(@socket_config, :id, name)
       )
 
@@ -175,8 +174,7 @@ defmodule PhoenixSocketClientTest do
     name = :"socket_#{System.unique_integer([:positive])}"
 
     {:ok, _pid} =
-      PhoenixSocketClient.start_socket(
-        PhoenixSocketClient,
+      PhoenixSocketClient.start_link(
         Keyword.put(@socket_config, :id, name)
       )
 
@@ -189,8 +187,7 @@ defmodule PhoenixSocketClientTest do
     name = :"socket_#{System.unique_integer([:positive])}"
 
     {:ok, _pid} =
-      PhoenixSocketClient.start_socket(
-        PhoenixSocketClient,
+      PhoenixSocketClient.start_link(
         Keyword.put(@socket_config, :id, name)
       )
 
@@ -207,8 +204,7 @@ defmodule PhoenixSocketClientTest do
     name = :"socket_#{System.unique_integer([:positive])}"
 
     {:ok, _pid} =
-      PhoenixSocketClient.start_socket(
-        PhoenixSocketClient,
+      PhoenixSocketClient.start_link(
         Keyword.put(@socket_config, :id, name)
       )
 
@@ -222,8 +218,7 @@ defmodule PhoenixSocketClientTest do
     name = :"socket_#{System.unique_integer([:positive])}"
 
     {:ok, _pid} =
-      PhoenixSocketClient.start_socket(
-        PhoenixSocketClient,
+      PhoenixSocketClient.start_link(
         Keyword.put(@socket_config, :id, name)
       )
 
@@ -236,8 +231,7 @@ defmodule PhoenixSocketClientTest do
     name = :"socket_#{System.unique_integer([:positive])}"
 
     {:ok, _pid} =
-      PhoenixSocketClient.start_socket(
-        PhoenixSocketClient,
+      PhoenixSocketClient.start_link(
         Keyword.put(@socket_config, :id, name)
       )
 
@@ -250,8 +244,7 @@ defmodule PhoenixSocketClientTest do
     name = :"socket_#{System.unique_integer([:positive])}"
 
     {:ok, _pid} =
-      PhoenixSocketClient.start_socket(
-        PhoenixSocketClient,
+      PhoenixSocketClient.start_link(
         Keyword.put(@socket_config, :id, name)
       )
 
@@ -263,8 +256,7 @@ defmodule PhoenixSocketClientTest do
     name = :"socket_#{System.unique_integer([:positive])}"
 
     {:ok, _pid} =
-      PhoenixSocketClient.start_socket(
-        PhoenixSocketClient,
+      PhoenixSocketClient.start_link(
         Keyword.put(@socket_config, :id, name)
       )
 
@@ -277,8 +269,7 @@ defmodule PhoenixSocketClientTest do
     name = :"socket_#{System.unique_integer([:positive])}"
 
     {:ok, _pid} =
-      PhoenixSocketClient.start_socket(
-        PhoenixSocketClient,
+      PhoenixSocketClient.start_link(
         Keyword.put(@socket_config, :id, name)
       )
 
@@ -296,7 +287,7 @@ defmodule PhoenixSocketClientTest do
       |> Keyword.put(:params, %{"reject" => true})
       |> Keyword.put(:caller, self())
 
-    {:ok, _pid} = PhoenixSocketClient.start_socket(PhoenixSocketClient, opts)
+    {:ok, _pid} = PhoenixSocketClient.start_link(opts)
     :timer.sleep(100)
     refute Socket.connected?(name)
   end
@@ -311,7 +302,7 @@ defmodule PhoenixSocketClientTest do
       id: name
     ]
 
-    {:ok, _pid} = PhoenixSocketClient.start_socket(PhoenixSocketClient, opts)
+    {:ok, _pid} = PhoenixSocketClient.start_link(opts)
     :timer.sleep(100)
     refute Socket.connected?(name)
   end
@@ -324,7 +315,7 @@ defmodule PhoenixSocketClientTest do
       |> Keyword.put(:id, name)
       |> Keyword.put(:headers, [{"x-extra", "value"}])
 
-    {:ok, _pid} = PhoenixSocketClient.start_socket(PhoenixSocketClient, config)
+    {:ok, _pid} = PhoenixSocketClient.start_link(config)
     wait_for_socket(name)
     {:ok, headers, _channel} = Channel.join(name, "rooms:headers")
     assert %{"x-extra" => "value"} = headers
@@ -340,8 +331,6 @@ defmodule PhoenixSocketClientTest do
       wait_for_socket(socket_name, retries - 1)
     end
   end
-
-  defp socket_config(), do: @socket_config
 
   defp start_endpoint() do
     self = self()

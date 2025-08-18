@@ -10,8 +10,12 @@ defmodule PhoenixSocketClient.Socket do
     GenServer.start_link(__MODULE__, {server_pid, opts})
   end
 
-  def whereis(id) do
-    Process.whereis(connection_name(id))
+  def whereis(id) when is_atom(id) do
+    Process.whereis(id)
+  end
+
+  def whereis(server_pid) when is_pid(server_pid) do
+    server_pid
   end
 
   @impl true
@@ -28,6 +32,8 @@ defmodule PhoenixSocketClient.Socket do
     transport = SocketState.get(state_pid, :transport)
     url = SocketState.get(state_pid, :url)
     transport_opts = SocketState.get(state_pid, :transport_opts) |> Keyword.put(:sender, self())
+    
+    Logger.debug("Connection: opening URL #{url} with opts #{inspect(transport_opts)}")
 
     case transport.open(url, transport_opts) do
       {:ok, transport_pid} ->
@@ -44,7 +50,7 @@ defmodule PhoenixSocketClient.Socket do
   @impl true
   def handle_info({:connected, transport_pid}, state) do
     Logger.debug("Connection: connected #{inspect(transport_pid)}")
-    state_pid = SocketState.whereis(state.id)
+    state_pid = SocketState.whereis(state.server_pid)
     current_transport_pid = SocketState.get(state_pid, :transport_pid)
 
     if transport_pid == current_transport_pid do
@@ -57,7 +63,7 @@ defmodule PhoenixSocketClient.Socket do
   @impl true
   def handle_info({:disconnected, reason, transport_pid}, state) do
     Logger.debug("Connection: disconnected #{inspect(reason)}")
-    state_pid = SocketState.whereis(state.id)
+    state_pid = SocketState.whereis(state.server_pid)
     current_transport_pid = SocketState.get(state_pid, :transport_pid)
 
     if transport_pid == current_transport_pid do
@@ -86,7 +92,7 @@ defmodule PhoenixSocketClient.Socket do
   @impl true
   def handle_info({:closed, reason, transport_pid}, state) do
     Logger.debug("Connection: closed #{inspect(reason)}")
-    state_pid = SocketState.whereis(state.id)
+    state_pid = SocketState.whereis(state.server_pid)
     current_transport_pid = SocketState.get(state_pid, :transport_pid)
 
     if transport_pid == current_transport_pid do
@@ -97,12 +103,12 @@ defmodule PhoenixSocketClient.Socket do
   end
 
   defp transport_receive(message, state) do
-    state_pid = SocketState.whereis(state.id)
+    state_pid = SocketState.whereis(state.server_pid)
     serializer = SocketState.get(state_pid, :serializer)
     json_library = SocketState.get(state_pid, :json_library)
     decoded = Message.decode!(serializer, message, json_library)
 
-    channels_pid = ChannelManager.whereis(state.id)
+    channels_pid = ChannelManager.whereis(state.server_pid)
     children = Supervisor.which_children(channels_pid)
 
     case find_channel(children, decoded.topic) do
@@ -118,7 +124,7 @@ defmodule PhoenixSocketClient.Socket do
   end
 
   defp transport_send(message, state) do
-    state_pid = SocketState.whereis(state.id)
+    state_pid = SocketState.whereis(state.server_pid)
     transport_pid = SocketState.get(state_pid, :transport_pid)
     serializer = SocketState.get(state_pid, :serializer)
     json_library = SocketState.get(state_pid, :json_library)
@@ -127,7 +133,7 @@ defmodule PhoenixSocketClient.Socket do
 
   defp close(reason, state) do
     Logger.debug("Connection: closing connection, reason: #{inspect(reason)}")
-    state_pid = SocketState.whereis(state.id)
+    state_pid = SocketState.whereis(state.server_pid)
     SocketState.put(state_pid, :status, :disconnected)
     reconnect = SocketState.get(state_pid, :reconnect)
 
@@ -140,7 +146,44 @@ defmodule PhoenixSocketClient.Socket do
     state
   end
 
-  defp connection_name(id) do
-    Module.concat(__MODULE__, id)
+
+  def connected?(socket_name) do
+    socket_pid = whereis(socket_name)
+    if socket_pid do
+      state_pid = SocketState.whereis(socket_name)
+      SocketState.connected(state_pid)
+    else
+      false
+    end
+  end
+
+  def channel_join(socket_name, topic, params) do
+    channel_manager_pid = ChannelManager.whereis(socket_name)
+    if channel_manager_pid do
+      ChannelManager.start_channel(channel_manager_pid, socket_name, topic, params)
+    else
+      {:error, :socket_not_found}
+    end
+  end
+
+  def channel_leave(socket_name, channel_pid) do
+    channel_manager_pid = ChannelManager.whereis(socket_name)
+    if channel_manager_pid do
+      ChannelManager.terminate_channel(channel_manager_pid, channel_pid)
+    else
+      {:error, :socket_not_found}
+    end
+  end
+
+  def push(socket_name, message) do
+    state_pid = SocketState.whereis(socket_name)
+    if state_pid do
+      SocketState.put(state_pid, :to_send_r, [message | SocketState.get(state_pid, :to_send_r)])
+      socket_pid = whereis(socket_name)
+      if socket_pid, do: send(socket_pid, :flush)
+      message
+    else
+      {:error, :socket_not_found}
+    end
   end
 end

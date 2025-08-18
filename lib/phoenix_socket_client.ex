@@ -4,10 +4,15 @@ defmodule PhoenixSocketClient do
   """
   use Supervisor
 
-  alias PhoenixSocketClient.Socket
 
   def start_link(opts) do
-    Supervisor.start_link(__MODULE__, opts)
+    opts = Map.new(opts)
+    name = Map.get(opts, :name)
+    if is_nil(name) do
+      Supervisor.start_link(__MODULE__, opts)
+    else
+      Supervisor.start_link(__MODULE__, opts, name: name)
+    end
   end
 
   @impl true
@@ -26,14 +31,14 @@ defmodule PhoenixSocketClient do
     Supervisor.init(children, strategy: :one_for_one)
   end
 
-  def get_process_pid(supervisor, name) do
+  def get_process_pid(supervisor_pid, name) do
     try do
-      case Process.alive?(supervisor) do
+      case Process.alive?(supervisor_pid) do
         false ->
           nil
 
         true ->
-          supervisor
+          supervisor_pid
           |> Supervisor.which_children()
           |> Enum.find_value(fn
             {process_name, process_pid, _, _} when is_pid(process_pid) and process_name == name ->
@@ -47,5 +52,10 @@ defmodule PhoenixSocketClient do
       ArgumentError -> nil
       _ -> nil
     end
+  end
+
+  def get(pid, key) do
+    state_pid = get_process_pid(pid, :socket_state)
+    PhoenixSocketClient.SocketState.get(state_pid, key)
   end
 end
