@@ -8,6 +8,7 @@ defmodule PhoenixSocketClient.Message do
 
   def serializer("1.0.0"), do: __MODULE__.V1
   def serializer("2.0.0"), do: __MODULE__.V2
+  def serializer(_), do: __MODULE__.V2
 
   def decode!(serializer, msg, json_library) do
     json_library.decode!(msg)
@@ -20,17 +21,28 @@ defmodule PhoenixSocketClient.Message do
   end
 
   def join(topic, params) do
+    ref = generate_ref()
+
     %__MODULE__{
       topic: topic,
       event: "phx_join",
-      payload: params
+      payload: params,
+      ref: ref,
+      join_ref: ref
     }
   end
 
   def leave(topic) do
     %__MODULE__{
       topic: topic,
-      event: "phx_leave"
+      event: "phx_leave",
+      payload: %{},
+      ref: generate_ref(),
+      join_ref: nil
     }
+  end
+
+  def generate_ref do
+    Integer.to_string(System.unique_integer([:positive]))
   end
 end

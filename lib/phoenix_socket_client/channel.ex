@@ -1,7 +1,7 @@
 defmodule PhoenixSocketClient.Channel do
   use GenServer
 
-  alias PhoenixSocketClient.{Socket, Message}
+  alias PhoenixSocketClient.{Socket, Message, Telemetry}
 
   @timeout 5_000
 
@@ -90,31 +90,51 @@ defmodule PhoenixSocketClient.Channel do
   @impl true
   def handle_call(
         :join,
-        {pid, _ref} = from,
+        {_pid, _ref} = from,
         %{socket: socket, topic: topic, params: params} = state
       ) do
     message = Message.join(topic, params)
-    push = Socket.push(socket, message)
 
-    {:noreply, %{state | join_ref: push.ref, caller: pid, pushes: [{from, push} | state.pushes]}}
+    # Find the actual socket process
+    socket_pid = PhoenixSocketClient.Socket.resolve_socket_pid(socket)
+
+    case socket_pid do
+      nil ->
+        {:reply, {:error, :socket_not_found}, state}
+
+      pid ->
+        push = Socket.push(pid, message)
+        Telemetry.channel_joined(self(), topic, nil, %{}, %{params: params})
+
+        {:noreply,
+         %{
+           state
+           | join_ref: push.ref,
+             caller: elem(from, 0),
+             pushes: [{from, push} | state.pushes]
+         }}
+    end
   end
 
   @impl true
-  def handle_call(:leave, _from, %{socket: socket, topic: _topic} = state) do
+  def handle_call(:leave, _from, %{socket: socket, topic: topic} = state) do
     Socket.channel_leave(socket, self())
-    {:reply, :ok, state}
+    Telemetry.channel_left(self(), topic, :leave)
+    {:stop, :normal, :ok, state}
   end
 
   @impl true
   def handle_call({:push, event, payload}, from, %{socket: socket, topic: topic} = state) do
-    push =
-      Socket.push(socket, %Message{
-        topic: topic,
-        event: event,
-        payload: payload,
-        join_ref: state.join_ref
-      })
+    message = %Message{
+      topic: topic,
+      event: event,
+      payload: payload,
+      ref: Message.generate_ref(),
+      join_ref: state.join_ref
+    }
 
+    push = Socket.push(socket, message)
+    Telemetry.message_sent(self(), topic, event, payload)
     {:noreply, %{state | pushes: [{from, push} | state.pushes]}}
   end
 
@@ -129,19 +149,35 @@ defmodule PhoenixSocketClient.Channel do
     }
 
     Socket.push(socket, message)
+    Telemetry.message_sent(self(), topic, event, payload)
     {:noreply, state}
   end
 
   @impl true
-  def handle_info(%Message{event: "phx_reply", ref: ref} = msg, %{pushes: pushes} = s) do
+  def handle_info(
+        %Message{event: "phx_reply", ref: ref} = msg,
+        %{pushes: pushes, topic: topic} = s
+      ) do
     pushes =
       case Enum.split_with(pushes, &(elem(&1, 1).ref == ref)) do
         {[{from_ref, _push}], pushes} ->
           %{"status" => status, "response" => response} = msg.payload
+
+          case status do
+            "ok" ->
+              Telemetry.message_received(self(), topic, "phx_reply", msg.payload)
+
+            "error" ->
+              Telemetry.message_received(self(), topic, "phx_reply", msg.payload)
+
+            _ ->
+              :noop
+          end
+
           GenServer.reply(from_ref, {String.to_atom(status), response})
           pushes
 
-        {_, pushes} ->
+        {[], pushes} ->
           send(s.caller, %{msg | channel_pid: s.caller, topic: s.topic})
           pushes
       end
@@ -151,6 +187,7 @@ defmodule PhoenixSocketClient.Channel do
 
   @impl true
   def handle_info(%Message{} = message, %{caller: pid, topic: topic} = state) do
+    Telemetry.message_received(self(), topic, message.event, message.payload)
     send(pid, %{message | channel_pid: pid, topic: topic})
     {:noreply, state}
   end
@@ -163,12 +200,20 @@ defmodule PhoenixSocketClient.Channel do
           {:ok, reply, pid}
 
         error ->
-          stop(pid)
+          GenServer.stop(pid)
           error
       end
     catch
+      :exit, {:timeout, _} ->
+        GenServer.stop(pid, :normal)
+        {:error, :timeout}
+
+      :exit, {:noproc, _} ->
+        GenServer.stop(pid, :normal)
+        {:error, :noproc}
+
       :exit, reason ->
-        stop(pid)
+        GenServer.stop(pid, :normal)
         {:error, exit_reason(reason)}
     end
   end

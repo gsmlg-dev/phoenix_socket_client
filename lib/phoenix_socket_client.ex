@@ -4,10 +4,10 @@ defmodule PhoenixSocketClient do
   """
   use Supervisor
 
-
   def start_link(opts) do
     opts = Map.new(opts)
     name = Map.get(opts, :name)
+
     if is_nil(name) do
       Supervisor.start_link(__MODULE__, opts)
     else
@@ -17,14 +17,10 @@ defmodule PhoenixSocketClient do
 
   @impl true
   def init(opts) do
-    server_pid = self()
-
     children = [
-      {PhoenixSocketClient.SocketState, {server_pid, opts}}
-      |> Supervisor.child_spec(id: :socket_state),
-      {PhoenixSocketClient.Socket, {server_pid, opts}}
+      {PhoenixSocketClient.Socket, opts}
       |> Supervisor.child_spec(id: :socket),
-      {PhoenixSocketClient.ChannelManager, {server_pid, opts}}
+      {PhoenixSocketClient.ChannelManager, opts}
       |> Supervisor.child_spec(id: :channel_manager)
     ]
 

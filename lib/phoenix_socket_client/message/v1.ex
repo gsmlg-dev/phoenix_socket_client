@@ -11,7 +11,15 @@ defmodule PhoenixSocketClient.Message.V1 do
   end
 
   def encode!(%Message{} = msg) do
-    msg
-    |> Map.take([:topic, :event, :payload, :ref])
+    result =
+      msg
+      |> Map.take([:topic, :event, :payload, :ref])
+
+    # Add join_ref if it's a join message
+    if msg.event == "phx_join" do
+      Map.put(result, :join_ref, msg.ref)
+    else
+      result
+    end
   end
 end

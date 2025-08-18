@@ -4,11 +4,14 @@ defmodule PhoenixSocketClient.Transports.Websocket do
   require Logger
 
   def open(url, transport_opts) do
+    headers = Keyword.get(transport_opts, :headers, [])
+    headers = Enum.map(headers, fn {k, v} -> {to_charlist(k), to_charlist(v)} end)
+
     :websocket_client.start_link(
       String.to_charlist(url),
       __MODULE__,
       transport_opts,
-      transport_opts
+      extra_headers: headers
     )
   end
 

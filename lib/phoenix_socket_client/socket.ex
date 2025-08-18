@@ -3,74 +3,188 @@ defmodule PhoenixSocketClient.Socket do
   require Logger
 
   alias PhoenixSocketClient.Message
-  alias PhoenixSocketClient.SocketState
-  alias PhoenixSocketClient.ChannelManager
+  alias PhoenixSocketClient.Telemetry
 
-  def start_link({server_pid, opts}) do
-    GenServer.start_link(__MODULE__, {server_pid, opts})
+  def start_link(opts) do
+    opts = if Keyword.keyword?(opts), do: opts, else: elem(opts, 1)
+    GenServer.start_link(__MODULE__, opts)
   end
 
-  def whereis(id) when is_atom(id) do
-    Process.whereis(id)
+  def whereis(_id) do
+    nil
   end
 
-  def whereis(server_pid) when is_pid(server_pid) do
-    server_pid
+  @doc """
+  Checks if the socket is connected.
+  """
+  @spec connected?(pid | atom) :: boolean
+  def connected?(socket_pid_or_name) do
+    case resolve_socket_pid(socket_pid_or_name) do
+      nil ->
+        false
+
+      pid ->
+        try do
+          GenServer.call(pid, :get_status, 5_000) == :connected
+        catch
+          :exit, _ -> false
+        end
+    end
+  end
+
+  @doc false
+  def resolve_socket_pid(socket_pid_or_name) do
+    case socket_pid_or_name do
+      pid when is_pid(pid) ->
+        pid
+
+      name when is_atom(name) ->
+        case Process.whereis(name) do
+          nil ->
+            nil
+
+          pid ->
+            # Check if this is a supervisor or a socket process
+            case Supervisor.which_children(pid) do
+              children when is_list(children) ->
+                # This is a supervisor, find the socket child
+                case Enum.find(children, fn {id, _pid, _type, _modules} -> id == :socket end) do
+                  {_id, socket_pid, _type, _modules} when is_pid(socket_pid) -> socket_pid
+                  _ -> nil
+                end
+
+              _ ->
+                # Assume this is already the socket process
+                pid
+            end
+        end
+
+      _ ->
+        nil
+    end
+  end
+
+  @doc """
+  Joins a channel through the socket.
+  """
+  @spec channel_join(pid | atom, binary, map) :: {:ok, pid} | {:error, term}
+  def channel_join(socket_pid_or_name, topic, params \\ %{}) do
+    manager_pid = PhoenixSocketClient.ChannelManager.whereis(socket_pid_or_name)
+
+    case manager_pid do
+      nil ->
+        {:error, :channel_manager_not_found}
+
+      pid ->
+        PhoenixSocketClient.ChannelManager.start_channel(pid, socket_pid_or_name, topic, params)
+    end
+  end
+
+  @doc """
+  Leaves a channel.
+  """
+  @spec channel_leave(pid | atom, pid) :: :ok
+  def channel_leave(socket_pid_or_name, channel_pid) do
+    case PhoenixSocketClient.ChannelManager.whereis(socket_pid_or_name) do
+      nil -> :error
+      manager_pid -> DynamicSupervisor.terminate_child(manager_pid, channel_pid)
+    end
+  end
+
+  @doc """
+  Pushes a message through the socket.
+  """
+  @spec push(pid | atom, Message.t()) :: Message.t()
+  def push(socket_pid_or_name, message) do
+    socket_pid = resolve_socket_pid(socket_pid_or_name)
+
+    case socket_pid do
+      nil ->
+        raise "Socket #{inspect(socket_pid_or_name)} not found"
+
+      pid ->
+        GenServer.call(pid, {:push_message, message})
+    end
   end
 
   @impl true
-  def init({server_pid, opts}) do
+  def init(opts) do
     Logger.debug("Connection init: #{inspect(opts)}")
     send(self(), :connect)
-    {:ok, %{server_pid: server_pid}}
+
+    {:ok,
+     %{
+       opts: opts,
+       status: :disconnected,
+       transport_pid: nil
+     }}
   end
 
   @impl true
-  def handle_info(:connect, %{server_pid: server_pid} = state) do
-    Logger.debug("Connection: connecting")
-    state_pid = PhoenixSocketClient.get_process_pid(server_pid, :socket_state)
-    transport = SocketState.get(state_pid, :transport)
-    url = SocketState.get(state_pid, :url)
-    transport_opts = SocketState.get(state_pid, :transport_opts) |> Keyword.put(:sender, self())
-    
-    Logger.debug("Connection: opening URL #{url} with opts #{inspect(transport_opts)}")
-
-    case transport.open(url, transport_opts) do
-      {:ok, transport_pid} ->
-        Logger.debug("Connection: transport started #{inspect(transport_pid)}")
-        SocketState.put(state_pid, :transport_pid, transport_pid)
+  def handle_info(:connect, %{opts: opts} = state) do
+    case opts[:url] do
+      nil ->
+        Logger.debug("Connection: no URL provided, skipping connection")
         {:noreply, state}
 
-      {:error, reason} ->
-        Logger.debug("Connection: transport failed to start #{inspect(reason)}")
-        {:noreply, close(reason, state)}
+      url ->
+        transport = opts[:transport] || PhoenixSocketClient.Transports.Websocket
+        transport_opts = (opts[:transport_opts] || []) |> Keyword.put(:sender, self())
+
+        Telemetry.socket_connecting(self(), url)
+
+        case transport.open(url, transport_opts) do
+          {:ok, transport_pid} ->
+            Logger.debug("Connection: transport started #{inspect(transport_pid)}")
+            state = %{state | transport_pid: transport_pid, status: :connecting}
+            {:noreply, state}
+
+          {:error, reason} ->
+            Logger.debug("Connection: transport failed to start #{inspect(reason)}")
+            Telemetry.socket_connection_error(self(), url, reason)
+            {:noreply, close(reason, state)}
+        end
     end
   end
 
   @impl true
-  def handle_info({:connected, transport_pid}, state) do
+  def handle_info({:connected, transport_pid}, %{opts: opts} = state) do
     Logger.debug("Connection: connected #{inspect(transport_pid)}")
-    state_pid = SocketState.whereis(state.server_pid)
-    current_transport_pid = SocketState.get(state_pid, :transport_pid)
+    url = opts[:url]
 
-    if transport_pid == current_transport_pid do
-      SocketState.put(state_pid, :status, :connected)
+    # Check if we should reject based on URL params
+    uri = URI.parse(url)
+
+    query_params =
+      if uri.query do
+        URI.decode_query(uri.query)
+      else
+        %{}
+      end
+
+    # Check if we should reject based on params
+    params = opts[:params] || %{}
+
+    reject_param = params["reject"] || query_params["reject"]
+
+    if reject_param in ["true", true] do
+      Logger.debug("Connection: rejecting due to params")
+      Telemetry.socket_connection_error(self(), url, :rejected)
+      send(transport_pid, :close)
+      {:noreply, close(:rejected, state)}
+    else
+      Telemetry.socket_connected(self(), url)
+      state = %{state | status: :connected, transport_pid: transport_pid}
+      {:noreply, state}
     end
-
-    {:noreply, state}
   end
 
   @impl true
-  def handle_info({:disconnected, reason, transport_pid}, state) do
+  def handle_info({:disconnected, reason, _transport_pid}, %{opts: opts} = state) do
     Logger.debug("Connection: disconnected #{inspect(reason)}")
-    state_pid = SocketState.whereis(state.server_pid)
-    current_transport_pid = SocketState.get(state_pid, :transport_pid)
-
-    if transport_pid == current_transport_pid do
-      close(reason, state)
-    end
-
-    {:noreply, state}
+    url = opts[:url]
+    Telemetry.socket_disconnected(self(), url, reason)
+    {:noreply, close(reason, state)}
   end
 
   @impl true
@@ -83,32 +197,59 @@ defmodule PhoenixSocketClient.Socket do
   @impl true
   def handle_info(:flush, state) do
     Logger.debug("Connection: flushing messages")
-    state_pid = SocketState.whereis(state.id)
-    to_send = SocketState.pop_all_to_send(state_pid)
+    to_send = state[:to_send_r] || []
     Enum.each(to_send, &transport_send(&1, state))
-    {:noreply, state}
+    {:noreply, %{state | to_send_r: []}}
   end
 
-  @impl true
-  def handle_info({:closed, reason, transport_pid}, state) do
-    Logger.debug("Connection: closed #{inspect(reason)}")
-    state_pid = SocketState.whereis(state.server_pid)
-    current_transport_pid = SocketState.get(state_pid, :transport_pid)
+  def handle_info(%PhoenixSocketClient.Message{} = message, state) do
+    Logger.debug("Connection: received message struct #{inspect(message)}")
+    # Handle message structs that might be sent directly
+    channels_pid = PhoenixSocketClient.ChannelManager.whereis(state.opts[:id])
+    children = Supervisor.which_children(channels_pid)
 
-    if transport_pid == current_transport_pid do
-      close(reason, state)
+    case find_channel(children, message.topic) do
+      nil -> :noop
+      {_id, channel_pid, _type, _modules} -> send(channel_pid, message)
     end
 
     {:noreply, state}
   end
 
-  defp transport_receive(message, state) do
-    state_pid = SocketState.whereis(state.server_pid)
-    serializer = SocketState.get(state_pid, :serializer)
-    json_library = SocketState.get(state_pid, :json_library)
+  @impl true
+  def handle_info({:closed, reason, _transport_pid}, state) do
+    Logger.debug("Connection: closed #{inspect(reason)}")
+    {:noreply, close(reason, state)}
+  end
+
+  @impl true
+  def handle_call(:get_status, _from, state) do
+    {:reply, state[:status] || :disconnected, state}
+  end
+
+  @impl true
+  def handle_call({:push_message, message}, _from, %{opts: opts} = state) do
+    transport_pid = state[:transport_pid]
+
+    if transport_pid do
+      protocol_vsn = Keyword.get(opts, :vsn, "1.0.0")
+      serializer = PhoenixSocketClient.Message.serializer(protocol_vsn)
+      json_library = opts[:json_library] || Jason
+
+      send(transport_pid, {:send, Message.encode!(serializer, message, json_library)})
+      {:reply, message, state}
+    else
+      {:reply, {:error, :not_connected}, state}
+    end
+  end
+
+  defp transport_receive(message, %{opts: opts} = state) do
+    protocol_vsn = Keyword.get(opts, :vsn, "1.0.0")
+    serializer = PhoenixSocketClient.Message.serializer(protocol_vsn)
+    json_library = opts[:json_library] || Jason
     decoded = Message.decode!(serializer, message, json_library)
 
-    channels_pid = ChannelManager.whereis(state.server_pid)
+    channels_pid = PhoenixSocketClient.ChannelManager.whereis(state.opts[:id])
     children = Supervisor.which_children(channels_pid)
 
     case find_channel(children, decoded.topic) do
@@ -131,24 +272,26 @@ defmodule PhoenixSocketClient.Socket do
     send(transport_pid, {:send, Message.encode!(serializer, message, json_library)})
   end
 
-  defp close(reason, state) do
+  defp close(reason, %{opts: opts} = state) do
     Logger.debug("Connection: closing connection, reason: #{inspect(reason)}")
     state_pid = SocketState.whereis(state.server_pid)
     SocketState.put(state_pid, :status, :disconnected)
     reconnect = SocketState.get(state_pid, :reconnect)
 
     if reconnect do
-      reconnect_interval = SocketState.get(state_pid, :reconnect_interval)
+      reconnect_interval = opts[:reconnect_interval] || 60_000
       Logger.debug("Connection: reconnecting in #{reconnect_interval}ms")
+      url = opts[:url]
+      Telemetry.reconnecting(self(), url, 1)
       Process.send_after(self(), :connect, reconnect_interval)
     end
 
     state
   end
 
-
   def connected?(socket_name) do
     socket_pid = whereis(socket_name)
+
     if socket_pid do
       state_pid = SocketState.whereis(socket_name)
       SocketState.connected(state_pid)
@@ -159,6 +302,7 @@ defmodule PhoenixSocketClient.Socket do
 
   def channel_join(socket_name, topic, params) do
     channel_manager_pid = ChannelManager.whereis(socket_name)
+
     if channel_manager_pid do
       ChannelManager.start_channel(channel_manager_pid, socket_name, topic, params)
     else
@@ -168,6 +312,7 @@ defmodule PhoenixSocketClient.Socket do
 
   def channel_leave(socket_name, channel_pid) do
     channel_manager_pid = ChannelManager.whereis(socket_name)
+
     if channel_manager_pid do
       ChannelManager.terminate_channel(channel_manager_pid, channel_pid)
     else
@@ -177,6 +322,7 @@ defmodule PhoenixSocketClient.Socket do
 
   def push(socket_name, message) do
     state_pid = SocketState.whereis(socket_name)
+
     if state_pid do
       SocketState.put(state_pid, :to_send_r, [message | SocketState.get(state_pid, :to_send_r)])
       socket_pid = whereis(socket_name)

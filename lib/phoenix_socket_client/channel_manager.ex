@@ -14,10 +14,6 @@ defmodule PhoenixSocketClient.ChannelManager do
     end
   end
 
-  def whereis(server_pid) when is_pid(server_pid) do
-    PhoenixSocketClient.get_process_pid(server_pid, :channel_manager)
-  end
-
   def start_channel(pid, socket, topic, params) do
     spec = %{
       id: topic,
@@ -25,8 +21,11 @@ defmodule PhoenixSocketClient.ChannelManager do
     }
 
     case DynamicSupervisor.start_child(pid, spec) do
-      {:error, {:already_started, _}} -> {:error, {:already_started, pid}}
-      result -> result
+      {:ok, channel_pid} -> {:ok, channel_pid}
+      {:error, {:already_started, channel_pid}} -> {:error, {:already_started, channel_pid}}
+      {:error, {:already_started, _, channel_pid}} -> {:error, {:already_started, channel_pid}}
+      {:error, {:already_registered, channel_pid}} -> {:error, {:already_started, channel_pid}}
+      error -> error
     end
   end
 
@@ -37,5 +36,4 @@ defmodule PhoenixSocketClient.ChannelManager do
   def init(_opts) do
     DynamicSupervisor.init(strategy: :one_for_one)
   end
-
 end

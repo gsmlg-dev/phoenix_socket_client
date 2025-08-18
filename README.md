@@ -82,3 +82,57 @@ The client uses a supervisor tree with separate processes for:
 - State management
 
 All processes are properly supervised with automatic restart strategies.
+
+## Telemetry
+
+The library includes comprehensive telemetry events for monitoring and debugging:
+
+### Socket Events
+- `[:phoenix_socket_client, :socket, :connecting]` - Connection attempt started
+- `[:phoenix_socket_client, :socket, :connected]` - Connection established
+- `[:phoenix_socket_client, :socket, :disconnected]` - Connection lost
+- `[:phoenix_socket_client, :socket, :connection_error]` - Connection failed
+- `[:phoenix_socket_client, :socket, :reconnecting]` - Reconnection attempt
+- `[:phoenix_socket_client, :socket, :heartbeat]` - Heartbeat sent
+
+### Channel Events
+- `[:phoenix_socket_client, :channel, :joined]` - Successfully joined channel
+- `[:phoenix_socket_client, :channel, :join_error]` - Failed to join channel
+- `[:phoenix_socket_client, :channel, :left]` - Left channel
+
+### Message Events
+- `[:phoenix_socket_client, :message, :sent]` - Message sent to server
+- `[:phoenix_socket_client, :message, :received]` - Message received from server
+
+### Example Usage
+
+```elixir
+# Attach a telemetry handler
+:telemetry.attach_many(
+  "my-handler",
+  [
+    [:phoenix_socket_client, :socket, :connected],
+    [:phoenix_socket_client, :socket, :disconnected],
+    [:phoenix_socket_client, :channel, :joined]
+  ],
+  fn event_name, measurements, metadata, _config ->
+    IO.inspect({event_name, metadata})
+  end,
+  %{}
+)
+
+# Use built-in debug handler
+PhoenixSocketClient.Telemetry.attach_debug_handler()
+```
+
+### Dependencies
+
+Add `:telemetry` to your dependencies if using custom handlers:
+
+```elixir
+def deps do
+  [
+    {:telemetry, "~> 1.0"}
+  ]
+end
+```

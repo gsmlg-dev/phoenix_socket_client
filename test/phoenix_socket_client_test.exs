@@ -92,7 +92,7 @@ defmodule PhoenixSocketClientTest do
 
     channel("rooms:*", RoomChannel)
 
-    def connect(%{"reject" => "true"}, _socket, _connect_info) do
+    def connect(%{"reject" => reject}, _socket, _connect_info) when reject in ["true", true] do
       :error
     end
 
@@ -110,7 +110,7 @@ defmodule PhoenixSocketClientTest do
     end
 
     defp encode_headers(headers) do
-      Enum.reduce(headers, %{}, &Map.put(&2, elem(&1, 0), elem(&1, 1)))
+      Enum.reduce(headers, %{}, fn {k, v}, acc -> Map.put(acc, k, v) end)
     end
   end
 
@@ -162,9 +162,7 @@ defmodule PhoenixSocketClientTest do
     name = :"socket_#{System.unique_integer([:positive])}"
 
     {:ok, _pid} =
-      PhoenixSocketClient.start_link(
-        Keyword.put(@socket_config, :id, name)
-      )
+      PhoenixSocketClient.start_link(Keyword.put(@socket_config, :id, name))
 
     wait_for_socket(name)
     assert {:ok, _, _channel} = Channel.join(name, "rooms:admin-lobby")
@@ -174,9 +172,7 @@ defmodule PhoenixSocketClientTest do
     name = :"socket_#{System.unique_integer([:positive])}"
 
     {:ok, _pid} =
-      PhoenixSocketClient.start_link(
-        Keyword.put(@socket_config, :id, name)
-      )
+      PhoenixSocketClient.start_link(Keyword.put(@socket_config, :id, name))
 
     wait_for_socket(name)
     assert {:ok, _, _channel} = Channel.join(name, "rooms:admin-lobby")
@@ -187,9 +183,7 @@ defmodule PhoenixSocketClientTest do
     name = :"socket_#{System.unique_integer([:positive])}"
 
     {:ok, _pid} =
-      PhoenixSocketClient.start_link(
-        Keyword.put(@socket_config, :id, name)
-      )
+      PhoenixSocketClient.start_link(Keyword.put(@socket_config, :id, name))
 
     wait_for_socket(name)
     message = %{"foo" => "bar"}
@@ -204,9 +198,7 @@ defmodule PhoenixSocketClientTest do
     name = :"socket_#{System.unique_integer([:positive])}"
 
     {:ok, _pid} =
-      PhoenixSocketClient.start_link(
-        Keyword.put(@socket_config, :id, name)
-      )
+      PhoenixSocketClient.start_link(Keyword.put(@socket_config, :id, name))
 
     wait_for_socket(name)
     user_id = "123"
@@ -218,9 +210,7 @@ defmodule PhoenixSocketClientTest do
     name = :"socket_#{System.unique_integer([:positive])}"
 
     {:ok, _pid} =
-      PhoenixSocketClient.start_link(
-        Keyword.put(@socket_config, :id, name)
-      )
+      PhoenixSocketClient.start_link(Keyword.put(@socket_config, :id, name))
 
     wait_for_socket(name)
     {:ok, _, channel} = Channel.join(name, "rooms:admin-lobby")
@@ -231,9 +221,7 @@ defmodule PhoenixSocketClientTest do
     name = :"socket_#{System.unique_integer([:positive])}"
 
     {:ok, _pid} =
-      PhoenixSocketClient.start_link(
-        Keyword.put(@socket_config, :id, name)
-      )
+      PhoenixSocketClient.start_link(Keyword.put(@socket_config, :id, name))
 
     wait_for_socket(name)
     {:ok, _, channel} = Channel.join(name, "rooms:admin-lobby")
@@ -244,9 +232,7 @@ defmodule PhoenixSocketClientTest do
     name = :"socket_#{System.unique_integer([:positive])}"
 
     {:ok, _pid} =
-      PhoenixSocketClient.start_link(
-        Keyword.put(@socket_config, :id, name)
-      )
+      PhoenixSocketClient.start_link(Keyword.put(@socket_config, :id, name))
 
     wait_for_socket(name)
     {:error, :timeout} = Channel.join(name, "rooms:join_timeout", %{}, 1)
@@ -256,9 +242,7 @@ defmodule PhoenixSocketClientTest do
     name = :"socket_#{System.unique_integer([:positive])}"
 
     {:ok, _pid} =
-      PhoenixSocketClient.start_link(
-        Keyword.put(@socket_config, :id, name)
-      )
+      PhoenixSocketClient.start_link(Keyword.put(@socket_config, :id, name))
 
     wait_for_socket(name)
     {:ok, _, channel} = Channel.join(name, "rooms:admin-lobby")
@@ -269,9 +253,7 @@ defmodule PhoenixSocketClientTest do
     name = :"socket_#{System.unique_integer([:positive])}"
 
     {:ok, _pid} =
-      PhoenixSocketClient.start_link(
-        Keyword.put(@socket_config, :id, name)
-      )
+      PhoenixSocketClient.start_link(Keyword.put(@socket_config, :id, name))
 
     wait_for_socket(name)
     {:ok, _, channel} = Channel.join(name, "rooms:admin-lobby")
