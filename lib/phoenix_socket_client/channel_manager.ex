@@ -3,7 +3,8 @@ defmodule PhoenixSocketClient.ChannelManager do
 
   alias PhoenixSocketClient.Channel
 
-  def start_link({_server_pid, opts}) do
+  def start_link(opts) do
+    opts = if Keyword.keyword?(opts), do: opts, else: Map.to_list(opts)
     DynamicSupervisor.start_link(__MODULE__, opts)
   end
 

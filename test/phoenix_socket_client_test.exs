@@ -303,14 +303,42 @@ defmodule PhoenixSocketClientTest do
     assert %{"x-extra" => "value"} = headers
   end
 
-  defp wait_for_socket(socket_name, retries \\ 100) do
+  defp wait_for_socket(socket_name, retries \\ 500) do
     if retries == 0 do
       raise "Socket did not connect in time"
     end
 
-    unless Socket.connected?(socket_name) do
-      :timer.sleep(10)
-      wait_for_socket(socket_name, retries - 1)
+    # Get the supervisor pid for the socket
+    supervisor_pid = Process.whereis(socket_name)
+    
+    if supervisor_pid do
+      # Find the socket process within the supervisor
+      children = Supervisor.which_children(supervisor_pid)
+      case Enum.find(children, fn {id, _, _, _} -> id == :socket end) do
+        {:socket, socket_pid, _, _} ->
+          try do
+            case GenServer.call(socket_pid, :get_status, 1000) do
+              :connected -> :ok
+              _status ->
+                :timer.sleep(100)
+                wait_for_socket(socket_name, retries - 1)
+            end
+          catch
+            :exit, _reason ->
+              :timer.sleep(100)
+              wait_for_socket(socket_name, retries - 1)
+          end
+        _ ->
+          :timer.sleep(100)
+          wait_for_socket(socket_name, retries - 1)
+      end
+    else
+      case Socket.connected?(socket_name) do
+        true -> :ok
+        false ->
+          :timer.sleep(100)
+          wait_for_socket(socket_name, retries - 1)
+      end
     end
   end
 

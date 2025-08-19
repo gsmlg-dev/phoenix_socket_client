@@ -7,7 +7,8 @@ defmodule PhoenixSocketClient.SocketState do
   @reconnect_interval 60_000
   @default_transport PhoenixSocketClient.Transports.Websocket
 
-  def start_link({_server_pid, opts}) do
+  def start_link(opts) do
+    opts = if Keyword.keyword?(opts), do: opts, else: Map.to_list(opts)
     Agent.start_link(fn -> init(opts) end)
   end
 
@@ -32,13 +33,6 @@ defmodule PhoenixSocketClient.SocketState do
 
   def connected(pid) do
     get(pid, :status) == :connected
-  end
-
-  @doc """
-  Returns the pid for the socket state process.
-  """
-  def whereis(id) do
-    PhoenixSocketClient.get_process_pid(id, :socket_state)
   end
 
   def pop_all_to_send(pid) do
