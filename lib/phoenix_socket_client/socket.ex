@@ -248,9 +248,9 @@ defmodule PhoenixSocketClient.Socket do
 
   defp close(reason, %{opts: opts} = state) do
     Logger.debug("Connection: closing connection, reason: #{inspect(reason)}")
-    
+
     reconnect = Keyword.get(opts, :reconnect?, true)
-    
+
     if reconnect do
       reconnect_interval = opts[:reconnect_interval] || 60_000
       Logger.debug("Connection: reconnecting in #{reconnect_interval}ms")
