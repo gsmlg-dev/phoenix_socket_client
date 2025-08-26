@@ -6,7 +6,7 @@ defmodule PhoenixSocketClient do
 
   def start_link(opts) do
     opts = Map.new(opts)
-    name = Map.get(opts, :name)
+    name = Map.get(opts, :id)
 
     if is_nil(name) do
       Supervisor.start_link(__MODULE__, opts)

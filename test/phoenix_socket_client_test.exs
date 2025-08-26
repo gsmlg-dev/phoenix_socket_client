@@ -165,7 +165,7 @@ defmodule PhoenixSocketClientTest do
       PhoenixSocketClient.start_link(Keyword.put(@socket_config, :id, name))
 
     wait_for_socket(name)
-    assert {:ok, _, _channel} = Channel.join(name, "rooms:admin-lobby")
+    assert {:ok, %{}, _channel} = Channel.join(name, "rooms:admin-lobby")
   end
 
   test "socket cannot join more than one channel of the same topic" do
@@ -175,7 +175,7 @@ defmodule PhoenixSocketClientTest do
       PhoenixSocketClient.start_link(Keyword.put(@socket_config, :id, name))
 
     wait_for_socket(name)
-    assert {:ok, _, _channel} = Channel.join(name, "rooms:admin-lobby")
+    {:ok, _, _channel} = Channel.join(name, "rooms:admin-lobby")
     assert {:error, {:already_started, _}} = Channel.join(name, "rooms:admin-lobby")
   end
 
@@ -202,7 +202,7 @@ defmodule PhoenixSocketClientTest do
 
     wait_for_socket(name)
     user_id = "123"
-    assert {:ok, _, _} = Channel.join(name, "rooms:admin-lobby", %{user: user_id})
+    {:ok, _, _} = Channel.join(name, "rooms:admin-lobby", %{user: user_id})
     assert_receive %Message{event: "user:entered", payload: %{"user" => ^user_id}}
   end
 
@@ -215,6 +215,9 @@ defmodule PhoenixSocketClientTest do
     wait_for_socket(name)
     {:ok, _, channel} = Channel.join(name, "rooms:admin-lobby")
     assert :ok = Channel.leave(channel)
+    # Give it a moment to shutdown
+    :timer.sleep(100)
+    refute Process.alive?(channel)
   end
 
   test "client can push to a channel" do
@@ -235,7 +238,7 @@ defmodule PhoenixSocketClientTest do
       PhoenixSocketClient.start_link(Keyword.put(@socket_config, :id, name))
 
     wait_for_socket(name)
-    {:error, :timeout} = Channel.join(name, "rooms:join_timeout", %{}, 1)
+    assert {:error, :timeout} = Channel.join(name, "rooms:join_timeout", %{}, 1)
   end
 
   test "push timeouts" do
@@ -300,45 +303,19 @@ defmodule PhoenixSocketClientTest do
     {:ok, _pid} = PhoenixSocketClient.start_link(config)
     wait_for_socket(name)
     {:ok, headers, _channel} = Channel.join(name, "rooms:headers")
-    assert %{"x-extra" => "value"} = headers
+    assert headers["x-extra"] == "value"
   end
 
-  defp wait_for_socket(socket_name, retries \\ 500) do
+  defp wait_for_socket(socket_name, retries \\ 100) do
     if retries == 0 do
       raise "Socket did not connect in time"
     end
 
-    # Get the supervisor pid for the socket
-    supervisor_pid = Process.whereis(socket_name)
-    
-    if supervisor_pid do
-      # Find the socket process within the supervisor
-      children = Supervisor.which_children(supervisor_pid)
-      case Enum.find(children, fn {id, _, _, _} -> id == :socket end) do
-        {:socket, socket_pid, _, _} ->
-          try do
-            case GenServer.call(socket_pid, :get_status, 1000) do
-              :connected -> :ok
-              _status ->
-                :timer.sleep(100)
-                wait_for_socket(socket_name, retries - 1)
-            end
-          catch
-            :exit, _reason ->
-              :timer.sleep(100)
-              wait_for_socket(socket_name, retries - 1)
-          end
-        _ ->
-          :timer.sleep(100)
-          wait_for_socket(socket_name, retries - 1)
-      end
+    if Socket.connected?(socket_name) do
+      :ok
     else
-      case Socket.connected?(socket_name) do
-        true -> :ok
-        false ->
-          :timer.sleep(100)
-          wait_for_socket(socket_name, retries - 1)
-      end
+      :timer.sleep(100)
+      wait_for_socket(socket_name, retries - 1)
     end
   end
 

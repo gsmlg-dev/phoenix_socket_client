@@ -6,8 +6,20 @@ defmodule PhoenixSocketClient.Channel do
   @timeout 5_000
 
   @doc false
+  def child_spec(args) do
+    %{
+      id: elem(args, 1),
+      start: {__MODULE__, :start_link, [args]}
+    }
+  end
+
+  @doc false
   def start_link(args) do
-    GenServer.start_link(__MODULE__, args)
+    GenServer.start_link(__MODULE__, args, name: via_tuple(elem(args, 1)))
+  end
+
+  defp via_tuple(topic) do
+    {:via, Registry, {Registry.Connection, topic}}
   end
 
   @doc false
@@ -90,7 +102,7 @@ defmodule PhoenixSocketClient.Channel do
   @impl true
   def handle_call(
         :join,
-        {_pid, _ref} = from,
+        from,
         %{socket: socket, topic: topic, params: params} = state
       ) do
     message = Message.join(topic, params)
@@ -117,10 +129,9 @@ defmodule PhoenixSocketClient.Channel do
   end
 
   @impl true
-  def handle_call(:leave, _from, %{socket: socket, topic: topic} = state) do
-    Socket.channel_leave(socket, self())
-    Telemetry.channel_left(self(), topic, :leave)
-    {:stop, :normal, :ok, state}
+  def handle_call(:leave, _from, state) do
+    send(self(), :shutdown)
+    {:reply, :ok, state}
   end
 
   @impl true
@@ -151,6 +162,13 @@ defmodule PhoenixSocketClient.Channel do
     Socket.push(socket, message)
     Telemetry.message_sent(self(), topic, event, payload)
     {:noreply, state}
+  end
+
+  @impl true
+  def handle_info(:shutdown, %{socket: socket, topic: topic} = state) do
+    Socket.channel_leave(socket, self())
+    Telemetry.channel_left(self(), topic, :leave)
+    {:stop, :normal, state}
   end
 
   @impl true
@@ -196,7 +214,6 @@ defmodule PhoenixSocketClient.Channel do
     try do
       case GenServer.call(pid, :join, timeout) do
         {:ok, reply} ->
-          Process.link(pid)
           {:ok, reply, pid}
 
         error ->

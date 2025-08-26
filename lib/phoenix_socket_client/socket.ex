@@ -43,20 +43,8 @@ defmodule PhoenixSocketClient.Socket do
           nil ->
             nil
 
-          pid ->
-            # Check if this is a supervisor or a socket process
-            case Supervisor.which_children(pid) do
-              children when is_list(children) ->
-                # This is a supervisor, find the socket child
-                case Enum.find(children, fn {id, _pid, _type, _modules} -> id == :socket end) do
-                  {_id, socket_pid, _type, _modules} when is_pid(socket_pid) -> socket_pid
-                  _ -> nil
-                end
-
-              _ ->
-                # Assume this is already the socket process
-                pid
-            end
+          supervisor_pid ->
+            PhoenixSocketClient.get_process_pid(supervisor_pid, :socket)
         end
 
       _ ->
@@ -129,7 +117,11 @@ defmodule PhoenixSocketClient.Socket do
 
       url ->
         transport = opts[:transport] || PhoenixSocketClient.Transports.Websocket
-        transport_opts = (opts[:transport_opts] || []) |> Keyword.put(:sender, self())
+
+        transport_opts =
+          (opts[:transport_opts] || [])
+          |> Keyword.put(:sender, self())
+          |> Keyword.put(:headers, opts[:headers] || [])
 
         Telemetry.socket_connecting(self(), url)
 
@@ -189,28 +181,17 @@ defmodule PhoenixSocketClient.Socket do
 
   @impl true
   def handle_info({:receive, message}, state) do
-    Logger.debug("Connection: received #{inspect(message)}")
     transport_receive(message, state)
     {:noreply, state}
   end
 
-  @impl true
-  def handle_info(:flush, state) do
-    Logger.debug("Connection: flushing messages")
-    to_send = state[:to_send_r] || []
-    Enum.each(to_send, &transport_send(&1, state))
-    {:noreply, %{state | to_send_r: []}}
-  end
-
   def handle_info(%PhoenixSocketClient.Message{} = message, state) do
-    Logger.debug("Connection: received message struct #{inspect(message)}")
-    # Handle message structs that might be sent directly
-    channels_pid = PhoenixSocketClient.ChannelManager.whereis(state.opts[:id])
-    children = Supervisor.which_children(channels_pid)
+    case find_channel(message.topic) do
+      nil ->
+        :noop
 
-    case find_channel(children, message.topic) do
-      nil -> :noop
-      {_id, channel_pid, _type, _modules} -> send(channel_pid, message)
+      {_id, channel_pid, _type, _modules} ->
+        send(channel_pid, message)
     end
 
     {:noreply, state}
@@ -243,37 +224,25 @@ defmodule PhoenixSocketClient.Socket do
     end
   end
 
-  defp transport_receive(message, %{opts: opts} = state) do
+  defp transport_receive(message, %{opts: opts} = _state) do
     protocol_vsn = Keyword.get(opts, :vsn, "1.0.0")
     serializer = PhoenixSocketClient.Message.serializer(protocol_vsn)
     json_library = opts[:json_library] || Jason
     decoded = Message.decode!(serializer, message, json_library)
 
-    channels_pid = PhoenixSocketClient.ChannelManager.whereis(state.opts[:id])
-    children = Supervisor.which_children(channels_pid)
+    case find_channel(decoded.topic) do
+      nil ->
+        :noop
 
-    case find_channel(children, decoded.topic) do
-      nil -> :noop
-      {_id, channel_pid, _type, _modules} -> send(channel_pid, decoded)
+      {_id, channel_pid, _type, _modules} ->
+        send(channel_pid, decoded)
     end
   end
 
-  defp find_channel(children, topic) do
-    Enum.find(children, fn {_id, pid, _type, _modules} ->
-      :sys.get_state(pid).topic == topic
-    end)
-  end
-
-  defp transport_send(message, state) do
-    opts = state.opts
-    transport_pid = state.transport_pid
-    
-    if transport_pid do
-      protocol_vsn = Keyword.get(opts, :vsn, "1.0.0")
-      serializer = PhoenixSocketClient.Message.serializer(protocol_vsn)
-      json_library = opts[:json_library] || Jason
-      
-      send(transport_pid, {:send, Message.encode!(serializer, message, json_library)})
+  defp find_channel(topic) do
+    case Registry.lookup(Registry.Connection, topic) do
+      [{pid, _}] -> {topic, pid, :worker, [PhoenixSocketClient.Channel]}
+      [] -> nil
     end
   end
 

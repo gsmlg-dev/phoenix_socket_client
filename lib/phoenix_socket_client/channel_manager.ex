@@ -16,17 +16,20 @@ defmodule PhoenixSocketClient.ChannelManager do
   end
 
   def start_channel(pid, socket, topic, params) do
-    spec = %{
-      id: topic,
-      start: {Channel, :start_link, [{socket, topic, params}]}
-    }
+    child_spec = {Channel, {socket, topic, params}}
 
-    case DynamicSupervisor.start_child(pid, spec) do
-      {:ok, channel_pid} -> {:ok, channel_pid}
-      {:error, {:already_started, channel_pid}} -> {:error, {:already_started, channel_pid}}
-      {:error, {:already_started, _, channel_pid}} -> {:error, {:already_started, channel_pid}}
-      {:error, {:already_registered, channel_pid}} -> {:error, {:already_started, channel_pid}}
-      error -> error
+    case DynamicSupervisor.start_child(pid, child_spec) do
+      {:ok, channel_pid} ->
+        {:ok, channel_pid}
+
+      {:error, {:already_started, channel_pid}} ->
+        {:error, {:already_started, channel_pid}}
+
+      {:error, {:already_registered, channel_pid}} ->
+        {:error, {:already_started, channel_pid}}
+
+      error ->
+        error
     end
   end
 
