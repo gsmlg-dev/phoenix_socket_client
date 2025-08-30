@@ -10,10 +10,6 @@ defmodule PhoenixSocketClient.Socket do
     GenServer.start_link(__MODULE__, opts)
   end
 
-  def whereis(_id) do
-    nil
-  end
-
   @doc """
   Checks if the socket is connected.
   """
@@ -267,21 +263,21 @@ defmodule PhoenixSocketClient.Socket do
   defp transport_send(message, state) do
     opts = state.opts
     transport_pid = state.transport_pid
-    
+
     if transport_pid do
       protocol_vsn = Keyword.get(opts, :vsn, "1.0.0")
       serializer = PhoenixSocketClient.Message.serializer(protocol_vsn)
       json_library = opts[:json_library] || Jason
-      
+
       send(transport_pid, {:send, Message.encode!(serializer, message, json_library)})
     end
   end
 
   defp close(reason, %{opts: opts} = state) do
     Logger.debug("Connection: closing connection, reason: #{inspect(reason)}")
-    
+
     reconnect = Keyword.get(opts, :reconnect?, true)
-    
+
     if reconnect do
       reconnect_interval = opts[:reconnect_interval] || 60_000
       Logger.debug("Connection: reconnecting in #{reconnect_interval}ms")

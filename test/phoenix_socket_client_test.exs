@@ -310,15 +310,18 @@ defmodule PhoenixSocketClientTest do
 
     # Get the supervisor pid for the socket
     supervisor_pid = Process.whereis(socket_name)
-    
+
     if supervisor_pid do
       # Find the socket process within the supervisor
       children = Supervisor.which_children(supervisor_pid)
+
       case Enum.find(children, fn {id, _, _, _} -> id == :socket end) do
         {:socket, socket_pid, _, _} ->
           try do
             case GenServer.call(socket_pid, :get_status, 1000) do
-              :connected -> :ok
+              :connected ->
+                :ok
+
               _status ->
                 :timer.sleep(100)
                 wait_for_socket(socket_name, retries - 1)
@@ -328,13 +331,16 @@ defmodule PhoenixSocketClientTest do
               :timer.sleep(100)
               wait_for_socket(socket_name, retries - 1)
           end
+
         _ ->
           :timer.sleep(100)
           wait_for_socket(socket_name, retries - 1)
       end
     else
       case Socket.connected?(socket_name) do
-        true -> :ok
+        true ->
+          :ok
+
         false ->
           :timer.sleep(100)
           wait_for_socket(socket_name, retries - 1)

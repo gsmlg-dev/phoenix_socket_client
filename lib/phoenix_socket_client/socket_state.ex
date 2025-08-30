@@ -9,7 +9,7 @@ defmodule PhoenixSocketClient.SocketState do
 
   def start_link(opts) do
     opts = if Keyword.keyword?(opts), do: opts, else: Map.to_list(opts)
-    Agent.start_link(fn -> init(opts) end)
+    Agent.start_link(fn -> init_state(opts) end)
   end
 
   def whereis(id) when is_atom(id) do
@@ -42,7 +42,7 @@ defmodule PhoenixSocketClient.SocketState do
     end)
   end
 
-  defp init(opts) do
+  defp init_state(opts) do
     opts = if is_map(opts), do: Map.to_list(opts), else: opts
 
     transport = Keyword.get(opts, :transport, @default_transport)

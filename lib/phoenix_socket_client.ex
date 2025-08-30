@@ -17,7 +17,12 @@ defmodule PhoenixSocketClient do
 
   @impl true
   def init(opts) do
+    sup_pid = self()
+    opts = opts |> Map.put(:sup_pid, sup_pid)
+
     children = [
+      {PhoenixSocketClient.SocketState, opts}
+      |> Supervisor.child_spec(id: :socket_state),
       {PhoenixSocketClient.Socket, opts}
       |> Supervisor.child_spec(id: :socket),
       {PhoenixSocketClient.ChannelManager, opts}
@@ -27,14 +32,14 @@ defmodule PhoenixSocketClient do
     Supervisor.init(children, strategy: :one_for_one)
   end
 
-  def get_process_pid(supervisor_pid, name) do
+  def get_process_pid(sup_pid, name) do
     try do
-      case Process.alive?(supervisor_pid) do
+      case Process.alive?(sup_pid) do
         false ->
           nil
 
         true ->
-          supervisor_pid
+          sup_pid
           |> Supervisor.which_children()
           |> Enum.find_value(fn
             {process_name, process_pid, _, _} when is_pid(process_pid) and process_name == name ->
