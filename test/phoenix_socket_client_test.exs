@@ -1,29 +1,11 @@
 defmodule PhoenixSocketClientTest do
   use ExUnit.Case, async: false
 
-  import ExUnit.CaptureLog
-  import Plug.Conn, except: [assign: 3, push: 3]
 
-  alias __MODULE__.Endpoint
   alias PhoenixSocketClient.{Socket, Channel, Message}
 
-  require Logger
 
   @port 5807
-
-  Application.put_env(:phoenix, :json_library, Jason)
-
-  Application.put_env(
-    :channel_app,
-    Endpoint,
-    https: false,
-    http: [port: @port],
-    secret_key_base: String.duplicate("abcdefgh", 8),
-    debug_errors: false,
-    code_reloader: false,
-    server: true,
-    pubsub: [adapter: Phoenix.PubSub.PG2, name: :int_pub]
-  )
 
   @socket_config [
     url: "ws://127.0.0.1:#{@port}/ws/admin/websocket",
@@ -31,124 +13,10 @@ defmodule PhoenixSocketClientTest do
     reconnect_interval: 10
   ]
 
-  defmodule RoomChannel do
-    use Phoenix.Channel
-    require Logger
-
-    def join("rooms:headers", _message, socket) do
-      {:ok, socket.assigns.headers, socket}
-    end
-
-    def join("rooms:join_timeout", message, socket) do
-      :timer.sleep(50)
-      {:ok, message, socket}
-    end
-
-    def join("rooms:reply", message, socket) do
-      {:ok, message, socket}
-    end
-
-    def join(topic, message, socket) do
-      Process.flag(:trap_exit, true)
-      Process.register(self(), String.to_atom(topic))
-      send(self(), {:after_join, message})
-      {:ok, socket}
-    end
-
-    def handle_info({:after_join, message}, socket) do
-      broadcast(socket, "user:entered", %{user: message["user"]})
-      push(socket, "joined", Map.merge(%{status: "connected"}, socket.assigns))
-      {:noreply, socket}
-    end
-
-    def handle_info(_, socket) do
-      {:noreply, socket}
-    end
-
-    def handle_in("new:msg", message, socket) do
-      {:reply, {:ok, message}, socket}
-    end
-
-    def handle_in("boom", _message, _socket) do
-      raise "boom"
-    end
-
-    def handle_in(_, _message, socket) do
-      {:noreply, socket}
-    end
-
-    def terminate(_reason, socket) do
-      push(socket, "you:left", %{message: "bye!"})
-      :ok
-    end
-  end
-
-  defmodule Router do
-    use Phoenix.Router
-  end
-
-  defmodule UserSocket do
-    use Phoenix.Socket
-
-    channel("rooms:*", RoomChannel)
-
-    def connect(%{"reject" => reject}, _socket, _connect_info) when reject in ["true", true] do
-      :error
-    end
-
-    def connect(params, socket, %{x_headers: headers}) do
-      socket =
-        socket
-        |> assign(:user_id, params["user_id"])
-        |> assign(:headers, encode_headers(headers))
-
-      {:ok, socket}
-    end
-
-    def id(socket) do
-      if id = socket.assigns.user_id, do: "user_sockets:#{id}"
-    end
-
-    defp encode_headers(headers) do
-      Enum.reduce(headers, %{}, fn {k, v}, acc -> Map.put(acc, k, v) end)
-    end
-  end
-
-  defmodule Endpoint do
-    use Phoenix.Endpoint, otp_app: :channel_app
-
-    def call(conn, opts) do
-      Logger.disable(self())
-      super(conn, opts)
-    end
-
-    socket("/ws", UserSocket, websocket: [check_origin: false, connect_info: [:x_headers]])
-
-    socket("/ws/admin", UserSocket, websocket: [check_origin: false, connect_info: [:x_headers]])
-
-    plug(
-      Plug.Parsers,
-      parsers: [:urlencoded, :json],
-      pass: "*/*",
-      json_decoder: Jason
-    )
-
-    plug(
-      Plug.Session,
-      store: :cookie,
-      key: "_integration_test",
-      encryption_salt: "yadayada",
-      signing_salt: "yadayada"
-    )
-
-    plug(Router)
-  end
-
   setup_all do
     Application.ensure_all_started(:bandit)
     Application.ensure_all_started(:phoenix)
     Application.ensure_all_started(:jason)
-    start_endpoint()
     :ok
   end
 
@@ -348,18 +216,4 @@ defmodule PhoenixSocketClientTest do
     end
   end
 
-  defp start_endpoint() do
-    self = self()
-
-    capture_log(fn ->
-      {:ok, pid} = Endpoint.start_link()
-      send(self, {:pid, pid})
-    end)
-
-    receive do
-      {:pid, pid} ->
-        Process.unlink(pid)
-        [endpoint: pid]
-    end
-  end
 end
