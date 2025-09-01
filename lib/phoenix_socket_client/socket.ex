@@ -12,8 +12,10 @@ defmodule PhoenixSocketClient.Socket do
   Checks if the socket is connected.
   """
   @spec connected?(pid | atom) :: boolean
-  def connected?(socket_pid_or_name) do
-    case resolve_socket_pid(socket_pid_or_name) do
+  def connected?(sup_pid) do
+    socket_pid = PhoenixSocketClient.get_process_pid(sup_pid, :socket)
+
+    case socket_pid do
       nil ->
         false
 
@@ -26,51 +28,20 @@ defmodule PhoenixSocketClient.Socket do
     end
   end
 
-  @doc false
-  def resolve_socket_pid(socket_pid_or_name) do
-    case socket_pid_or_name do
-      pid when is_pid(pid) ->
-        pid
-
-      name when is_atom(name) ->
-        case Process.whereis(name) do
-          nil ->
-            nil
-
-          pid ->
-            # Check if this is a supervisor or a socket process
-            case Supervisor.which_children(pid) do
-              children when is_list(children) ->
-                # This is a supervisor, find the socket child
-                case Enum.find(children, fn {id, _pid, _type, _modules} -> id == :socket end) do
-                  {_id, socket_pid, _type, _modules} when is_pid(socket_pid) -> socket_pid
-                  _ -> nil
-                end
-
-              _ ->
-                # Assume this is already the socket process
-                pid
-            end
-        end
-
-      _ ->
-        nil
-    end
-  end
-
   @doc """
   Joins a channel through the socket.
   """
-  @spec channel_join(pid | atom, binary, map) :: {:ok, pid} | {:error, term}
+  @spec channel_join(pid, binary, map) :: {:ok, pid} | {:error, term}
   def channel_join(sup_pid, topic, params \\ %{}) do
     manager_pid = PhoenixSocketClient.get_process_pid(sup_pid, :channel_manager)
+    socket_pid = PhoenixSocketClient.get_process_pid(sup_pid, :socket)
 
     case manager_pid do
       nil ->
         {:error, :channel_manager_not_found}
 
       pid ->
-        PhoenixSocketClient.ChannelManager.start_channel(pid, socket_pid_or_name, topic, params)
+        PhoenixSocketClient.ChannelManager.start_channel(pid, socket_pid, topic, params)
     end
   end
 
@@ -89,8 +60,8 @@ defmodule PhoenixSocketClient.Socket do
   Pushes a message through the socket.
   """
   @spec push(pid | atom, Message.t()) :: Message.t()
-  def push(socket_pid_or_name, message) do
-    socket_pid = resolve_socket_pid(socket_pid_or_name)
+  def push(sup_pid, message) do
+    socket_pid = PhoenixSocketClient.get_process_pid(sup_pid, :socket)
 
     case socket_pid do
       nil ->
