@@ -28,9 +28,7 @@ end
 defmodule PhoenixSocketClientTest.Endpoint do
   use Phoenix.Endpoint, otp_app: :channel_app
 
-  socket("/ws/admin", PhoenixSocketClientTest.AdminSocket,
-    websocket: [check_origin: false]
-  )
+  socket("/ws/admin", PhoenixSocketClientTest.AdminSocket, websocket: [check_origin: false])
 end
 
 defmodule PhoenixSocketClientTest.AdminSocket do

@@ -1,9 +1,7 @@
 defmodule PhoenixSocketClientTest do
   use ExUnit.Case, async: false
 
-
   alias PhoenixSocketClient.{Socket, Channel, Message}
-
 
   @port 5807
 
@@ -215,5 +213,4 @@ defmodule PhoenixSocketClientTest do
       end
     end
   end
-
 end

@@ -97,6 +97,7 @@ defmodule PhoenixSocketClient.SocketState do
       url: base_url,
       json_library: json_library,
       params: params,
+      vsn: protocol_vsn,
       reconnect: reconnect?,
       reconnect_interval: reconnect_interval,
       reconnect_timer: nil,
