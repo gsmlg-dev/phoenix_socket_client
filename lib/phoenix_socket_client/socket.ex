@@ -76,57 +76,20 @@ defmodule PhoenixSocketClient.Socket do
   end
 
   @impl true
-  def init(opts) do
-    Telemetry.debug(self(), "Connection init", nil, %{opts: opts})
-    send(self(), :connect)
-
+  def init(%{sup_pid: sup_pid} = opts) do
     # Update socket state status to disconnected
-    update_socket_state_status(opts[:sup_pid], :disconnected)
+    update_socket_state_status(sup_pid, :disconnected)
+
+    if get_state(sup_pid, :auto_connect) do
+      Process.send_after(self(), :connect, 0)
+    end
 
     {:ok,
      %{
-       sup_pid: opts[:sup_pid],
+       sup_pid: sup_pid,
        status: :disconnected,
        transport_pid: nil
-     }, {:continue, :connect}}
-  end
-
-  @impl true
-  def handle_continue(:connect, %{sup_pid: sup_pid} = state) do
-    case get_state(sup_pid, :url) do
-      nil ->
-        Telemetry.debug(self(), "Connection: no URL provided, skipping connection")
-        {:noreply, state}
-
-      url ->
-        transport =
-          get_state(sup_pid, :transport)
-
-        transport_opts =
-          get_state(sup_pid, :transport_opts)
-          |> Keyword.put(:sender, self())
-
-        Telemetry.socket_connecting(self(), url)
-
-        case transport.open(url, transport_opts) do
-          {:ok, transport_pid} ->
-            Telemetry.debug(self(), "Connection: transport started", url, %{
-              transport_pid: transport_pid
-            })
-
-            state = %{state | transport_pid: transport_pid, status: :connecting}
-            update_socket_state_status(sup_pid, :connecting)
-            {:noreply, state}
-
-          {:error, reason} ->
-            Telemetry.debug(self(), "Connection: transport failed to start", url, %{
-              reason: reason
-            })
-
-            Telemetry.socket_connection_error(self(), url, reason)
-            {:noreply, close(reason, state)}
-        end
-    end
+     }}
   end
 
   @impl true

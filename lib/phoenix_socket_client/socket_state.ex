@@ -38,19 +38,20 @@ defmodule PhoenixSocketClient.SocketState do
     json_library = Keyword.get(opts, :json_library, Jason)
     reconnect? = Keyword.get(opts, :reconnect?, true)
 
+    auto_connect = Keyword.get(opts, :auto_connect, true)
+
     protocol_vsn = Keyword.get(opts, :vsn, "2.0.0")
     serializer = Message.serializer(protocol_vsn)
 
     url =
       case Keyword.get(opts, :url) do
-        nil -> "ws://localhost:4000/ws/websocket"
-        "" -> "ws://localhost:4000/ws/websocket"
+        nil -> "ws://localhost:4000/socket/websocket"
         url -> url
       end
 
     uri = URI.parse(url)
 
-    params = Keyword.get(opts, :params, %{}) || %{}
+    params = Keyword.get(opts, :params, %{})
 
     query_params = Map.merge(%{"vsn" => protocol_vsn}, params)
     query = URI.encode_query(query_params)
@@ -87,6 +88,7 @@ defmodule PhoenixSocketClient.SocketState do
       json_library: json_library,
       params: params,
       vsn: protocol_vsn,
+      auto_connect: auto_connect,
       reconnect: reconnect?,
       reconnect_interval: reconnect_interval,
       reconnect_timer: nil,
