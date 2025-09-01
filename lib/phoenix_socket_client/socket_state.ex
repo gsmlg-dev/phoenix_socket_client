@@ -12,17 +12,6 @@ defmodule PhoenixSocketClient.SocketState do
     Agent.start_link(fn -> init_state(opts) end)
   end
 
-  def whereis(id) when is_atom(id) do
-    case Process.whereis(id) do
-      nil -> nil
-      server_pid -> PhoenixSocketClient.get_process_pid(server_pid, :socket_state)
-    end
-  end
-
-  def whereis(server_pid) when is_pid(server_pid) do
-    PhoenixSocketClient.get_process_pid(server_pid, :socket_state)
-  end
-
   def get(pid, key) do
     Agent.get(pid, &Map.get(&1, key))
   end

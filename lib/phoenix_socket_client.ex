@@ -59,4 +59,9 @@ defmodule PhoenixSocketClient do
     state_pid = get_process_pid(pid, :socket_state)
     PhoenixSocketClient.SocketState.get(state_pid, key)
   end
+
+  def put_state(pid, key, value) do
+    state_pid = get_process_pid(pid, :socket_state)
+    PhoenixSocketClient.SocketState.put(state_pid, key, value)
+  end
 end

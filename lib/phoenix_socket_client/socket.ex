@@ -62,8 +62,8 @@ defmodule PhoenixSocketClient.Socket do
   Joins a channel through the socket.
   """
   @spec channel_join(pid | atom, binary, map) :: {:ok, pid} | {:error, term}
-  def channel_join(socket_pid_or_name, topic, params \\ %{}) do
-    manager_pid = PhoenixSocketClient.ChannelManager.whereis(socket_pid_or_name)
+  def channel_join(sup_pid, topic, params \\ %{}) do
+    manager_pid = PhoenixSocketClient.get_process_pid(sup_pid, :channel_manager)
 
     case manager_pid do
       nil ->
@@ -77,9 +77,9 @@ defmodule PhoenixSocketClient.Socket do
   @doc """
   Leaves a channel.
   """
-  @spec channel_leave(pid | atom, pid) :: :ok
-  def channel_leave(socket_pid_or_name, channel_pid) do
-    case PhoenixSocketClient.ChannelManager.whereis(socket_pid_or_name) do
+  @spec channel_leave(pid, pid) :: :ok
+  def channel_leave(sup_pid, channel_pid) do
+    case PhoenixSocketClient.get_process_pid(sup_pid, :channel_manager) do
       nil -> :error
       manager_pid -> DynamicSupervisor.terminate_child(manager_pid, channel_pid)
     end
