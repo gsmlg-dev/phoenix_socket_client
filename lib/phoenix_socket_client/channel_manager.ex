@@ -8,7 +8,7 @@ defmodule PhoenixSocketClient.ChannelManager do
     DynamicSupervisor.start_link(__MODULE__, opts)
   end
 
-  def channel_pid(sup_pid, topic) when is_pid(id) do
+  def channel_pid(sup_pid, topic) when is_pid(sup_pid) do
     try do
       case Process.alive?(sup_pid) do
         false ->

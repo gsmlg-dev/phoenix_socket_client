@@ -31,12 +31,12 @@ defmodule PhoenixSocketClient.Channel do
           | {:error, :socket_not_connected}
           | {:error, :timeout}
           | {:error, any}
-  def join(socket_pid_or_name, topic, params \\ %{}, timeout \\ @timeout)
+  def join(socket_pid, topic, params \\ %{}, timeout \\ @timeout)
   def join(nil, _topic, _params, _timeout), do: {:error, :socket_not_started}
 
-  def join(socket_pid_or_name, topic, params, timeout) do
-    if Process.whereis(socket_pid_or_name) |> is_pid() and Socket.connected?(socket_pid_or_name) do
-      case Socket.channel_join(socket_pid_or_name, topic, params) do
+  def join(socket_pid, topic, params, timeout) do
+    if socket_pid |> is_pid() and Socket.connected?(socket_pid) do
+      case Socket.channel_join(socket_pid, topic, params) do
         {:ok, pid} -> do_join(pid, timeout)
         {:error, {:already_started, _}} = error -> error
         error -> error
@@ -96,7 +96,7 @@ defmodule PhoenixSocketClient.Channel do
     message = Message.join(topic, params)
 
     # Find the actual socket process
-    socket_pid = PhoenixSocketClient.Socket.resolve_socket_pid(socket)
+    socket_pid = PhoenixSocketClient.get_process_pid(socket, :socket)
 
     case socket_pid do
       nil ->
