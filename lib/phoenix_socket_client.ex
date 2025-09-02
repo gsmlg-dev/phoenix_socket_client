@@ -30,6 +30,7 @@ defmodule PhoenixSocketClient do
       {Task,
        fn ->
          if get_state(sup_pid, :auto_connect) do
+           Process.sleep(1_000)
            connect(sup_pid)
          end
        end}
