@@ -34,7 +34,7 @@ defmodule PhoenixSocketClient.SocketTest do
       name = :"socket_connect_#{System.unique_integer([:positive])}"
 
       {:ok, _pid} =
-        PhoenixSocketClient.start_link(Keyword.put(get_socket_config(), :id, name))
+        PhoenixSocketClient.start_link(Keyword.put(get_socket_config(), :name, name))
 
       wait_for_socket(name)
       assert Socket.connected?(name)
@@ -44,7 +44,7 @@ defmodule PhoenixSocketClient.SocketTest do
       name = :"socket_auto_#{System.unique_integer([:positive])}"
 
       {:ok, _pid} =
-        PhoenixSocketClient.start_link(Keyword.put(get_socket_config(), :id, name))
+        PhoenixSocketClient.start_link(Keyword.put(get_socket_config(), :name, name))
 
       # Default auto_connect is true, should connect automatically
       wait_for_socket(name)
@@ -57,7 +57,7 @@ defmodule PhoenixSocketClient.SocketTest do
 
       config =
         get_socket_config()
-        |> Keyword.put(:id, name)
+        |> Keyword.put(:name, name)
         |> Keyword.put(:auto_connect, false)
 
       {:ok, _pid} = PhoenixSocketClient.start_link(config)
@@ -71,7 +71,7 @@ defmodule PhoenixSocketClient.SocketTest do
       name = :"socket_status_#{System.unique_integer([:positive])}"
 
       {:ok, _pid} =
-        PhoenixSocketClient.start_link(Keyword.put(get_socket_config(), :id, name))
+        PhoenixSocketClient.start_link(Keyword.put(get_socket_config(), :name, name))
 
       # Initially disconnected/connecting
       refute Socket.connected?(name)
@@ -102,7 +102,7 @@ defmodule PhoenixSocketClient.SocketTest do
 
       config =
         get_socket_config()
-        |> Keyword.put(:id, name)
+        |> Keyword.put(:name, name)
         |> Keyword.put(:params, %{"custom" => "param"})
 
       {:ok, _pid} = PhoenixSocketClient.start_link(config)
@@ -115,7 +115,7 @@ defmodule PhoenixSocketClient.SocketTest do
 
       config =
         get_socket_config()
-        |> Keyword.put(:id, name)
+        |> Keyword.put(:name, name)
         |> Keyword.put(:headers, [{"x-custom", "header"}])
 
       {:ok, _pid} = PhoenixSocketClient.start_link(config)
