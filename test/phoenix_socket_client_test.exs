@@ -183,15 +183,14 @@ defmodule PhoenixSocketClientTest do
   describe "PhoenixSocketClient state management" do
     test "get_process_pid retrieves correct process pids" do
       name = :"test_socket_#{System.unique_integer([:positive])}"
+      port = get_port()
 
       {:ok, _pid} =
-        port = get_port()
-
-      PhoenixSocketClient.start_link(
-        name: name,
-        url: "ws://127.0.0.1:#{port}/ws/admin/websocket",
-        serializer: Jason
-      )
+        PhoenixSocketClient.start_link(
+          name: name,
+          url: "ws://127.0.0.1:#{port}/ws/admin/websocket",
+          serializer: Jason
+        )
 
       # Test retrieving socket_state pid
       assert state_pid = PhoenixSocketClient.get_process_pid(name, :socket_state)
@@ -246,15 +245,14 @@ defmodule PhoenixSocketClientTest do
 
     test "put_state updates state values in socket_state" do
       name = :"test_socket_#{System.unique_integer([:positive])}"
+      port = get_port()
 
       {:ok, _pid} =
-        port = get_port()
-
-      PhoenixSocketClient.start_link(
-        name: name,
-        url: "ws://127.0.0.1:#{port}/ws/admin/websocket",
-        serializer: Jason
-      )
+        PhoenixSocketClient.start_link(
+          name: name,
+          url: "ws://127.0.0.1:#{port}/ws/admin/websocket",
+          serializer: Jason
+        )
 
       # Test updating a custom state value
       assert :ok = PhoenixSocketClient.put_state(name, :custom_key, "custom_value")
@@ -317,43 +315,13 @@ defmodule PhoenixSocketClientTest do
       raise "Socket did not connect in time"
     end
 
-    # Get the supervisor pid for the socket
-    supervisor_pid = Process.whereis(socket_name)
+    case Socket.connected?(socket_name) do
+      true ->
+        :ok
 
-    if supervisor_pid do
-      # Find the socket process within the supervisor
-      children = Supervisor.which_children(supervisor_pid)
-
-      case Enum.find(children, fn {id, _, _, _} -> id == :socket end) do
-        {:socket, socket_pid, _, _} ->
-          try do
-            case GenServer.call(socket_pid, :get_status, 1000) do
-              :connected ->
-                :ok
-
-              _status ->
-                :timer.sleep(100)
-                wait_for_socket(socket_name, retries - 1)
-            end
-          catch
-            :exit, _reason ->
-              :timer.sleep(100)
-              wait_for_socket(socket_name, retries - 1)
-          end
-
-        _ ->
-          :timer.sleep(100)
-          wait_for_socket(socket_name, retries - 1)
-      end
-    else
-      case Socket.connected?(socket_name) do
-        true ->
-          :ok
-
-        false ->
-          :timer.sleep(100)
-          wait_for_socket(socket_name, retries - 1)
-      end
+      false ->
+        :timer.sleep(100)
+        wait_for_socket(socket_name, retries - 1)
     end
   end
 end
