@@ -3,5 +3,6 @@ ExUnit.start(timeout: 120_000)
 
 Logger.configure(level: :debug)
 
-# Start the mock Phoenix server
-PhoenixSocketClientTest.MockServer.start()
+# Start the mock Phoenix server with dynamic port
+port = PhoenixSocketClientTest.MockServer.start()
+IO.puts("Mock server started on port: #{port}")

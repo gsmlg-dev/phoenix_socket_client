@@ -1,7 +1,9 @@
 defmodule PhoenixSocketClient.StateFunctionsTest do
   use ExUnit.Case, async: false
 
-  @port 5807
+  defp get_port do
+    Application.get_env(:phoenix_socket_client_test, :port, 5807)
+  end
 
   setup_all do
     Application.ensure_all_started(:bandit)
@@ -18,10 +20,11 @@ defmodule PhoenixSocketClient.StateFunctionsTest do
   test "PhoenixSocketClient.get_state retrieves configuration" do
     name = :"test_config_#{System.unique_integer([:positive])}"
 
+    port = get_port()
     {:ok, _pid} =
       PhoenixSocketClient.start_link(
-        id: name,
-        url: "ws://127.0.0.1:#{@port}/ws/admin/websocket",
+        name: name,
+        url: "ws://127.0.0.1:#{port}/ws/admin/websocket",
         serializer: Jason,
         auto_connect: false,
         params: %{"test" => "value"}
@@ -39,10 +42,11 @@ defmodule PhoenixSocketClient.StateFunctionsTest do
   test "PhoenixSocketClient.put_state updates state" do
     name = :"test_update_#{System.unique_integer([:positive])}"
 
+    port = get_port()
     {:ok, _pid} =
       PhoenixSocketClient.start_link(
-        id: name,
-        url: "ws://127.0.0.1:#{@port}/ws/admin/websocket",
+        name: name,
+        url: "ws://127.0.0.1:#{port}/ws/admin/websocket",
         serializer: Jason,
         auto_connect: false
       )
@@ -55,10 +59,11 @@ defmodule PhoenixSocketClient.StateFunctionsTest do
   test "PhoenixSocketClient.get_process_pid works correctly" do
     name = :"test_pid_#{System.unique_integer([:positive])}"
 
+    port = get_port()
     {:ok, _pid} =
       PhoenixSocketClient.start_link(
-        id: name,
-        url: "ws://127.0.0.1:#{@port}/ws/admin/websocket",
+        name: name,
+        url: "ws://127.0.0.1:#{port}/ws/admin/websocket",
         serializer: Jason,
         auto_connect: false
       )

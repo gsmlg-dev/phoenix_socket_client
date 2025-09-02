@@ -1,7 +1,9 @@
 defmodule PhoenixSocketClient.StateTest do
   use ExUnit.Case, async: false
 
-  @port 5807
+  defp get_port do
+    Application.get_env(:phoenix_socket_client_test, :port, 5807)
+  end
 
   setup_all do
     Application.ensure_all_started(:bandit)
@@ -21,8 +23,8 @@ defmodule PhoenixSocketClient.StateTest do
 
       {:ok, _pid} =
         PhoenixSocketClient.start_link(
-          id: name,
-          url: "ws://127.0.0.1:#{@port}/ws/admin/websocket",
+          name: name,
+          url: "ws://127.0.0.1:#{get_port()}/ws/admin/websocket",
           serializer: Jason,
           auto_connect: false
         )
@@ -50,7 +52,7 @@ defmodule PhoenixSocketClient.StateTest do
       {:ok, _pid} =
         PhoenixSocketClient.start_link(
           name: name,
-          url: "ws://127.0.0.1:#{@port}/ws/admin/websocket",
+          url: "ws://127.0.0.1:#{get_port()}/ws/admin/websocket",
           serializer: Jason,
           params: %{"test" => "value"},
           auto_connect: false
@@ -58,7 +60,7 @@ defmodule PhoenixSocketClient.StateTest do
 
       # Test retrieving URL
       assert url = PhoenixSocketClient.get_state(name, :url)
-      assert url =~ "ws://127.0.0.1:#{@port}/ws/admin/websocket"
+      assert url =~ "ws://127.0.0.1:#{get_port()}/ws/admin/websocket"
 
       # Test retrieving params
       assert params = PhoenixSocketClient.get_state(name, :params)
@@ -73,8 +75,8 @@ defmodule PhoenixSocketClient.StateTest do
 
       {:ok, _pid} =
         PhoenixSocketClient.start_link(
-          id: name,
-          url: "ws://127.0.0.1:#{@port}/ws/admin/websocket",
+          name: name,
+          url: "ws://127.0.0.1:#{get_port()}/ws/admin/websocket",
           serializer: Jason,
           auto_connect: false
         )
@@ -95,7 +97,7 @@ defmodule PhoenixSocketClient.StateTest do
       {:ok, _pid1} =
         PhoenixSocketClient.start_link(
           name: name1,
-          url: "ws://127.0.0.1:#{@port}/ws/admin/websocket",
+          url: "ws://127.0.0.1:#{get_port()}/ws/admin/websocket",
           serializer: Jason,
           auto_connect: false
         )
@@ -103,7 +105,7 @@ defmodule PhoenixSocketClient.StateTest do
       {:ok, _pid2} =
         PhoenixSocketClient.start_link(
           name: name2,
-          url: "ws://127.0.0.1:#{@port}/ws/admin/websocket",
+          url: "ws://127.0.0.1:#{get_port()}/ws/admin/websocket",
           serializer: Jason,
           auto_connect: false
         )

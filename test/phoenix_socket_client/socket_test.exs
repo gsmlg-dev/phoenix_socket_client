@@ -3,13 +3,18 @@ defmodule PhoenixSocketClient.SocketTest do
 
   alias PhoenixSocketClient.Socket
 
-  @port 5807
+  defp get_port do
+    Application.get_env(:phoenix_socket_client_test, :port, 5807)
+  end
 
-  @socket_config [
-    url: "ws://127.0.0.1:#{@port}/ws/admin/websocket",
-    serializer: Jason,
-    reconnect_interval: 10
-  ]
+  defp get_socket_config do
+    port = get_port()
+    [
+      url: "ws://127.0.0.1:#{port}/ws/admin/websocket",
+      serializer: Jason,
+      reconnect_interval: 10
+    ]
+  end
 
   setup_all do
     Application.ensure_all_started(:bandit)
@@ -28,7 +33,7 @@ defmodule PhoenixSocketClient.SocketTest do
       name = :"socket_connect_#{System.unique_integer([:positive])}"
 
       {:ok, _pid} =
-        PhoenixSocketClient.start_link(Keyword.put(@socket_config, :id, name))
+        PhoenixSocketClient.start_link(Keyword.put(get_socket_config(), :id, name))
 
       wait_for_socket(name)
       assert Socket.connected?(name)
@@ -38,7 +43,7 @@ defmodule PhoenixSocketClient.SocketTest do
       name = :"socket_auto_#{System.unique_integer([:positive])}"
 
       {:ok, _pid} =
-        PhoenixSocketClient.start_link(Keyword.put(@socket_config, :id, name))
+        PhoenixSocketClient.start_link(Keyword.put(get_socket_config(), :id, name))
 
       # Default auto_connect is true, should connect automatically
       wait_for_socket(name)
@@ -50,7 +55,7 @@ defmodule PhoenixSocketClient.SocketTest do
       name = :"socket_no_auto_#{System.unique_integer([:positive])}"
 
       config =
-        @socket_config
+        get_socket_config()
         |> Keyword.put(:id, name)
         |> Keyword.put(:auto_connect, false)
 
@@ -65,7 +70,7 @@ defmodule PhoenixSocketClient.SocketTest do
       name = :"socket_status_#{System.unique_integer([:positive])}"
 
       {:ok, _pid} =
-        PhoenixSocketClient.start_link(Keyword.put(@socket_config, :id, name))
+        PhoenixSocketClient.start_link(Keyword.put(get_socket_config(), :id, name))
 
       # Initially disconnected/connecting
       refute Socket.connected?(name)
@@ -81,7 +86,7 @@ defmodule PhoenixSocketClient.SocketTest do
       config = [
         url: "ws://127.0.0.1:9999/ws/admin/websocket",
         serializer: Jason,
-        id: name,
+        name: name,
         reconnect_interval: 100
       ]
 
@@ -95,7 +100,7 @@ defmodule PhoenixSocketClient.SocketTest do
       name = :"socket_params_#{System.unique_integer([:positive])}"
 
       config =
-        @socket_config
+        get_socket_config()
         |> Keyword.put(:id, name)
         |> Keyword.put(:params, %{"custom" => "param"})
 
@@ -108,7 +113,7 @@ defmodule PhoenixSocketClient.SocketTest do
       name = :"socket_headers_#{System.unique_integer([:positive])}"
 
       config =
-        @socket_config
+        get_socket_config()
         |> Keyword.put(:id, name)
         |> Keyword.put(:headers, [{"x-custom", "header"}])
 

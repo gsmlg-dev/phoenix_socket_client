@@ -7,12 +7,16 @@ defmodule PhoenixSocketClientTest.MockServer do
     # Configure Phoenix
     Application.put_env(:phoenix, :json_library, Jason)
 
+    # Find an available port
+    port = find_available_port()
+    Application.put_env(:phoenix_socket_client_test, :port, port)
+
     # Configure endpoint
     Application.put_env(
       :channel_app,
       PhoenixSocketClientTest.Endpoint,
       https: false,
-      http: [port: 5807],
+      http: [port: port],
       secret_key_base: String.duplicate("abcdefgh", 8),
       debug_errors: false,
       code_reloader: false,
@@ -23,6 +27,20 @@ defmodule PhoenixSocketClientTest.MockServer do
 
     # Start the endpoint
     {:ok, _pid} = PhoenixSocketClientTest.Endpoint.start_link()
+    port
+  end
+
+  defp find_available_port do
+    # Try to find an available port starting from 5807
+    case :gen_tcp.listen(0, []) do
+      {:ok, listen_socket} ->
+        {:ok, port} = :inet.port(listen_socket)
+        :gen_tcp.close(listen_socket)
+        port
+      {:error, _} ->
+        # Fallback to a random port in a reasonable range
+        Enum.random(5808..65535)
+    end
   end
 end
 

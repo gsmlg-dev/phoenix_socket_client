@@ -3,15 +3,22 @@ defmodule PhoenixSocketClientTest do
 
   alias PhoenixSocketClient.{Socket, Channel, Message}
 
-  @port 5807
-
   @socket_config [
-    url: "ws://127.0.0.1:#{@port}/ws/admin/websocket",
+    url: nil, # Will be set dynamically
     serializer: Jason,
     reconnect_interval: 10,
     auto_connect: true,
     vsn: "2.0.0"
   ]
+
+  defp get_port do
+    Application.get_env(:phoenix_socket_client_test, :port, 5807)
+  end
+
+  defp get_socket_config do
+    port = get_port()
+    Keyword.put(@socket_config, :url, "ws://127.0.0.1:#{port}/ws/admin/websocket")
+  end
 
   setup_all do
     Application.ensure_all_started(:bandit)
@@ -29,7 +36,7 @@ defmodule PhoenixSocketClientTest do
     name = :"socket_#{System.unique_integer([:positive])}"
 
     {:ok, _pid} =
-      PhoenixSocketClient.start_link(Keyword.put(@socket_config, :name, name))
+      PhoenixSocketClient.start_link(Keyword.put(get_socket_config(), :name, name))
 
     wait_for_socket(name)
     assert {:ok, _, _channel} = Channel.join(name, "rooms:admin-lobby")
@@ -39,7 +46,7 @@ defmodule PhoenixSocketClientTest do
     name = :"socket_#{System.unique_integer([:positive])}"
 
     {:ok, _pid} =
-      PhoenixSocketClient.start_link(Keyword.put(@socket_config, :name, name))
+      PhoenixSocketClient.start_link(Keyword.put(get_socket_config(), :name, name))
 
     wait_for_socket(name)
     assert {:ok, _, _channel} = Channel.join(name, "rooms:admin-lobby")
@@ -50,7 +57,7 @@ defmodule PhoenixSocketClientTest do
     name = :"socket_#{System.unique_integer([:positive])}"
 
     {:ok, _pid} =
-      PhoenixSocketClient.start_link(Keyword.put(@socket_config, :name, name))
+      PhoenixSocketClient.start_link(Keyword.put(get_socket_config(), :name, name))
 
     wait_for_socket(name)
     message = %{"foo" => "bar"}
@@ -65,7 +72,7 @@ defmodule PhoenixSocketClientTest do
     name = :"socket_#{System.unique_integer([:positive])}"
 
     {:ok, _pid} =
-      PhoenixSocketClient.start_link(Keyword.put(@socket_config, :name, name))
+      PhoenixSocketClient.start_link(Keyword.put(get_socket_config(), :name, name))
 
     wait_for_socket(name)
     user_id = "123"
@@ -77,7 +84,7 @@ defmodule PhoenixSocketClientTest do
     name = :"socket_#{System.unique_integer([:positive])}"
 
     {:ok, _pid} =
-      PhoenixSocketClient.start_link(Keyword.put(@socket_config, :name, name))
+      PhoenixSocketClient.start_link(Keyword.put(get_socket_config(), :name, name))
 
     wait_for_socket(name)
     {:ok, _, channel} = Channel.join(name, "rooms:admin-lobby")
@@ -88,7 +95,7 @@ defmodule PhoenixSocketClientTest do
     name = :"socket_#{System.unique_integer([:positive])}"
 
     {:ok, _pid} =
-      PhoenixSocketClient.start_link(Keyword.put(@socket_config, :name, name))
+      PhoenixSocketClient.start_link(Keyword.put(get_socket_config(), :name, name))
 
     wait_for_socket(name)
     {:ok, _, channel} = Channel.join(name, "rooms:admin-lobby")
@@ -99,7 +106,7 @@ defmodule PhoenixSocketClientTest do
     name = :"socket_#{System.unique_integer([:positive])}"
 
     {:ok, _pid} =
-      PhoenixSocketClient.start_link(Keyword.put(@socket_config, :name, name))
+      PhoenixSocketClient.start_link(Keyword.put(get_socket_config(), :name, name))
 
     wait_for_socket(name)
     {:error, :timeout} = Channel.join(name, "rooms:join_timeout", %{}, 1)
@@ -109,7 +116,7 @@ defmodule PhoenixSocketClientTest do
     name = :"socket_#{System.unique_integer([:positive])}"
 
     {:ok, _pid} =
-      PhoenixSocketClient.start_link(Keyword.put(@socket_config, :name, name))
+      PhoenixSocketClient.start_link(Keyword.put(get_socket_config(), :name, name))
 
     wait_for_socket(name)
     {:ok, _, channel} = Channel.join(name, "rooms:admin-lobby")
@@ -120,7 +127,7 @@ defmodule PhoenixSocketClientTest do
     name = :"socket_#{System.unique_integer([:positive])}"
 
     {:ok, _pid} =
-      PhoenixSocketClient.start_link(Keyword.put(@socket_config, :name, name))
+      PhoenixSocketClient.start_link(Keyword.put(get_socket_config(), :name, name))
 
     wait_for_socket(name)
     {:ok, _, channel} = Channel.join(name, "rooms:admin-lobby")
@@ -144,11 +151,12 @@ defmodule PhoenixSocketClientTest do
   test "socket params can be set in url" do
     name = :"socket_#{System.unique_integer([:positive])}"
 
+    port = get_port()
     opts = [
-      url: "ws://127.0.0.1:#{@port}/ws/admin/websocket?reject=true",
+      url: "ws://127.0.0.1:#{port}/ws/admin/websocket?reject=true",
       serializer: Jason,
       caller: self(),
-      id: name
+      name: name
     ]
 
     {:ok, _pid} = PhoenixSocketClient.start_link(opts)
@@ -175,9 +183,10 @@ defmodule PhoenixSocketClientTest do
       name = :"test_socket_#{System.unique_integer([:positive])}"
 
       {:ok, _pid} =
+        port = get_port()
         PhoenixSocketClient.start_link(
           name: name,
-          url: "ws://127.0.0.1:#{@port}/ws/admin/websocket",
+          url: "ws://127.0.0.1:#{port}/ws/admin/websocket",
           serializer: Jason
         )
 
@@ -206,14 +215,15 @@ defmodule PhoenixSocketClientTest do
       {:ok, _pid} =
         PhoenixSocketClient.start_link(
           name: name,
-          url: "ws://127.0.0.1:#{@port}/ws/admin/websocket",
+          url: "ws://127.0.0.1:#{get_port()}/ws/admin/websocket",
           serializer: Jason,
           params: %{"test" => "value"}
         )
 
       # Test retrieving URL
       assert url = PhoenixSocketClient.get_state(name, :url)
-      assert url =~ "ws://127.0.0.1:#{@port}/ws/admin/websocket"
+      port = get_port()
+      assert url =~ "ws://127.0.0.1:#{port}/ws/admin/websocket"
 
       # Test retrieving status
       assert status = PhoenixSocketClient.get_state(name, :status)
@@ -235,9 +245,10 @@ defmodule PhoenixSocketClientTest do
       name = :"test_socket_#{System.unique_integer([:positive])}"
 
       {:ok, _pid} =
+        port = get_port()
         PhoenixSocketClient.start_link(
           name: name,
-          url: "ws://127.0.0.1:#{@port}/ws/admin/websocket",
+          url: "ws://127.0.0.1:#{port}/ws/admin/websocket",
           serializer: Jason
         )
 
@@ -272,14 +283,14 @@ defmodule PhoenixSocketClientTest do
       {:ok, _pid1} =
         PhoenixSocketClient.start_link(
           name: name1,
-          url: "ws://127.0.0.1:#{@port}/ws/admin/websocket",
+          url: "ws://127.0.0.1:#{get_port()}/ws/admin/websocket",
           serializer: Jason
         )
 
       {:ok, _pid2} =
         PhoenixSocketClient.start_link(
           name: name2,
-          url: "ws://127.0.0.1:#{@port}/ws/admin/websocket",
+          url: "ws://127.0.0.1:#{get_port()}/ws/admin/websocket",
           serializer: Jason
         )
 
