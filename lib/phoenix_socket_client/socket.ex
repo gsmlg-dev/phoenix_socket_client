@@ -5,7 +5,7 @@ defmodule PhoenixSocketClient.Socket do
   alias PhoenixSocketClient.Message
   alias PhoenixSocketClient.Telemetry
 
-  import PhoenixSocketClient, only: [:get_state, :put_state, :get_process_pid]
+  import PhoenixSocketClient, only: [get_state: 2, put_state: 3, get_process_pid: 2]
 
   def start_link(opts) do
     GenServer.start_link(__MODULE__, opts)
@@ -76,14 +76,7 @@ defmodule PhoenixSocketClient.Socket do
   end
 
   @impl true
-  def init(%{sup_pid: sup_pid} = opts) do
-    # Update socket state status to disconnected
-    update_socket_state_status(sup_pid, :disconnected)
-
-    if get_state(sup_pid, :auto_connect) do
-      Process.send_after(self(), :connect, 0)
-    end
-
+  def init(%{sup_pid: sup_pid} = _opts) do
     {:ok,
      %{
        sup_pid: sup_pid,

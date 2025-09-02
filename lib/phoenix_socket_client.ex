@@ -26,13 +26,40 @@ defmodule PhoenixSocketClient do
       {PhoenixSocketClient.Socket, opts}
       |> Supervisor.child_spec(id: :socket),
       {PhoenixSocketClient.ChannelManager, opts}
-      |> Supervisor.child_spec(id: :channel_manager)
+      |> Supervisor.child_spec(id: :channel_manager),
+      {Task,
+       fn ->
+         if get_state(sup_pid, :auto_connect) do
+           connect(sup_pid)
+         end
+       end}
+      |> Supervisor.child_spec(id: :post_start)
     ]
 
     Supervisor.init(children, strategy: :one_for_one)
   end
 
-  def get_process_pid(sup_pid, name) do
+  def connect(sup_pid) do
+    case get_process_pid(sup_pid, :socket) do
+      nil ->
+        {:error, :no_socket_found}
+
+      socket_pid ->
+        send(socket_pid, :connect)
+    end
+  end
+
+  def get_process_pid(sup_name, name) when is_atom(sup_name) do
+    case Process.whereis(sup_name) do
+      nil ->
+        nil
+
+      sup_pid ->
+        get_process_pid(sup_pid, name)
+    end
+  end
+
+  def get_process_pid(sup_pid, name) when is_pid(sup_pid) do
     try do
       case Process.alive?(sup_pid) do
         false ->
@@ -55,12 +82,32 @@ defmodule PhoenixSocketClient do
     end
   end
 
-  def get_state(pid, key) do
+  def get_state(name, key) when is_atom(name) do
+    case Process.whereis(name) do
+      nil ->
+        nil
+
+      sup_pid ->
+        get_state(sup_pid, key)
+    end
+  end
+
+  def get_state(pid, key) when is_pid(pid) do
     state_pid = get_process_pid(pid, :socket_state)
     PhoenixSocketClient.SocketState.get(state_pid, key)
   end
 
-  def put_state(pid, key, value) do
+  def put_state(name, key, value) when is_atom(name) do
+    case Process.whereis(name) do
+      nil ->
+        nil
+
+      sup_pid ->
+        put_state(sup_pid, key, value)
+    end
+  end
+
+  def put_state(pid, key, value) when is_pid(pid) do
     state_pid = get_process_pid(pid, :socket_state)
     PhoenixSocketClient.SocketState.put(state_pid, key, value)
   end

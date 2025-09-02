@@ -1,0 +1,40 @@
+defmodule PhoenixSocketClient.QuickTest do
+  use ExUnit.Case, async: false
+
+  @port 5807
+
+  setup_all do
+    Application.ensure_all_started(:bandit)
+    Application.ensure_all_started(:phoenix)
+    Application.ensure_all_started(:jason)
+    :ok
+  end
+
+  test "basic startup works" do
+    name = :"test_basic_#{System.unique_integer([:positive])}"
+    IO.inspect(name)
+    # Test basic startup without connection
+    {:ok, pid} =
+      PhoenixSocketClient.start_link(
+        id: name,
+        url: "ws://127.0.0.1:#{@port}/ws/admin/websocket",
+        serializer: Jason,
+        auto_connect: false,
+        reconnect_interval: 1000
+      )
+
+    IO.inspect({:pid, pid})
+    assert is_pid(pid)
+    assert Process.alive?(pid)
+
+    # Test state retrieval
+    assert url = PhoenixSocketClient.get_state(pid, :url)
+    assert url =~ "ws://127.0.0.1"
+
+    # Test process pid retrieval
+    assert state_pid = PhoenixSocketClient.get_process_pid(pid, :socket_state)
+    assert is_pid(state_pid)
+
+    Process.exit(pid, :normal)
+  end
+end

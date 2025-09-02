@@ -17,7 +17,8 @@ defmodule PhoenixSocketClientTest.MockServer do
       debug_errors: false,
       code_reloader: false,
       server: true,
-      pubsub: [adapter: Phoenix.PubSub.PG2, name: :int_pub]
+      adapter: Bandit.PhoenixAdapter,
+      pubsub_server: :int_pub
     )
 
     # Start the endpoint
@@ -36,6 +37,8 @@ defmodule PhoenixSocketClientTest.AdminSocket do
 
   channel("rooms:*", PhoenixSocketClientTest.RoomChannel)
   channel("topic:*", PhoenixSocketClientTest.TopicChannel)
+
+  def id(_socket), do: nil
 end
 
 defmodule PhoenixSocketClientTest.RoomChannel do
