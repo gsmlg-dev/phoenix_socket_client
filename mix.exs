@@ -34,6 +34,7 @@ defmodule PhoenixSocketClient.Mixfile do
       {:websocket_client, "~> 1.3"},
       {:telemetry, "~> 1.0"},
       {:phoenix, "~> 1.7", only: :test},
+      {:phoenix_pubsub, "~> 2.0", only: :test},
       {:bandit, "~> 1.0", only: :test},
       {:ex_doc, "~> 0.18", only: :dev}
     ]

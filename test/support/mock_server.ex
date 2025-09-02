@@ -11,9 +11,9 @@ defmodule PhoenixSocketClientTest.MockServer do
     port = find_available_port()
     Application.put_env(:phoenix_socket_client_test, :port, port)
 
-    # Configure endpoint
+    # Configure endpoint - Phoenix will handle PubSub internally
     Application.put_env(
-      :channel_app,
+      :phoenix_socket_client_test,
       PhoenixSocketClientTest.Endpoint,
       https: false,
       http: [port: port],
@@ -22,12 +22,30 @@ defmodule PhoenixSocketClientTest.MockServer do
       code_reloader: false,
       server: true,
       adapter: Bandit.PhoenixAdapter,
-      pubsub_server: :int_pub
+      pubsub_server: PhoenixSocketClientTest.PubSub,
+      render_errors: [formats: [json: PhoenixSocketClientTest.ErrorView], accepts: ~w(json)]
     )
 
-    # Start the endpoint
+    # Start the endpoint - it will start PubSub automatically
     {:ok, _pid} = PhoenixSocketClientTest.Endpoint.start_link()
+
+    # Give it a moment to start
+    Process.sleep(100)
+
+    IO.puts("Mock server started on port #{port}")
     port
+  end
+
+  def stop do
+    # Find and stop the endpoint
+    case Process.whereis(PhoenixSocketClientTest.Endpoint) do
+      nil ->
+        :ok
+
+      pid ->
+        Process.exit(pid, :shutdown)
+        :ok
+    end
   end
 
   defp find_available_port do
@@ -37,6 +55,7 @@ defmodule PhoenixSocketClientTest.MockServer do
         {:ok, port} = :inet.port(listen_socket)
         :gen_tcp.close(listen_socket)
         port
+
       {:error, _} ->
         # Fallback to a random port in a reasonable range
         Enum.random(5808..65535)
@@ -45,9 +64,29 @@ defmodule PhoenixSocketClientTest.MockServer do
 end
 
 defmodule PhoenixSocketClientTest.Endpoint do
-  use Phoenix.Endpoint, otp_app: :channel_app
+  use Phoenix.Endpoint, otp_app: :phoenix_socket_client_test
+
+  @session_options [
+    store: :cookie,
+    key: "_test_key",
+    signing_salt: "test_salt"
+  ]
 
   socket("/ws/admin", PhoenixSocketClientTest.AdminSocket, websocket: [check_origin: false])
+
+  # Add this plug to handle basic HTTP requests
+  plug(Plug.RequestId)
+  plug(Plug.Telemetry, event_prefix: [:phoenix, :endpoint])
+
+  plug(Plug.Parsers,
+    parsers: [:urlencoded, :multipart, :json],
+    pass: ["*/*"],
+    json_decoder: Phoenix.json_library()
+  )
+
+  plug(Plug.MethodOverride)
+  plug(Plug.Head)
+  plug(Plug.Session, @session_options)
 end
 
 defmodule PhoenixSocketClientTest.AdminSocket do
@@ -56,6 +95,7 @@ defmodule PhoenixSocketClientTest.AdminSocket do
   channel("rooms:*", PhoenixSocketClientTest.RoomChannel)
   channel("topic:*", PhoenixSocketClientTest.TopicChannel)
 
+  def connect(_params, socket), do: {:ok, socket}
   def id(_socket), do: nil
 end
 
@@ -64,7 +104,8 @@ defmodule PhoenixSocketClientTest.RoomChannel do
   require Logger
 
   def join("rooms:headers", _message, socket) do
-    {:ok, socket.assigns.headers, socket}
+    headers = socket.assigns[:headers] || %{}
+    {:ok, headers, socket}
   end
 
   def join("rooms:join_timeout", message, socket) do
@@ -113,5 +154,11 @@ defmodule PhoenixSocketClientTest.TopicChannel do
   def handle_in("shout", message, socket) do
     broadcast!(socket, "shout", message)
     {:reply, {:ok, %{msg: message["body"]}}, socket}
+  end
+end
+
+defmodule PhoenixSocketClientTest.ErrorView do
+  def render(template, _assigns) do
+    %{errors: %{detail: Phoenix.Controller.status_message_from_template(template)}}
   end
 end

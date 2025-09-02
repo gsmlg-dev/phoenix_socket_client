@@ -21,6 +21,7 @@ defmodule PhoenixSocketClient.StateFunctionsTest do
     name = :"test_config_#{System.unique_integer([:positive])}"
 
     port = get_port()
+
     {:ok, _pid} =
       PhoenixSocketClient.start_link(
         name: name,
@@ -43,6 +44,7 @@ defmodule PhoenixSocketClient.StateFunctionsTest do
     name = :"test_update_#{System.unique_integer([:positive])}"
 
     port = get_port()
+
     {:ok, _pid} =
       PhoenixSocketClient.start_link(
         name: name,
@@ -60,6 +62,7 @@ defmodule PhoenixSocketClient.StateFunctionsTest do
     name = :"test_pid_#{System.unique_integer([:positive])}"
 
     port = get_port()
+
     {:ok, _pid} =
       PhoenixSocketClient.start_link(
         name: name,

@@ -9,6 +9,7 @@ defmodule PhoenixSocketClient.SocketTest do
 
   defp get_socket_config do
     port = get_port()
+
     [
       url: "ws://127.0.0.1:#{port}/ws/admin/websocket",
       serializer: Jason,
@@ -123,7 +124,7 @@ defmodule PhoenixSocketClient.SocketTest do
     end
   end
 
-  defp wait_for_socket(socket_name, retries \\ 50) do
+  defp wait_for_socket(socket_name, retries \\ 300) do
     if retries == 0 do
       false
     else

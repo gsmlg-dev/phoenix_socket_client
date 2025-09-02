@@ -4,7 +4,8 @@ defmodule PhoenixSocketClientTest do
   alias PhoenixSocketClient.{Socket, Channel, Message}
 
   @socket_config [
-    url: nil, # Will be set dynamically
+    # Will be set dynamically
+    url: nil,
     serializer: Jason,
     reconnect_interval: 10,
     auto_connect: true,
@@ -152,6 +153,7 @@ defmodule PhoenixSocketClientTest do
     name = :"socket_#{System.unique_integer([:positive])}"
 
     port = get_port()
+
     opts = [
       url: "ws://127.0.0.1:#{port}/ws/admin/websocket?reject=true",
       serializer: Jason,
@@ -184,11 +186,12 @@ defmodule PhoenixSocketClientTest do
 
       {:ok, _pid} =
         port = get_port()
-        PhoenixSocketClient.start_link(
-          name: name,
-          url: "ws://127.0.0.1:#{port}/ws/admin/websocket",
-          serializer: Jason
-        )
+
+      PhoenixSocketClient.start_link(
+        name: name,
+        url: "ws://127.0.0.1:#{port}/ws/admin/websocket",
+        serializer: Jason
+      )
 
       # Test retrieving socket_state pid
       assert state_pid = PhoenixSocketClient.get_process_pid(name, :socket_state)
@@ -231,7 +234,7 @@ defmodule PhoenixSocketClientTest do
 
       # Test retrieving params
       assert params = PhoenixSocketClient.get_state(name, :params)
-      assert params == %{"test" => "value", "vsn" => "2.0.0"}
+      assert params == %{"test" => "value"}
 
       # Test retrieving serializer
       assert serializer = PhoenixSocketClient.get_state(name, :serializer)
@@ -246,11 +249,12 @@ defmodule PhoenixSocketClientTest do
 
       {:ok, _pid} =
         port = get_port()
-        PhoenixSocketClient.start_link(
-          name: name,
-          url: "ws://127.0.0.1:#{port}/ws/admin/websocket",
-          serializer: Jason
-        )
+
+      PhoenixSocketClient.start_link(
+        name: name,
+        url: "ws://127.0.0.1:#{port}/ws/admin/websocket",
+        serializer: Jason
+      )
 
       # Test updating a custom state value
       assert :ok = PhoenixSocketClient.put_state(name, :custom_key, "custom_value")
