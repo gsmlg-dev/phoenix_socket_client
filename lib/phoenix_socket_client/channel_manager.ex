@@ -18,9 +18,13 @@ defmodule PhoenixSocketClient.ChannelManager do
           sup_pid
           |> Supervisor.which_children()
           |> Enum.find_value(fn
-            {process_name, process_pid, _, _}
-            when is_pid(process_pid) and process_name == topic ->
-              process_pid
+            {_id, process_pid, _, _} ->
+              # id - it is always :undefined for dynamic supervisors
+              if :sys.get_state(process_pid).topic == topic do
+                process_pid
+              else
+                nil
+              end
 
             _ ->
               nil
@@ -52,5 +56,12 @@ defmodule PhoenixSocketClient.ChannelManager do
 
   def init(_opts) do
     DynamicSupervisor.init(strategy: :one_for_one)
+  end
+
+  def terminate(cm_pid) when is_pid(cm_pid) do
+    DynamicSupervisor.which_children(cm_pid)
+    |> Enum.each(fn {_id, process_pid, _, _} ->
+      DynamicSupervisor.terminate_child(cm_pid, process_pid)
+    end)
   end
 end

@@ -77,12 +77,26 @@ defmodule PhoenixSocketClient.Socket do
 
   @impl true
   def init(%{sup_pid: sup_pid} = _opts) do
+    Process.flag(:trap_exit, true)
+
     {:ok,
      %{
        sup_pid: sup_pid,
        status: :disconnected,
+       transport_ref: nil,
        transport_pid: nil
-     }}
+     }, {:continue, :post_start}}
+  end
+
+  @impl true
+  def handle_continue(:post_start, %{sup_pid: sup_pid} = state) do
+    Process.sleep(1_000)
+
+    if get_state(sup_pid, :auto_connect) do
+      Process.send(self(), :connect, [:noconnect])
+    end
+
+    {:noreply, state}
   end
 
   @impl true
@@ -108,7 +122,15 @@ defmodule PhoenixSocketClient.Socket do
               transport_pid: transport_pid
             })
 
-            state = %{state | transport_pid: transport_pid, status: :connecting}
+            transport_ref = Process.monitor(transport_pid)
+
+            state = %{
+              state
+              | transport_pid: transport_pid,
+                status: :connecting,
+                transport_ref: transport_ref
+            }
+
             update_socket_state_status(sup_pid, :connecting)
             {:noreply, state}
 
@@ -128,32 +150,10 @@ defmodule PhoenixSocketClient.Socket do
     url = get_state(sup_pid, :url)
     Telemetry.debug(self(), "Connection: connected", url, %{transport_pid: transport_pid})
 
-    # Check if we should reject based on URL params
-    uri = URI.parse(url)
-
-    query_params =
-      if uri.query do
-        URI.decode_query(uri.query)
-      else
-        %{}
-      end
-
-    # Check if we should reject based on params
-    params = get_state(sup_pid, :params)
-
-    reject_param = params["reject"] || query_params["reject"]
-
-    if reject_param in ["true", true] do
-      Telemetry.debug(self(), "Connection: rejecting due to params", url)
-      Telemetry.socket_connection_error(self(), url, :rejected)
-      send(transport_pid, :close)
-      {:noreply, close(:rejected, state)}
-    else
-      Telemetry.socket_connected(self(), url)
-      state = %{state | status: :connected, transport_pid: transport_pid}
-      update_socket_state_status(sup_pid, :connected)
-      {:noreply, state}
-    end
+    Telemetry.socket_connected(self(), url)
+    state = %{state | status: :connected, transport_pid: transport_pid}
+    update_socket_state_status(sup_pid, :connected)
+    {:noreply, state}
   end
 
   @impl true
@@ -161,6 +161,8 @@ defmodule PhoenixSocketClient.Socket do
     url = get_state(sup_pid, :url)
     Telemetry.debug(self(), "Connection: disconnected", url, %{reason: reason})
     Telemetry.socket_disconnected(self(), url, reason)
+    cm_pid = get_process_pid(sup_pid, :channel_manager)
+    ChannelManager.terminate(cm_pid)
     {:noreply, close(reason, state)}
   end
 
@@ -181,7 +183,7 @@ defmodule PhoenixSocketClient.Socket do
     {:noreply, %{state | to_send_r: []}}
   end
 
-  def handle_info(%PhoenixSocketClient.Message{} = message, %{sup_pid: sup_pid} = state) do
+  def handle_info(%Message{} = message, %{sup_pid: sup_pid} = state) do
     url = get_state(sup_pid, :url)
     Telemetry.debug(self(), "Connection: received message struct", url, %{message: message})
     # Handle message structs that might be sent directly
@@ -204,8 +206,48 @@ defmodule PhoenixSocketClient.Socket do
   end
 
   @impl true
+  def handle_info(
+        {:DOWN, ref, :process, pid, reason},
+        %{sup_pid: sup_pid, transport_ref: transport_ref, transport_pid: transport_pid} = state
+      ) do
+    if ref == transport_ref do
+      url = get_state(sup_pid, :url)
+
+      Telemetry.debug(self(), "Connection process: DOWN", url, %{
+        reason: reason,
+        transport_pid: transport_pid,
+        transport_ref: transport_ref
+      })
+
+      {:noreply, close(:shutdown, state)}
+    else
+      {:noreply, state}
+    end
+  end
+
+  @impl true
+  def handle_info(
+        {:EXIT, _from_pid, reason},
+        state
+      ) do
+    terminate(reason, state)
+
+    {:noreply, state}
+  end
+
+  @impl true
+  def terminate(reason, %{transport_pid: transport_pid} = state) do
+    Process.exit(transport_pid, reason)
+  end
+
+  @impl true
   def handle_call(:get_status, _from, state) do
     {:reply, state[:status] || :disconnected, state}
+  end
+
+  @impl true
+  def handle_call(:get_state, _from, state) do
+    {:reply, state, state}
   end
 
   @impl true
@@ -222,6 +264,12 @@ defmodule PhoenixSocketClient.Socket do
     else
       {:reply, {:error, :not_connected}, state}
     end
+  end
+
+  @impl true
+  def handle_call(not_matched, _from, state) do
+    IO.inspect({:not_matched_handle_call, not_matched, state})
+    {:noreply, state}
   end
 
   defp transport_receive(message, %{sup_pid: sup_pid} = _state) do

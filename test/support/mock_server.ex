@@ -11,8 +11,14 @@ defmodule PhoenixSocketClientTest.MockServer do
     port = find_available_port()
     Application.put_env(:phoenix_socket_client_test, :port, port)
 
+    Task.Supervisor.start_link(name: PhoenixSocketClientTest.TaskSupervisor)
+
     # Start PubSub
-    {:ok, _} = Supervisor.start_link([{Phoenix.PubSub, [name: PhoenixSocketClientTest.PubSub, adapter: Phoenix.PubSub.PG2]}], strategy: :one_for_one)
+    {:ok, _} =
+      Supervisor.start_link(
+        [{Phoenix.PubSub, [name: PhoenixSocketClientTest.PubSub, adapter: Phoenix.PubSub.PG2]}],
+        strategy: :one_for_one
+      )
 
     # Configure endpoint - Phoenix will handle PubSub internally
     Application.put_env(
@@ -98,8 +104,39 @@ defmodule PhoenixSocketClientTest.AdminSocket do
   channel("rooms:*", PhoenixSocketClientTest.RoomChannel)
   channel("topic:*", PhoenixSocketClientTest.TopicChannel)
 
-  def connect(_params, socket), do: {:ok, socket}
+  def connect(params, socket, connect_info) do
+    on_connect(self(), %{
+      params: params,
+      connect_info: connect_info
+    })
+
+    {:ok, socket}
+  end
+
   def id(_socket), do: nil
+
+  def on_connect(pid, info) do
+    # Log info connected, increase gauge, etc.
+    monitor(pid, info)
+    IO.inspect({:connected, info})
+  end
+
+  def on_disconnect(info) do
+    # Log info disconnected, decrease gauge, etc.
+    IO.inspect({:disconnected, info})
+  end
+
+  defp monitor(pid, info) do
+    Task.Supervisor.start_child(PhoenixSocketClientTest.TaskSupervisor, fn ->
+      Process.flag(:trap_exit, true)
+      ref = Process.monitor(pid)
+
+      receive do
+        {:DOWN, ^ref, :process, _pid, _reason} ->
+          on_disconnect(info)
+      end
+    end)
+  end
 end
 
 defmodule PhoenixSocketClientTest.RoomChannel do

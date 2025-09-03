@@ -169,7 +169,6 @@ defmodule PhoenixSocketClientTest do
     refute Socket.connected?(name)
   end
 
-
   describe "PhoenixSocketClient state management" do
     test "get_process_pid retrieves correct process pids" do
       name = :"test_socket_#{System.unique_integer([:positive])}"
