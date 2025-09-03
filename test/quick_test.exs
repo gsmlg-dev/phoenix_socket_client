@@ -25,7 +25,6 @@ defmodule PhoenixSocketClient.QuickTest do
         reconnect_interval: 1000
       )
 
-    IO.inspect({:pid, pid})
     assert is_pid(pid)
     assert Process.alive?(pid)
 

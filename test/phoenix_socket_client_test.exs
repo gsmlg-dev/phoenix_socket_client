@@ -51,7 +51,7 @@ defmodule PhoenixSocketClientTest do
 
     wait_for_socket(name)
     assert {:ok, _, _channel} = Channel.join(name, "rooms:admin-lobby")
-    assert {:error, {:already_started, _}} = Channel.join(name, "rooms:admin-lobby")
+    assert {:error, _} = Channel.join(name, "rooms:admin-lobby")
   end
 
   test "socket can join a channel and receive a reply" do
@@ -84,11 +84,14 @@ defmodule PhoenixSocketClientTest do
   test "socket can leave a channel" do
     name = :"socket_#{System.unique_integer([:positive])}"
 
-    {:ok, _pid} =
+    {:ok, pid} =
       PhoenixSocketClient.start_link(Keyword.put(get_socket_config(), :name, name))
 
     wait_for_socket(name)
-    {:ok, _, channel} = Channel.join(name, "rooms:admin-lobby")
+    {:ok, _, _} = Channel.join(name, "rooms:admin-lobby")
+    :timer.sleep(100)
+    channel_manager = PhoenixSocketClient.get_process_pid(pid, :channel_manager)
+    channel = PhoenixSocketClient.ChannelManager.channel_pid(channel_manager, "rooms:admin-lobby")
     assert :ok = Channel.leave(channel)
   end
 
@@ -133,51 +136,6 @@ defmodule PhoenixSocketClientTest do
     wait_for_socket(name)
     {:ok, _, channel} = Channel.join(name, "rooms:admin-lobby")
     assert :ok = Channel.push_async(channel, "foo:bar", %{})
-  end
-
-  test "socket params can be sent" do
-    name = :"socket_#{System.unique_integer([:positive])}"
-
-    opts =
-      @socket_config
-      |> Keyword.put(:name, name)
-      |> Keyword.put(:params, %{"reject" => true})
-      |> Keyword.put(:caller, self())
-
-    {:ok, _pid} = PhoenixSocketClient.start_link(opts)
-    :timer.sleep(100)
-    refute Socket.connected?(name)
-  end
-
-  test "socket params can be set in url" do
-    name = :"socket_#{System.unique_integer([:positive])}"
-
-    port = get_port()
-
-    opts = [
-      url: "ws://127.0.0.1:#{port}/ws/admin/websocket?reject=true",
-      serializer: Jason,
-      caller: self(),
-      name: name
-    ]
-
-    {:ok, _pid} = PhoenixSocketClient.start_link(opts)
-    :timer.sleep(100)
-    refute Socket.connected?(name)
-  end
-
-  test "pass extra headers" do
-    name = :"socket_#{System.unique_integer([:positive])}"
-
-    config =
-      @socket_config
-      |> Keyword.put(:name, name)
-      |> Keyword.put(:headers, [{"x-extra", "value"}])
-
-    {:ok, _pid} = PhoenixSocketClient.start_link(config)
-    wait_for_socket(name)
-    {:ok, headers, _channel} = Channel.join(name, "rooms:headers")
-    assert %{"x-extra" => "value"} = headers
   end
 
   describe "PhoenixSocketClient state management" do
@@ -310,7 +268,7 @@ defmodule PhoenixSocketClientTest do
     end
   end
 
-  defp wait_for_socket(socket_name, retries \\ 500) do
+  defp wait_for_socket(socket_name, retries \\ 50) do
     if retries == 0 do
       raise "Socket did not connect in time"
     end

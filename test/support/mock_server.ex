@@ -11,6 +11,15 @@ defmodule PhoenixSocketClientTest.MockServer do
     port = find_available_port()
     Application.put_env(:phoenix_socket_client_test, :port, port)
 
+    Task.Supervisor.start_link(name: PhoenixSocketClientTest.TaskSupervisor)
+
+    # Start PubSub
+    {:ok, _} =
+      Supervisor.start_link(
+        [{Phoenix.PubSub, [name: PhoenixSocketClientTest.PubSub, adapter: Phoenix.PubSub.PG2]}],
+        strategy: :one_for_one
+      )
+
     # Configure endpoint - Phoenix will handle PubSub internally
     Application.put_env(
       :phoenix_socket_client_test,
@@ -96,8 +105,39 @@ defmodule PhoenixSocketClientTest.AdminSocket do
   channel("rooms:*", PhoenixSocketClientTest.RoomChannel)
   channel("topic:*", PhoenixSocketClientTest.TopicChannel)
 
-  def connect(_params, socket), do: {:ok, socket}
+  def connect(params, socket, connect_info) do
+    on_connect(self(), %{
+      params: params,
+      connect_info: connect_info
+    })
+
+    {:ok, socket}
+  end
+
   def id(_socket), do: nil
+
+  def on_connect(pid, info) do
+    # Log info connected, increase gauge, etc.
+    monitor(pid, info)
+    IO.inspect({:connected, info})
+  end
+
+  def on_disconnect(info) do
+    # Log info disconnected, decrease gauge, etc.
+    IO.inspect({:disconnected, info})
+  end
+
+  defp monitor(pid, info) do
+    Task.Supervisor.start_child(PhoenixSocketClientTest.TaskSupervisor, fn ->
+      Process.flag(:trap_exit, true)
+      ref = Process.monitor(pid)
+
+      receive do
+        {:DOWN, ^ref, :process, _pid, _reason} ->
+          on_disconnect(info)
+      end
+    end)
+  end
 end
 
 defmodule PhoenixSocketClientTest.RoomChannel do
@@ -118,7 +158,11 @@ defmodule PhoenixSocketClientTest.RoomChannel do
     {:ok, message, socket}
   end
 
-  def join("rooms:admin-lobby", _message, socket) do
+  def join("rooms:admin-lobby", message, socket) do
+    if user_id = message["user"] do
+      send(self(), {:after_join, user_id})
+    end
+
     {:ok, socket}
   end
 
@@ -126,9 +170,14 @@ defmodule PhoenixSocketClientTest.RoomChannel do
     raise "crash"
   end
 
+  def handle_info({:after_join, user_id}, socket) do
+    push(socket, "user:entered", %{"user" => user_id})
+    {:noreply, socket}
+  end
+
   def handle_in("new:msg", message, socket) do
     broadcast!(socket, "new:msg", message)
-    {:reply, {:ok, %{msg: message["body"]}}, socket}
+    {:reply, {:ok, message}, socket}
   end
 
   def handle_in("ping", _message, socket) do
@@ -137,6 +186,10 @@ defmodule PhoenixSocketClientTest.RoomChannel do
 
   def handle_in("boom", _message, _socket) do
     raise "boom"
+  end
+
+  def handle_in("foo:bar", _message, socket) do
+    {:noreply, socket}
   end
 end
 

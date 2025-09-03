@@ -2,6 +2,7 @@ defmodule PhoenixSocketClient.ChannelManager do
   use DynamicSupervisor
 
   alias PhoenixSocketClient.Channel
+  import PhoenixSocketClient, only: [get_state: 2, put_state: 3, get_process_pid: 2]
 
   def start_link(opts) do
     opts = if Keyword.keyword?(opts), do: opts, else: Map.to_list(opts)
@@ -18,9 +19,13 @@ defmodule PhoenixSocketClient.ChannelManager do
           sup_pid
           |> Supervisor.which_children()
           |> Enum.find_value(fn
-            {process_name, process_pid, _, _}
-            when is_pid(process_pid) and process_name == topic ->
-              process_pid
+            {_id, process_pid, _, _} ->
+              # id - it is always :undefined for dynamic supervisors
+              if :sys.get_state(process_pid).topic == topic do
+                process_pid
+              else
+                nil
+              end
 
             _ ->
               nil
@@ -32,12 +37,15 @@ defmodule PhoenixSocketClient.ChannelManager do
     end
   end
 
-  def start_channel(pid, socket, topic, params, channel_module \\ Channel) do
+  def start_channel(sup_pid, topic, params, channel_module \\ Channel) do
+    socket_pid = get_process_pid(sup_pid, :socket)
+    cm_pid = get_process_pid(sup_pid, :channel_manager)
+
     spec =
-      {channel_module, {socket, topic, params}}
+      {channel_module, {sup_pid, socket_pid, topic, params}}
       |> Supervisor.child_spec(id: topic)
 
-    case DynamicSupervisor.start_child(pid, spec) do
+    case DynamicSupervisor.start_child(cm_pid, spec) do
       {:ok, channel_pid} -> {:ok, channel_pid}
       {:error, {:already_started, channel_pid}} -> {:error, {:already_started, channel_pid}}
       {:error, {:already_started, _, channel_pid}} -> {:error, {:already_started, channel_pid}}
@@ -52,5 +60,12 @@ defmodule PhoenixSocketClient.ChannelManager do
 
   def init(_opts) do
     DynamicSupervisor.init(strategy: :one_for_one)
+  end
+
+  def terminate(cm_pid) when is_pid(cm_pid) do
+    DynamicSupervisor.which_children(cm_pid)
+    |> Enum.each(fn {_id, process_pid, _, _} ->
+      DynamicSupervisor.terminate_child(cm_pid, process_pid)
+    end)
   end
 end
