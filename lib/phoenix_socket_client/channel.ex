@@ -35,7 +35,7 @@ defmodule PhoenixSocketClient.Channel do
   def join(nil, _topic, _params, _timeout), do: {:error, :socket_not_started}
 
   def join(socket_pid, topic, params, timeout) do
-    if socket_pid |> is_pid() and Socket.connected?(socket_pid) do
+    if Socket.connected?(socket_pid) do
       case Socket.channel_join(socket_pid, topic, params) do
         {:ok, pid} -> do_join(pid, timeout)
         {:error, {:already_started, _}} = error -> error

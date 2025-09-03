@@ -232,12 +232,13 @@ defmodule PhoenixSocketClient.Socket do
       ) do
     terminate(reason, state)
 
-    {:noreply, state}
+    {:noreply, close(reason, state)}
   end
 
   @impl true
-  def terminate(reason, %{transport_pid: transport_pid} = state) do
-    Process.exit(transport_pid, reason)
+  def terminate(reason, state) do
+    IO.inspect({:socket_terminated, reason, state})
+    :ok
   end
 
   @impl true
@@ -267,8 +268,8 @@ defmodule PhoenixSocketClient.Socket do
   end
 
   @impl true
-  def handle_call(not_matched, _from, state) do
-    IO.inspect({:not_matched_handle_call, not_matched, state})
+  def handle_call(not_matched, from, state) do
+    IO.inspect({:not_matched_handle_call, not_matched, from, state})
     {:noreply, state}
   end
 
