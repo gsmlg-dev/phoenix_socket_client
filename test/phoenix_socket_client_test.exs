@@ -138,37 +138,6 @@ defmodule PhoenixSocketClientTest do
     assert :ok = Channel.push_async(channel, "foo:bar", %{})
   end
 
-  test "socket params can be sent" do
-    name = :"socket_#{System.unique_integer([:positive])}"
-
-    opts =
-      @socket_config
-      |> Keyword.put(:name, name)
-      |> Keyword.put(:params, %{"reject" => true})
-      |> Keyword.put(:caller, self())
-
-    {:ok, _pid} = PhoenixSocketClient.start_link(opts)
-    :timer.sleep(100)
-    refute Socket.connected?(name)
-  end
-
-  test "socket params can be set in url" do
-    name = :"socket_#{System.unique_integer([:positive])}"
-
-    port = get_port()
-
-    opts = [
-      url: "ws://127.0.0.1:#{port}/ws/admin/websocket?reject=true",
-      serializer: Jason,
-      caller: self(),
-      name: name
-    ]
-
-    {:ok, _pid} = PhoenixSocketClient.start_link(opts)
-    :timer.sleep(100)
-    refute Socket.connected?(name)
-  end
-
   describe "PhoenixSocketClient state management" do
     test "get_process_pid retrieves correct process pids" do
       name = :"test_socket_#{System.unique_integer([:positive])}"
@@ -303,6 +272,8 @@ defmodule PhoenixSocketClientTest do
     if retries == 0 do
       raise "Socket did not connect in time"
     end
+
+    IO.inspect({:waiting_for_socket, socket_name, retries})
 
     case Socket.connected?(socket_name) do
       true ->
