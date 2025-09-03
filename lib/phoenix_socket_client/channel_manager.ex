@@ -2,6 +2,7 @@ defmodule PhoenixSocketClient.ChannelManager do
   use DynamicSupervisor
 
   alias PhoenixSocketClient.Channel
+  import PhoenixSocketClient, only: [get_state: 2, put_state: 3, get_process_pid: 2]
 
   def start_link(opts) do
     opts = if Keyword.keyword?(opts), do: opts, else: Map.to_list(opts)
@@ -36,12 +37,15 @@ defmodule PhoenixSocketClient.ChannelManager do
     end
   end
 
-  def start_channel(pid, socket, topic, params, channel_module \\ Channel) do
+  def start_channel(sup_pid, topic, params, channel_module \\ Channel) do
+    socket_pid = get_process_pid(sup_pid, :socket)
+    cm_pid = get_process_pid(sup_pid, :channel_manager)
+
     spec =
-      {channel_module, {socket, topic, params}}
+      {channel_module, {sup_pid, socket_pid, topic, params}}
       |> Supervisor.child_spec(id: topic)
 
-    case DynamicSupervisor.start_child(pid, spec) do
+    case DynamicSupervisor.start_child(cm_pid, spec) do
       {:ok, channel_pid} -> {:ok, channel_pid}
       {:error, {:already_started, channel_pid}} -> {:error, {:already_started, channel_pid}}
       {:error, {:already_started, _, channel_pid}} -> {:error, {:already_started, channel_pid}}

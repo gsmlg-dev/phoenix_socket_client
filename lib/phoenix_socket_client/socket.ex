@@ -43,8 +43,8 @@ defmodule PhoenixSocketClient.Socket do
       nil ->
         {:error, :channel_manager_not_found}
 
-      pid ->
-        ChannelManager.start_channel(pid, socket_pid, topic, params)
+      _pid ->
+        ChannelManager.start_channel(sup_pid, topic, params)
     end
   end
 
@@ -207,7 +207,7 @@ defmodule PhoenixSocketClient.Socket do
 
   @impl true
   def handle_info(
-        {:DOWN, ref, :process, pid, reason},
+        {:DOWN, ref, :process, _pid, reason},
         %{sup_pid: sup_pid, transport_ref: transport_ref, transport_pid: transport_pid} = state
       ) do
     if ref == transport_ref do
@@ -237,7 +237,6 @@ defmodule PhoenixSocketClient.Socket do
 
   @impl true
   def terminate(reason, state) do
-    IO.inspect({:socket_terminated, reason, state})
     :ok
   end
 

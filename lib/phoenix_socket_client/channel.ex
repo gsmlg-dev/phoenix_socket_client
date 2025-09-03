@@ -31,12 +31,12 @@ defmodule PhoenixSocketClient.Channel do
           | {:error, :socket_not_connected}
           | {:error, :timeout}
           | {:error, any}
-  def join(socket_pid, topic, params \\ %{}, timeout \\ @timeout)
+  def join(sup_pid, topic, params \\ %{}, timeout \\ @timeout)
   def join(nil, _topic, _params, _timeout), do: {:error, :socket_not_started}
 
-  def join(socket_pid, topic, params, timeout) do
-    if Socket.connected?(socket_pid) do
-      case Socket.channel_join(socket_pid, topic, params) do
+  def join(sup_pid, topic, params, timeout) do
+    if Socket.connected?(sup_pid) do
+      case Socket.channel_join(sup_pid, topic, params) do
         {:ok, pid} -> do_join(pid, timeout)
         {:error, {:already_started, _}} = error -> error
         error -> error
@@ -75,11 +75,12 @@ defmodule PhoenixSocketClient.Channel do
 
   # Callbacks
   @impl true
-  def init({socket, topic, params}) do
+  def init({sup_pid, socket_pid, topic, params}) do
     {:ok,
      %{
        caller: nil,
-       socket: socket,
+       sup_pid: sup_pid,
+       socket_pid: socket_pid,
        topic: topic,
        params: params,
        pushes: [],
@@ -91,40 +92,38 @@ defmodule PhoenixSocketClient.Channel do
   def handle_call(
         :join,
         {_pid, _ref} = from,
-        %{socket: socket, topic: topic, params: params} = state
+        %{sup_pid: sup_pid, topic: topic, params: params} = state
       ) do
     message = Message.join(topic, params)
 
-    # Find the actual socket process
-    socket_pid = PhoenixSocketClient.get_process_pid(socket, :socket)
+    push = Socket.push(sup_pid, message)
+    Telemetry.channel_joined(self(), topic, nil, %{}, %{params: params})
 
-    case socket_pid do
-      nil ->
-        {:reply, {:error, :socket_not_found}, state}
-
-      pid ->
-        push = Socket.push(pid, message)
-        Telemetry.channel_joined(self(), topic, nil, %{}, %{params: params})
-
-        {:noreply,
-         %{
-           state
-           | join_ref: push.ref,
-             caller: elem(from, 0),
-             pushes: [{from, push} | state.pushes]
-         }}
-    end
+    {:noreply,
+     %{
+       state
+       | join_ref: push.ref,
+         caller: elem(from, 0),
+         pushes: [{from, push} | state.pushes]
+     }}
   end
 
   @impl true
-  def handle_call(:leave, _from, %{socket: socket, topic: topic} = state) do
-    Socket.channel_leave(socket, self())
+  def handle_call(
+        :leave,
+        _from,
+        %{sup_pid: sup_pid, socket_pid: socket_pid, topic: topic} = state
+      ) do
+    message = Message.leave(topic)
+
+    push = Socket.push(sup_pid, message)
+
     Telemetry.channel_left(self(), topic, :leave)
     {:stop, :normal, :ok, state}
   end
 
   @impl true
-  def handle_call({:push, event, payload}, from, %{socket: socket, topic: topic} = state) do
+  def handle_call({:push, event, payload}, from, %{sup_pid: sup_pid, topic: topic} = state) do
     message = %Message{
       topic: topic,
       event: event,
@@ -133,13 +132,13 @@ defmodule PhoenixSocketClient.Channel do
       join_ref: state.join_ref
     }
 
-    push = Socket.push(socket, message)
+    push = Socket.push(sup_pid, message)
     Telemetry.message_sent(self(), topic, event, payload)
     {:noreply, %{state | pushes: [{from, push} | state.pushes]}}
   end
 
   @impl true
-  def handle_cast({:push, event, payload}, %{socket: socket, topic: topic} = state) do
+  def handle_cast({:push, event, payload}, %{sup_pid: sup_pid, topic: topic} = state) do
     message = %Message{
       topic: topic,
       event: event,
@@ -148,7 +147,7 @@ defmodule PhoenixSocketClient.Channel do
       join_ref: state.join_ref
     }
 
-    Socket.push(socket, message)
+    Socket.push(sup_pid, message)
     Telemetry.message_sent(self(), topic, event, payload)
     {:noreply, state}
   end
@@ -196,7 +195,6 @@ defmodule PhoenixSocketClient.Channel do
     try do
       case GenServer.call(pid, :join, timeout) do
         {:ok, reply} ->
-          Process.link(pid)
           {:ok, reply, pid}
 
         error ->

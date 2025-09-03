@@ -277,6 +277,7 @@ defmodule PhoenixSocketClientTest do
 
     case Socket.connected?(socket_name) do
       true ->
+        IO.inspect({:waiting_for_socket, socket_name, :ok})
         :ok
 
       false ->
