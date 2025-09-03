@@ -26,6 +26,7 @@ defmodule PhoenixSocketClientTest.MockServer do
       render_errors: [formats: [json: PhoenixSocketClientTest.ErrorView], accepts: ~w(json)]
     )
 
+    Phoenix.PubSub.Supervisor.start_link(name: PhoenixSocketClientTest.PubSub)
     # Start the endpoint - it will start PubSub automatically
     {:ok, _pid} = PhoenixSocketClientTest.Endpoint.start_link()
 
