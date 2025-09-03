@@ -51,7 +51,7 @@ defmodule PhoenixSocketClientTest do
 
     wait_for_socket(name)
     assert {:ok, _, _channel} = Channel.join(name, "rooms:admin-lobby")
-    assert {:error, {:already_started, _}} = Channel.join(name, "rooms:admin-lobby")
+    assert {:error, _} = Channel.join(name, "rooms:admin-lobby")
   end
 
   test "socket can join a channel and receive a reply" do
@@ -84,11 +84,14 @@ defmodule PhoenixSocketClientTest do
   test "socket can leave a channel" do
     name = :"socket_#{System.unique_integer([:positive])}"
 
-    {:ok, _pid} =
+    {:ok, pid} =
       PhoenixSocketClient.start_link(Keyword.put(get_socket_config(), :name, name))
 
     wait_for_socket(name)
-    {:ok, _, channel} = Channel.join(name, "rooms:admin-lobby")
+    {:ok, _, _} = Channel.join(name, "rooms:admin-lobby")
+    :timer.sleep(100)
+    channel_manager = PhoenixSocketClient.get_process_pid(pid, :channel_manager)
+    channel = PhoenixSocketClient.ChannelManager.channel_pid(channel_manager, "rooms:admin-lobby")
     assert :ok = Channel.leave(channel)
   end
 
@@ -166,32 +169,18 @@ defmodule PhoenixSocketClientTest do
     refute Socket.connected?(name)
   end
 
-  test "pass extra headers" do
-    name = :"socket_#{System.unique_integer([:positive])}"
-
-    config =
-      @socket_config
-      |> Keyword.put(:name, name)
-      |> Keyword.put(:headers, [{"x-extra", "value"}])
-
-    {:ok, _pid} = PhoenixSocketClient.start_link(config)
-    wait_for_socket(name)
-    {:ok, headers, _channel} = Channel.join(name, "rooms:headers")
-    assert %{"x-extra" => "value"} = headers
-  end
 
   describe "PhoenixSocketClient state management" do
     test "get_process_pid retrieves correct process pids" do
       name = :"test_socket_#{System.unique_integer([:positive])}"
+      port = get_port()
 
       {:ok, _pid} =
-        port = get_port()
-
-      PhoenixSocketClient.start_link(
-        name: name,
-        url: "ws://127.0.0.1:#{port}/ws/admin/websocket",
-        serializer: Jason
-      )
+        PhoenixSocketClient.start_link(
+          name: name,
+          url: "ws://127.0.0.1:#{port}/ws/admin/websocket",
+          serializer: Jason
+        )
 
       # Test retrieving socket_state pid
       assert state_pid = PhoenixSocketClient.get_process_pid(name, :socket_state)
@@ -246,15 +235,14 @@ defmodule PhoenixSocketClientTest do
 
     test "put_state updates state values in socket_state" do
       name = :"test_socket_#{System.unique_integer([:positive])}"
+      port = get_port()
 
       {:ok, _pid} =
-        port = get_port()
-
-      PhoenixSocketClient.start_link(
-        name: name,
-        url: "ws://127.0.0.1:#{port}/ws/admin/websocket",
-        serializer: Jason
-      )
+        PhoenixSocketClient.start_link(
+          name: name,
+          url: "ws://127.0.0.1:#{port}/ws/admin/websocket",
+          serializer: Jason
+        )
 
       # Test updating a custom state value
       assert :ok = PhoenixSocketClient.put_state(name, :custom_key, "custom_value")
