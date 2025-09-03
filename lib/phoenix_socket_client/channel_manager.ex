@@ -2,7 +2,7 @@ defmodule PhoenixSocketClient.ChannelManager do
   use DynamicSupervisor
 
   alias PhoenixSocketClient.Channel
-  import PhoenixSocketClient, only: [get_state: 2, put_state: 3, get_process_pid: 2]
+  import PhoenixSocketClient, only: [get_process_pid: 2]
 
   def start_link(opts) do
     opts = if Keyword.keyword?(opts), do: opts, else: Map.to_list(opts)

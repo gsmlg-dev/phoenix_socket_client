@@ -112,11 +112,11 @@ defmodule PhoenixSocketClient.Channel do
   def handle_call(
         :leave,
         _from,
-        %{sup_pid: sup_pid, socket_pid: socket_pid, topic: topic} = state
+        %{sup_pid: sup_pid, socket_pid: _socket_pid, topic: topic} = state
       ) do
     message = Message.leave(topic)
 
-    push = Socket.push(sup_pid, message)
+    _push = Socket.push(sup_pid, message)
 
     Telemetry.channel_left(self(), topic, :leave)
     {:stop, :normal, :ok, state}

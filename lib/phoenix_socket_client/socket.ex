@@ -37,7 +37,7 @@ defmodule PhoenixSocketClient.Socket do
   @spec channel_join(pid, binary, map) :: {:ok, pid} | {:error, term}
   def channel_join(sup_pid, topic, params \\ %{}) do
     manager_pid = get_process_pid(sup_pid, :channel_manager)
-    socket_pid = get_process_pid(sup_pid, :socket)
+    _socket_pid = get_process_pid(sup_pid, :socket)
 
     case manager_pid do
       nil ->
@@ -236,7 +236,7 @@ defmodule PhoenixSocketClient.Socket do
   end
 
   @impl true
-  def terminate(reason, state) do
+  def terminate(_reason, _state) do
     :ok
   end
 
