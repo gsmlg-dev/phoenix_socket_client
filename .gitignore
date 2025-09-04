@@ -12,3 +12,13 @@
 
 # If the VM crashes, it generates a dump, let's ignore it too.
 erl_crash.dump
+
+# Devenv
+.devenv*
+devenv.local.nix
+
+# direnv
+.direnv
+
+# pre-commit
+.pre-commit-config.yaml
