@@ -31,10 +31,17 @@ end
 ```elixir
 {:ok, response, channel} = PhoenixSocketClient.Channel.join(socket, "rooms:lobby", %{user_id: 123})
 
-# Handle incoming messages
-PhoenixSocketClient.Channel.on(channel, "new_msg", fn payload ->
-  IO.inspect(payload)
-end)
+# Handle incoming messages via message passing
+# Messages are received as PhoenixSocketClient.Message structs
+receive do
+  %PhoenixSocketClient.Message{event: "new_msg", payload: payload} ->
+    IO.inspect(payload)
+  %PhoenixSocketClient.Message{event: "user:joined", payload: payload} ->
+    IO.puts("User joined: #{inspect(payload)}")
+end
+
+# Or in tests/explicit handling:
+assert_receive %PhoenixSocketClient.Message{event: "new_msg", payload: %{"body" => body}}
 
 # Push messages to the channel
 PhoenixSocketClient.Channel.push(channel, "new_msg", %{"body" => "Hello"})
@@ -54,6 +61,32 @@ PhoenixSocketClient.Channel.push(channel, "new_msg", %{"body" => "Hello"})
 | `:auto_connect` | `boolean()` | `true` | Connect automatically on startup |
 | `:serializer` | `module()` | `Jason` | JSON serializer module |
 | `:vsn` | `String.t()` | `"2.0.0"` | Phoenix Channels protocol version (V1 is deprecated) |
+
+### Message Handling Examples
+
+```elixir
+# Using in a GenServer or other process
+{:ok, response, channel} = PhoenixSocketClient.Channel.join(socket, "rooms:lobby")
+
+# In your GenServer handle_info or process loop:
+def handle_info(%PhoenixSocketClient.Message{event: "new_msg", payload: payload}, state) do
+  IO.puts("New message: #{inspect(payload)}")
+  {:noreply, state}
+end
+
+def handle_info(%PhoenixSocketClient.Message{event: "user:joined", payload: %{"user" => user}}, state) do
+  IO.puts("User #{user} joined the room")
+  {:noreply, state}
+end
+
+# For simple usage, use receive blocks:
+receive do
+  %PhoenixSocketClient.Message{event: event, payload: payload} ->
+    IO.puts("Received event: #{event} with payload: #{inspect(payload)}")
+after
+  5_000 -> IO.puts("No messages received")
+end
+```
 
 ### Error Handling Examples
 
