@@ -1,14 +1,60 @@
 defmodule PhoenixSocketClient.ChannelManager do
+  @moduledoc """
+  Dynamic supervisor for managing channel processes.
+
+  This module supervises individual channel processes, handling their lifecycle
+  from creation to termination. It provides functionality for:
+  - Starting and supervising channel processes
+  - Finding channel processes by topic
+  - Managing channel lifecycle events
+
+  ## Channel Lifecycle
+
+  Channels are started as child processes under this supervisor when:
+  - A client calls `PhoenixSocketClient.Channel.join/3`
+  - The socket connection is active and the channel join is successful
+
+  Channels are terminated when:
+  - The channel is left explicitly via `Channel.leave/1`
+  - The socket connection is lost
+  - The supervisor terminates
+  """
+
   use DynamicSupervisor
 
   alias PhoenixSocketClient.Channel
   import PhoenixSocketClient, only: [get_process_pid: 2]
 
+  @doc """
+  Starts the ChannelManager dynamic supervisor.
+
+  ## Parameters
+    * `opts` - Configuration options (unused, required by DynamicSupervisor)
+
+  ## Examples
+      {:ok, pid} = PhoenixSocketClient.ChannelManager.start_link([])
+  """
+  @spec start_link(keyword() | map()) :: {:ok, pid()} | {:error, term()}
   def start_link(opts) do
     opts = if Keyword.keyword?(opts), do: opts, else: Map.to_list(opts)
     DynamicSupervisor.start_link(__MODULE__, opts)
   end
 
+  @doc """
+  Finds the PID of a channel process by its topic.
+
+  ## Parameters
+    * `sup_pid` - The supervisor PID
+    * `topic` - The channel topic to search for
+
+  ## Returns
+    * `pid` - The channel PID if found
+    * `nil` - If no channel with the given topic exists
+
+  ## Examples
+      channel_pid = PhoenixSocketClient.ChannelManager.channel_pid(sup_pid, "rooms:lobby")
+  """
+  @spec channel_pid(pid(), String.t()) :: pid() | nil
   def channel_pid(sup_pid, topic) when is_pid(sup_pid) do
     try do
       case Process.alive?(sup_pid) do

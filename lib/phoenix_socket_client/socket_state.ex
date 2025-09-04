@@ -1,4 +1,26 @@
 defmodule PhoenixSocketClient.SocketState do
+  @moduledoc """
+  Agent-based state management for WebSocket connection configuration and status.
+
+  This module provides centralized state management for socket connections,
+  including configuration parameters, connection status, and custom state values.
+  All state is stored in an Agent process for concurrent access and updates.
+
+  ## State Structure
+
+  The state is a map that includes:
+  - `:url` - WebSocket URL
+  - `:params` - Connection parameters
+  - `:headers` - HTTP headers
+  - `:serializer` - JSON serializer module
+  - `:transport` - Transport module
+  - `:status` - Connection status (:disconnected, :connecting, :connected)
+  - `:heartbeat_interval` - Heartbeat interval in milliseconds
+  - `:reconnect_interval` - Reconnection interval in milliseconds
+  - `:auto_connect` - Whether to auto-connect on startup
+  - Custom state values added by users
+  """
+
   use Agent
 
   alias PhoenixSocketClient.Message
@@ -7,15 +29,48 @@ defmodule PhoenixSocketClient.SocketState do
   @reconnect_interval 60_000
   @default_transport PhoenixSocketClient.Transports.Websocket
 
+  @doc """
+  Starts the SocketState agent with the given configuration options.
+
+  ## Parameters
+    * `opts` - Keyword list or map of configuration options
+
+  ## Examples
+      {:ok, pid} = PhoenixSocketClient.SocketState.start_link(url: "ws://localhost:4000/socket")
+  """
+  @spec start_link(keyword() | map()) :: {:ok, pid()} | {:error, term()}
   def start_link(opts) do
     opts = if Keyword.keyword?(opts), do: opts, else: Map.to_list(opts)
     Agent.start_link(fn -> init_state(opts) end)
   end
 
+  @doc """
+  Retrieves a value from the state by key.
+
+  ## Parameters
+    * `pid` - The SocketState agent PID
+    * `key` - The key to retrieve
+
+  ## Examples
+      value = PhoenixSocketClient.SocketState.get(pid, :url)
+  """
+  @spec get(pid(), atom() | String.t()) :: any()
   def get(pid, key) do
     Agent.get(pid, &Map.get(&1, key))
   end
 
+  @doc """
+  Updates the state with a new key-value pair.
+
+  ## Parameters
+    * `pid` - The SocketState agent PID
+    * `key` - The key to set
+    * `value` - The value to associate with the key
+
+  ## Examples
+      :ok = PhoenixSocketClient.SocketState.put(pid, :custom_key, "custom_value")
+  """
+  @spec put(pid(), atom() | String.t(), any()) :: :ok
   def put(pid, key, value) do
     Agent.update(pid, &Map.put(&1, key, value))
   end
