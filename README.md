@@ -53,7 +53,7 @@ PhoenixSocketClient.Channel.push(channel, "new_msg", %{"body" => "Hello"})
 | `:reconnect?` | `boolean()` | `true` | Enable automatic reconnection |
 | `:auto_connect` | `boolean()` | `true` | Connect automatically on startup |
 | `:serializer` | `module()` | `Jason` | JSON serializer module |
-| `:vsn` | `String.t()` | `"2.0.0"` | Phoenix Channels protocol version |
+| `:vsn` | `String.t()` | `"2.0.0"` | Phoenix Channels protocol version (V1 is deprecated) |
 
 ### Error Handling Examples
 
@@ -210,3 +210,8 @@ def deps do
   ]
 end
 ```
+
+### Deprecation Notices
+
+- **V1 Protocol Deprecation**: Phoenix Channels V1 protocol ("1.0.0") is deprecated and will be removed in a future version. Use V2 protocol ("2.0.0") for new applications.
+- **Migration**: Update your `:vsn` configuration from `"1.0.0"` to `"2.0.0"` to avoid deprecation warnings.

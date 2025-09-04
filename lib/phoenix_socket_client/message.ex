@@ -50,9 +50,17 @@ defmodule PhoenixSocketClient.Message do
 
   ## Returns
     * Module - Serializer module for the protocol version
+
+  ## Deprecation Notice
+  V1 protocol ("1.0.0") is deprecated and will be removed in a future version.
+  Use V2 protocol ("2.0.0") for new applications.
   """
   @spec serializer(String.t()) :: module()
-  def serializer("1.0.0"), do: __MODULE__.V1
+  def serializer("1.0.0") do
+    IO.warn("Phoenix Channels V1 protocol is deprecated. Use V2 (2.0.0) instead.")
+    __MODULE__.V1
+  end
+
   def serializer("2.0.0"), do: __MODULE__.V2
   def serializer(_), do: __MODULE__.V2
 
