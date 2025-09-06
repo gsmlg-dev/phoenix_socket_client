@@ -31,10 +31,17 @@ end
 ```elixir
 {:ok, response, channel} = PhoenixSocketClient.Channel.join(socket, "rooms:lobby", %{user_id: 123})
 
-# Handle incoming messages
-PhoenixSocketClient.Channel.on(channel, "new_msg", fn payload ->
-  IO.inspect(payload)
-end)
+# Handle incoming messages via message passing
+# Messages are received as PhoenixSocketClient.Message structs
+receive do
+  %PhoenixSocketClient.Message{event: "new_msg", payload: payload} ->
+    IO.inspect(payload)
+  %PhoenixSocketClient.Message{event: "user:joined", payload: payload} ->
+    IO.puts("User joined: #{inspect(payload)}")
+end
+
+# Or in tests/explicit handling:
+assert_receive %PhoenixSocketClient.Message{event: "new_msg", payload: %{"body" => body}}
 
 # Push messages to the channel
 PhoenixSocketClient.Channel.push(channel, "new_msg", %{"body" => "Hello"})
@@ -42,13 +49,113 @@ PhoenixSocketClient.Channel.push(channel, "new_msg", %{"body" => "Hello"})
 
 ### Configuration Options
 
-- `:url` - WebSocket URL (required)
-- `:params` - Query parameters for connection
-- `:headers` - HTTP headers for connection
-- `:transport` - Transport module (default: `PhoenixSocketClient.Transports.WebSocket`)
-- `:heartbeat_interval` - Keep-alive interval in ms (default: 30_000)
-- `:reconnect_interval` - Reconnection delay in ms (default: 60_000)
-- `:reconnect?` - Enable auto-reconnect (default: true)
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `:url` | `String.t()` | **Required** | WebSocket URL (e.g., "ws://localhost:4000/socket/websocket") |
+| `:params` | `map() \| keyword()` | `%{}` | Query parameters for connection |
+| `:headers` | `[{String.t(), String.t()}]` | `[]` | HTTP headers for connection |
+| `:transport` | `module()` | `PhoenixSocketClient.Transports.Websocket` | Transport module |
+| `:heartbeat_interval` | `integer()` | `30_000` | Keep-alive interval in milliseconds |
+| `:reconnect_interval` | `integer()` | `60_000` | Reconnection delay in milliseconds |
+| `:reconnect?` | `boolean()` | `true` | Enable automatic reconnection |
+| `:auto_connect` | `boolean()` | `true` | Connect automatically on startup |
+| `:serializer` | `module()` | `Jason` | JSON serializer module |
+| `:vsn` | `String.t()` | `"2.0.0"` | Phoenix Channels protocol version (V1 is deprecated) |
+
+### Message Handling Examples
+
+```elixir
+# Using in a GenServer or other process
+{:ok, response, channel} = PhoenixSocketClient.Channel.join(socket, "rooms:lobby")
+
+# In your GenServer handle_info or process loop:
+def handle_info(%PhoenixSocketClient.Message{event: "new_msg", payload: payload}, state) do
+  IO.puts("New message: #{inspect(payload)}")
+  {:noreply, state}
+end
+
+def handle_info(%PhoenixSocketClient.Message{event: "user:joined", payload: %{"user" => user}}, state) do
+  IO.puts("User #{user} joined the room")
+  {:noreply, state}
+end
+
+# For simple usage, use receive blocks:
+receive do
+  %PhoenixSocketClient.Message{event: event, payload: payload} ->
+    IO.puts("Received event: #{event} with payload: #{inspect(payload)}")
+after
+  5_000 -> IO.puts("No messages received")
+end
+```
+
+### Error Handling Examples
+
+```elixir
+# Handle connection errors
+{:ok, socket} = PhoenixSocketClient.start_link(
+  url: "ws://localhost:4000/socket/websocket",
+  params: %{"token" => "invalid-token"}
+)
+
+# Check connection status
+if PhoenixSocketClient.Socket.connected?(socket) do
+  {:ok, _response, channel} = PhoenixSocketClient.Channel.join(socket, "rooms:lobby")
+else
+  IO.puts("Failed to connect to server")
+end
+
+# Handle channel join errors
+case PhoenixSocketClient.Channel.join(socket, "rooms:private", %{user_id: 123}) do
+  {:ok, response, channel} ->
+    # Successfully joined channel
+    IO.inspect(response)
+    
+  {:error, :timeout} ->
+    # Join request timed out
+    IO.puts("Channel join timed out")
+    
+  {:error, :unauthorized} ->
+    # Not authorized to join this channel
+    IO.puts("Not authorized to join channel")
+    
+  {:error, reason} ->
+    # Other join errors
+    IO.puts("Failed to join channel: #{inspect(reason)}")
+end
+
+# Handle message push errors
+case PhoenixSocketClient.Channel.push(channel, "new_msg", %{body: "Hello"}, 5000) do
+  {:ok, response} ->
+    # Message sent successfully
+    IO.inspect(response)
+    
+  {:error, :timeout} ->
+    # Push request timed out
+    IO.puts("Message push timed out")
+    
+  {:error, :channel_closed} ->
+    # Channel was closed
+    IO.puts("Channel is no longer available")
+end
+```
+
+### Connection Recovery
+
+```elixir
+# Monitor connection status
+PhoenixSocketClient.Telemetry.attach_debug_handler()
+
+# Implement custom reconnection logic
+:telemetry.attach(
+  "reconnection-handler",
+  [:phoenix_socket_client, :socket, :disconnected],
+  fn _event, _measurements, _metadata, _config ->
+    Process.sleep(1000)
+    PhoenixSocketClient.connect(socket)
+  end,
+  %{}
+)
+```
 
 ## Development
 
@@ -136,3 +243,8 @@ def deps do
   ]
 end
 ```
+
+### Deprecation Notices
+
+- **V1 Protocol Deprecation**: Phoenix Channels V1 protocol ("1.0.0") is deprecated and will be removed in a future version. Use V2 protocol ("2.0.0") for new applications.
+- **Migration**: Update your `:vsn` configuration from `"1.0.0"` to `"2.0.0"` to avoid deprecation warnings.

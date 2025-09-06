@@ -16,9 +16,9 @@ defmodule PhoenixSocketClient.Socket do
   """
   @spec connected?(pid | atom) :: boolean
   def connected?(sup_pid) do
-    socket_pid = get_process_pid(sup_pid, :socket)
+    _socket_pid = get_process_pid(sup_pid, :socket)
 
-    case socket_pid do
+    case get_process_pid(sup_pid, :socket) do
       nil ->
         false
 
@@ -64,9 +64,9 @@ defmodule PhoenixSocketClient.Socket do
   """
   @spec push(pid | atom, Message.t()) :: Message.t()
   def push(sup_pid, message) do
-    socket_pid = get_process_pid(sup_pid, :socket)
+    _socket_pid = get_process_pid(sup_pid, :socket)
 
-    case socket_pid do
+    case get_process_pid(sup_pid, :socket) do
       nil ->
         raise "Socket not found"
 
