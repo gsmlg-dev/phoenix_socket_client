@@ -1,5 +1,10 @@
 # PhoenixSocketClient
 
+[![release](https://github.com/gsmlg-dev/phoenix_socket_client/actions/workflows/release.yml/badge.svg)](https://github.com/gsmlg-dev/phoenix_socket_client/actions/workflows/release.yml)
+[![Hex.pm](https://img.shields.io/hexpm/v/phoenix_socket_client.svg)](https://hex.pm/packages/phoenix_socket_client)
+[![Documentation](https://img.shields.io/badge/documentation-gray)](https://hexdocs.pm/phoenix_socket_client)
+
+
 Elixir client for Phoenix Channels WebSocket connections.
 
 ## Installation
