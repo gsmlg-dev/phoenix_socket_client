@@ -68,6 +68,21 @@ end)
 PhoenixSocketClient.Channel.off(channel, "new_msg")
 ```
 
+You can also use a module as a hook. The module must implement a `handle_in/2` function, which will be called with the event and the payload.
+
+```elixir
+defmodule MyHook do
+  def handle_in(event, payload) do
+    IO.puts("Got event \#{event} with payload \#{inspect payload}")
+  end
+end
+
+{:ok, response, channel} = PhoenixSocketClient.Channel.join(socket, "rooms:lobby")
+
+# Register a module hook for the "new_msg" event
+PhoenixSocketClient.Channel.on(channel, "new_msg", MyHook)
+```
+
 ### Configuration Options
 
 | Option | Type | Default | Description |

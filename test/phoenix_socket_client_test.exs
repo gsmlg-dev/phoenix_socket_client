@@ -345,5 +345,27 @@ defmodule PhoenixSocketClientTest do
 
       assert_receive %Message{event: "another_event", payload: %{"foo" => "bar"}}, 1000
     end
+
+    test "can register a module hook and receive a message", %{socket: name} do
+      defmodule MyTestHook do
+        def handle_in(event, payload) do
+          send(:test_process, {:module_hook_fired, event, payload})
+        end
+      end
+
+      Process.register(self(), :test_process)
+
+      {:ok, _response, channel} = Channel.join(name, "rooms:admin-lobby")
+
+      Channel.on(channel, "new_msg", MyTestHook)
+
+      PhoenixSocketClientTest.Endpoint.broadcast(
+        "rooms:admin-lobby",
+        "new_msg",
+        %{"hello" => "world"}
+      )
+
+      assert_receive {:module_hook_fired, "new_msg", %{"hello" => "world"}}, 1000
+    end
   end
 end
