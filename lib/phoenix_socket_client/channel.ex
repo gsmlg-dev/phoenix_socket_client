@@ -106,18 +106,6 @@ defmodule PhoenixSocketClient.Channel do
   end
 
   @impl true
-  def handle_cast({:on, event, callback}, state) do
-    hooks = Map.put(state.hooks, event, callback)
-    {:noreply, %{state | hooks: hooks}}
-  end
-
-  @impl true
-  def handle_cast({:off, event}, state) do
-    hooks = Map.delete(state.hooks, event)
-    {:noreply, %{state | hooks: hooks}}
-  end
-
-  @impl true
   def handle_call(
         :join,
         {_pid, _ref} = from,
@@ -164,6 +152,18 @@ defmodule PhoenixSocketClient.Channel do
     push = Socket.push(sup_pid, message)
     Telemetry.message_sent(self(), topic, event, payload)
     {:noreply, %{state | pushes: [{from, push} | state.pushes]}}
+  end
+
+  @impl true
+  def handle_cast({:on, event, callback}, state) do
+    hooks = Map.put(state.hooks, event, callback)
+    {:noreply, %{state | hooks: hooks}}
+  end
+
+  @impl true
+  def handle_cast({:off, event}, state) do
+    hooks = Map.delete(state.hooks, event)
+    {:noreply, %{state | hooks: hooks}}
   end
 
   @impl true
