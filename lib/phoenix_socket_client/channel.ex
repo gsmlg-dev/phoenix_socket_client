@@ -75,9 +75,29 @@ defmodule PhoenixSocketClient.Channel do
 
   @doc """
   Registers a callback for a specific event on the channel.
+
+  The callback can be an anonymous function of arity 1, which will be called
+  with the message payload.
+
+  ## Examples
+
+      on(channel, "new_msg", fn payload -> IO.inspect(payload) end)
+
+  It can also be a module that implements `handle_in/2`, which will be
+  called with the event and the payload.
+
+  ## Examples
+
+      defmodule MyHook do
+        def handle_in(event, payload) do
+          IO.puts("Got event \#{event} with payload \#{inspect payload}")
+        end
+      end
+
+      on(channel, "new_msg", MyHook)
   """
-  @spec on(pid, String.t(), (map() -> any())) :: :ok
-  def on(pid, event, callback) when is_function(callback, 1) do
+  @spec on(pid, String.t(), (map() -> any()) | module()) :: :ok
+  def on(pid, event, callback) when is_function(callback, 1) or is_atom(callback) do
     GenServer.cast(pid, {:on, event, callback})
   end
 
@@ -224,7 +244,11 @@ defmodule PhoenixSocketClient.Channel do
         send(pid, %{message | channel_pid: pid, topic: topic})
 
       callback ->
-        callback.(message.payload)
+        if is_function(callback) do
+          callback.(message.payload)
+        else
+          callback.handle_in(message.event, message.payload)
+        end
     end
 
     {:noreply, state}
