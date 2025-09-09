@@ -73,6 +73,22 @@ defmodule PhoenixSocketClient.Channel do
     GenServer.cast(pid, {:push, event, payload})
   end
 
+  @doc """
+  Registers a callback for a specific event on the channel.
+  """
+  @spec on(pid, String.t(), (map() -> any())) :: :ok
+  def on(pid, event, callback) when is_function(callback, 1) do
+    GenServer.cast(pid, {:on, event, callback})
+  end
+
+  @doc """
+  Unregisters a callback for a specific event on the channel.
+  """
+  @spec off(pid, String.t()) :: :ok
+  def off(pid, event) do
+    GenServer.cast(pid, {:off, event})
+  end
+
   # Callbacks
   @impl true
   def init({sup_pid, socket_pid, topic, params}) do
@@ -84,8 +100,21 @@ defmodule PhoenixSocketClient.Channel do
        topic: topic,
        params: params,
        pushes: [],
-       join_ref: nil
+       join_ref: nil,
+       hooks: %{}
      }}
+  end
+
+  @impl true
+  def handle_cast({:on, event, callback}, state) do
+    hooks = Map.put(state.hooks, event, callback)
+    {:noreply, %{state | hooks: hooks}}
+  end
+
+  @impl true
+  def handle_cast({:off, event}, state) do
+    hooks = Map.delete(state.hooks, event)
+    {:noreply, %{state | hooks: hooks}}
   end
 
   @impl true
@@ -185,9 +214,19 @@ defmodule PhoenixSocketClient.Channel do
   end
 
   @impl true
-  def handle_info(%Message{} = message, %{caller: pid, topic: topic} = state) do
+  def handle_info(%Message{} = message, state) do
+    %{caller: pid, topic: topic, hooks: hooks} = state
+
     Telemetry.message_received(self(), topic, message.event, message.payload)
-    send(pid, %{message | channel_pid: pid, topic: topic})
+
+    case Map.get(hooks, message.event) do
+      nil ->
+        send(pid, %{message | channel_pid: pid, topic: topic})
+
+      callback ->
+        callback.(message.payload)
+    end
+
     {:noreply, state}
   end
 

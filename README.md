@@ -52,6 +52,22 @@ assert_receive %PhoenixSocketClient.Message{event: "new_msg", payload: %{"body" 
 PhoenixSocketClient.Channel.push(channel, "new_msg", %{"body" => "Hello"})
 ```
 
+### Handling Incoming Messages with Hooks
+
+You can also handle incoming messages using hooks. This is useful when you want to handle messages in a more direct way, without using message passing.
+
+```elixir
+{:ok, response, channel} = PhoenixSocketClient.Channel.join(socket, "rooms:lobby")
+
+# Register a hook for the "new_msg" event
+PhoenixSocketClient.Channel.on(channel, "new_msg", fn payload ->
+  IO.inspect(payload)
+end)
+
+# Unregister the hook
+PhoenixSocketClient.Channel.off(channel, "new_msg")
+```
+
 ### Configuration Options
 
 | Option | Type | Default | Description |
