@@ -125,20 +125,13 @@ defmodule PhoenixSocketClient.SocketTest do
   end
 
   defmodule MyTestChannel do
-    use GenServer
+    use PhoenixSocketClient.Channel
 
-    def start_link(args) do
-      GenServer.start_link(__MODULE__, args)
-    end
-
+    @impl true
     def init({_sup_pid, _socket_pid, topic, params}) do
       test_pid = Map.get(params, "test_pid")
       send(test_pid, {:channel_started, topic})
       {:ok, %{}}
-    end
-
-    def handle_call(:join, _from, state) do
-      {:reply, {:ok, %{}}, state}
     end
   end
 

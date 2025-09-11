@@ -1,4 +1,27 @@
 defmodule PhoenixSocketClient.Channel do
+  defmacro __using__(_opts) do
+    quote do
+      use GenServer
+
+      @doc false
+      def start_link(args) do
+        GenServer.start_link(__MODULE__, args)
+      end
+
+      @impl true
+      def init(args) do
+        {:ok, args}
+      end
+
+      @impl true
+      def handle_call(:join, _from, state) do
+        {:reply, {:ok, %{}}, state}
+      end
+
+      defoverridable [init: 1, handle_call: 3]
+    end
+  end
+
   use GenServer
 
   alias PhoenixSocketClient.{Socket, Message, Telemetry}
