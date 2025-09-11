@@ -18,16 +18,17 @@ config :phoenix_socket_client,
   #   * 4 - Errors, warnings, info and debug (IO.inspects)
   #
   log_level: 0
-  # topic_channel_map: %{},
-  #
-  # The `topic_channel_map` can be passed as an option to `PhoenixSocketClient.start_link/1`
-  # to specify a custom channel module for a given topic.
-  #
-  # Example:
-  #
-  # PhoenixSocketClient.start_link(
-  #   url: "ws://localhost:4000/socket",
-  #   topic_channel_map: %{
-  #     "my_topic" => MyApp.MyChannel
-  #   }
-  # )
+
+# topic_channel_map: %{},
+#
+# The `topic_channel_map` can be passed as an option to `PhoenixSocketClient.start_link/1`
+# to specify a custom channel module for a given topic.
+#
+# Example:
+#
+# PhoenixSocketClient.start_link(
+#   url: "ws://localhost:4000/socket",
+#   topic_channel_map: %{
+#     "my_topic" => MyApp.MyChannel
+#   }
+# )

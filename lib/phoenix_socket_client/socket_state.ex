@@ -98,11 +98,13 @@ defmodule PhoenixSocketClient.SocketState do
     params = Keyword.get(opts, :params, %{})
     query_params = Map.merge(%{"vsn" => protocol_vsn}, params)
     query = URI.encode_query(query_params)
+
     base_url =
       if uri.query do
         url_parts = String.split(url, "?", parts: 2)
         base = Enum.at(url_parts, 0)
         existing_query = Enum.at(url_parts, 1)
+
         if existing_query && String.trim(existing_query) != "" do
           base <> "?" <> existing_query <> "&" <> query
         else
@@ -111,8 +113,10 @@ defmodule PhoenixSocketClient.SocketState do
       else
         url <> "?" <> query
       end
+
     heartbeat_interval = Keyword.get(opts, :heartbeat_interval, @heartbeat_interval)
     reconnect_interval = Keyword.get(opts, :reconnect_interval, @reconnect_interval)
+
     transport_opts =
       Keyword.get(opts, :transport_opts, [])
       |> Keyword.put(:extra_headers, Keyword.get(opts, :headers, []))
