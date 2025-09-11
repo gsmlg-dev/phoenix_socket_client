@@ -18,7 +18,7 @@ defmodule PhoenixSocketClient.Channel do
         {:reply, {:ok, %{}}, state}
       end
 
-      defoverridable [init: 1, handle_call: 3]
+      defoverridable init: 1, handle_call: 3
     end
   end
 
