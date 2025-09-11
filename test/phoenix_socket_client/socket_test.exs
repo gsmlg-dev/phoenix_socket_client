@@ -124,6 +124,45 @@ defmodule PhoenixSocketClient.SocketTest do
     end
   end
 
+  defmodule MyTestChannel do
+    use GenServer
+
+    def start_link(args) do
+      GenServer.start_link(__MODULE__, args)
+    end
+
+    def init({_sup_pid, _socket_pid, topic, params}) do
+      test_pid = Map.get(params, "test_pid")
+      send(test_pid, {:channel_started, topic})
+      {:ok, %{}}
+    end
+
+    def handle_call(:join, _from, state) do
+      {:reply, {:ok, %{}}, state}
+    end
+  end
+
+  test "socket uses custom channel from topic_channel_map" do
+    name = :"socket_custom_channel_#{System.unique_integer([:positive])}"
+
+    topic = "custom:topic"
+
+    config =
+      get_socket_config()
+      |> Keyword.put(:name, name)
+      |> Keyword.put(:topic_channel_map, %{topic => MyTestChannel})
+
+    {:ok, sup_pid} = PhoenixSocketClient.start_link(config)
+
+    # The channel needs the socket to be connected to join
+    wait_for_socket(name)
+
+    {:ok, _, _channel_pid} =
+      PhoenixSocketClient.Channel.join(sup_pid, topic, %{"test_pid" => self()})
+
+    assert_receive {:channel_started, ^topic}, 5000
+  end
+
   defp wait_for_socket(socket_name, retries \\ 300) do
     if retries == 0 do
       false
