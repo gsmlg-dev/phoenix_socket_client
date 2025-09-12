@@ -1,7 +1,7 @@
-defmodule PhoenixSocketClient.SocketStateTest do
+defmodule Phoenix.SocketClient.SocketStateTest do
   use ExUnit.Case, async: false
 
-  alias PhoenixSocketClient.SocketState
+  alias Phoenix.SocketClient.SocketState
 
   describe "SocketState functionality" do
     test "initializes with correct state" do

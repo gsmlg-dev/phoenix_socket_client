@@ -1,4 +1,4 @@
-defmodule PhoenixSocketClientTest.MockServer do
+defmodule Phoenix.SocketClientTest.MockServer do
   @moduledoc """
   Mock Phoenix Socket Server for testing purposes.
   """
@@ -11,19 +11,19 @@ defmodule PhoenixSocketClientTest.MockServer do
     port = find_available_port()
     Application.put_env(:phoenix_socket_client_test, :port, port)
 
-    Task.Supervisor.start_link(name: PhoenixSocketClientTest.TaskSupervisor)
+    Task.Supervisor.start_link(name: Phoenix.SocketClientTest.TaskSupervisor)
 
     # Start PubSub
     {:ok, _} =
       Supervisor.start_link(
-        [{Phoenix.PubSub, [name: PhoenixSocketClientTest.PubSub, adapter: Phoenix.PubSub.PG2]}],
+        [{Phoenix.PubSub, [name: Phoenix.SocketClientTest.PubSub, adapter: Phoenix.PubSub.PG2]}],
         strategy: :one_for_one
       )
 
     # Configure endpoint - Phoenix will handle PubSub internally
     Application.put_env(
       :phoenix_socket_client_test,
-      PhoenixSocketClientTest.Endpoint,
+      Phoenix.SocketClientTest.Endpoint,
       https: false,
       http: [port: port],
       secret_key_base: String.duplicate("abcdefgh", 8),
@@ -31,13 +31,13 @@ defmodule PhoenixSocketClientTest.MockServer do
       code_reloader: false,
       server: true,
       adapter: Bandit.PhoenixAdapter,
-      pubsub_server: PhoenixSocketClientTest.PubSub,
-      render_errors: [formats: [json: PhoenixSocketClientTest.ErrorView], accepts: ~w(json)]
+      pubsub_server: Phoenix.SocketClientTest.PubSub,
+      render_errors: [formats: [json: Phoenix.SocketClientTest.ErrorView], accepts: ~w(json)]
     )
 
-    Phoenix.PubSub.Supervisor.start_link(name: PhoenixSocketClientTest.PubSub)
+    Phoenix.PubSub.Supervisor.start_link(name: Phoenix.SocketClientTest.PubSub)
     # Start the endpoint - it will start PubSub automatically
-    {:ok, _pid} = PhoenixSocketClientTest.Endpoint.start_link()
+    {:ok, _pid} = Phoenix.SocketClientTest.Endpoint.start_link()
 
     # Give it a moment to start
     Process.sleep(100)
@@ -48,7 +48,7 @@ defmodule PhoenixSocketClientTest.MockServer do
 
   def stop do
     # Find and stop the endpoint
-    case Process.whereis(PhoenixSocketClientTest.Endpoint) do
+    case Process.whereis(Phoenix.SocketClientTest.Endpoint) do
       nil ->
         :ok
 
@@ -73,7 +73,7 @@ defmodule PhoenixSocketClientTest.MockServer do
   end
 end
 
-defmodule PhoenixSocketClientTest.Endpoint do
+defmodule Phoenix.SocketClientTest.Endpoint do
   use Phoenix.Endpoint, otp_app: :phoenix_socket_client_test
 
   @session_options [
@@ -82,7 +82,7 @@ defmodule PhoenixSocketClientTest.Endpoint do
     signing_salt: "test_salt"
   ]
 
-  socket("/ws/admin", PhoenixSocketClientTest.AdminSocket, websocket: [check_origin: false])
+  socket("/ws/admin", Phoenix.SocketClientTest.AdminSocket, websocket: [check_origin: false])
 
   # Add this plug to handle basic HTTP requests
   plug(Plug.RequestId)
@@ -99,11 +99,11 @@ defmodule PhoenixSocketClientTest.Endpoint do
   plug(Plug.Session, @session_options)
 end
 
-defmodule PhoenixSocketClientTest.AdminSocket do
+defmodule Phoenix.SocketClientTest.AdminSocket do
   use Phoenix.Socket
 
-  channel("rooms:*", PhoenixSocketClientTest.RoomChannel)
-  channel("topic:*", PhoenixSocketClientTest.TopicChannel)
+  channel("rooms:*", Phoenix.SocketClientTest.RoomChannel)
+  channel("topic:*", Phoenix.SocketClientTest.TopicChannel)
 
   def connect(params, socket, connect_info) do
     on_connect(self(), %{
@@ -128,7 +128,7 @@ defmodule PhoenixSocketClientTest.AdminSocket do
   end
 
   defp monitor(pid, info) do
-    Task.Supervisor.start_child(PhoenixSocketClientTest.TaskSupervisor, fn ->
+    Task.Supervisor.start_child(Phoenix.SocketClientTest.TaskSupervisor, fn ->
       Process.flag(:trap_exit, true)
       ref = Process.monitor(pid)
 
@@ -140,7 +140,7 @@ defmodule PhoenixSocketClientTest.AdminSocket do
   end
 end
 
-defmodule PhoenixSocketClientTest.RoomChannel do
+defmodule Phoenix.SocketClientTest.RoomChannel do
   use Phoenix.Channel
   require Logger
 
@@ -193,7 +193,7 @@ defmodule PhoenixSocketClientTest.RoomChannel do
   end
 end
 
-defmodule PhoenixSocketClientTest.TopicChannel do
+defmodule Phoenix.SocketClientTest.TopicChannel do
   use Phoenix.Channel
 
   def join("topic:" <> _ = topic, message, socket) do
@@ -211,7 +211,7 @@ defmodule PhoenixSocketClientTest.TopicChannel do
   end
 end
 
-defmodule PhoenixSocketClientTest.ErrorView do
+defmodule Phoenix.SocketClientTest.ErrorView do
   def render(template, _assigns) do
     %{errors: %{detail: Phoenix.Controller.status_message_from_template(template)}}
   end

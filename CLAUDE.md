@@ -23,7 +23,7 @@ mix compile --warnings-as-errors
 ```
 
 ## Architecture
-- **Main supervisor**: `PhoenixSocketClient` (lib/phoenix_socket_client.ex)
+- **Main supervisor**: `Phoenix.SocketClient` (lib/phoenix_socket_client.ex)
 - **State management**: `SocketState` (Agent)
 - **Connection handler**: `Socket` (GenServer)
 - **Channel supervisor**: `ChannelManager` (DynamicSupervisor)

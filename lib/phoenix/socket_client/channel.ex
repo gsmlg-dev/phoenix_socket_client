@@ -1,4 +1,4 @@
-defmodule PhoenixSocketClient.Channel do
+defmodule Phoenix.SocketClient.Channel do
   defmacro __using__(_opts) do
     quote do
       use GenServer
@@ -24,7 +24,7 @@ defmodule PhoenixSocketClient.Channel do
 
   use GenServer
 
-  alias PhoenixSocketClient.{Socket, Message, Telemetry}
+  alias Phoenix.SocketClient.{Socket, Message, Telemetry}
 
   @timeout 5_000
 

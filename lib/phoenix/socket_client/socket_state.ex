@@ -1,4 +1,4 @@
-defmodule PhoenixSocketClient.SocketState do
+defmodule Phoenix.SocketClient.SocketState do
   @moduledoc """
   Agent-based state management for WebSocket connection configuration and status.
 
@@ -23,11 +23,11 @@ defmodule PhoenixSocketClient.SocketState do
 
   use Agent
 
-  alias PhoenixSocketClient.Message
+  alias Phoenix.SocketClient.Message
 
   @heartbeat_interval 30_000
   @reconnect_interval 60_000
-  @default_transport PhoenixSocketClient.Transports.Websocket
+  @default_transport Phoenix.SocketClient.Transports.Websocket
 
   @doc """
   Starts the SocketState agent with the given configuration options.
@@ -36,7 +36,7 @@ defmodule PhoenixSocketClient.SocketState do
     * `opts` - Keyword list or map of configuration options
 
   ## Examples
-      {:ok, pid} = PhoenixSocketClient.SocketState.start_link(url: "ws://localhost:4000/socket")
+      {:ok, pid} = Phoenix.SocketClient.SocketState.start_link(url: "ws://localhost:4000/socket")
   """
   @spec start_link(keyword() | map()) :: {:ok, pid()} | {:error, term()}
   def start_link(opts) do
@@ -52,7 +52,7 @@ defmodule PhoenixSocketClient.SocketState do
     * `key` - The key to retrieve
 
   ## Examples
-      value = PhoenixSocketClient.SocketState.get(pid, :url)
+      value = Phoenix.SocketClient.SocketState.get(pid, :url)
   """
   @spec get(pid(), atom() | String.t()) :: any()
   def get(pid, key) do
@@ -68,7 +68,7 @@ defmodule PhoenixSocketClient.SocketState do
     * `value` - The value to associate with the key
 
   ## Examples
-      :ok = PhoenixSocketClient.SocketState.put(pid, :custom_key, "custom_value")
+      :ok = Phoenix.SocketClient.SocketState.put(pid, :custom_key, "custom_value")
   """
   @spec put(pid(), atom() | String.t(), any()) :: :ok
   def put(pid, key, value) do

@@ -1,4 +1,4 @@
-defmodule PhoenixSocketClient.Message do
+defmodule Phoenix.SocketClient.Message do
   @moduledoc """
   Defines the message structure and protocol for Phoenix Channels communication.
 
@@ -73,10 +73,10 @@ defmodule PhoenixSocketClient.Message do
     * `json_library` - JSON library module (e.g., Jason)
 
   ## Returns
-    * `PhoenixSocketClient.Message.t()` - Decoded message struct
+    * `Phoenix.SocketClient.Message.t()` - Decoded message struct
 
   ## Examples
-      message = PhoenixSocketClient.Message.decode!(V2, raw_json, Jason)
+      message = Phoenix.SocketClient.Message.decode!(V2, raw_json, Jason)
   """
   @spec decode!(module(), String.t(), module()) :: t()
   def decode!(serializer, msg, json_library) do
@@ -96,7 +96,7 @@ defmodule PhoenixSocketClient.Message do
     * String - JSON-encoded message
 
   ## Examples
-      json = PhoenixSocketClient.Message.encode!(V2, message, Jason)
+      json = Phoenix.SocketClient.Message.encode!(V2, message, Jason)
   """
   @spec encode!(module(), t(), module()) :: String.t()
   def encode!(serializer, %__MODULE__{} = msg, json_library) do
@@ -112,10 +112,10 @@ defmodule PhoenixSocketClient.Message do
     * `params` - Join parameters (map or keyword list)
 
   ## Returns
-    * `PhoenixSocketClient.Message.t()` - Join message
+    * `Phoenix.SocketClient.Message.t()` - Join message
 
   ## Examples
-      message = PhoenixSocketClient.Message.join("rooms:lobby", %{user_id: 123})
+      message = Phoenix.SocketClient.Message.join("rooms:lobby", %{user_id: 123})
   """
   @spec join(String.t(), map() | keyword()) :: t()
   def join(topic, params) do
@@ -137,10 +137,10 @@ defmodule PhoenixSocketClient.Message do
     * `topic` - Channel topic to leave
 
   ## Returns
-    * `PhoenixSocketClient.Message.t()` - Leave message
+    * `Phoenix.SocketClient.Message.t()` - Leave message
 
   ## Examples
-      message = PhoenixSocketClient.Message.leave("rooms:lobby")
+      message = Phoenix.SocketClient.Message.leave("rooms:lobby")
   """
   @spec leave(String.t()) :: t()
   def leave(topic) do
@@ -162,10 +162,10 @@ defmodule PhoenixSocketClient.Message do
     * `payload` - Message payload
 
   ## Returns
-    * `PhoenixSocketClient.Message.t()` - Push message
+    * `Phoenix.SocketClient.Message.t()` - Push message
 
   ## Examples
-      message = PhoenixSocketClient.Message.push("rooms:lobby", "new_msg", %{body: "Hello"})
+      message = Phoenix.SocketClient.Message.push("rooms:lobby", "new_msg", %{body: "Hello"})
   """
   @spec push(String.t(), String.t(), any()) :: t()
   def push(topic, event, payload) do

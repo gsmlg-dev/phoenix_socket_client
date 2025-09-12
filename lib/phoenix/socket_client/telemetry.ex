@@ -1,6 +1,6 @@
-defmodule PhoenixSocketClient.Telemetry do
+defmodule Phoenix.SocketClient.Telemetry do
   @moduledoc """
-  Telemetry integration for PhoenixSocketClient.
+  Telemetry integration for Phoenix.SocketClient.
 
   This module provides telemetry events for monitoring socket connections,
   channel joins/leaves, message handling, and connection lifecycle events.
@@ -176,7 +176,7 @@ defmodule PhoenixSocketClient.Telemetry do
 
   ## Example
 
-      PhoenixSocketClient.Telemetry.attach_debug_handler()
+      Phoenix.SocketClient.Telemetry.attach_debug_handler()
   """
   @spec attach_debug_handler() :: :ok
   def attach_debug_handler do
@@ -210,6 +210,6 @@ defmodule PhoenixSocketClient.Telemetry do
   end
 
   defp debug_handler(event_name, measurements, metadata, _config) do
-    IO.inspect({event_name, measurements, metadata}, label: "[PhoenixSocketClient] Telemetry")
+    IO.inspect({event_name, measurements, metadata}, label: "[Phoenix.SocketClient] Telemetry")
   end
 end

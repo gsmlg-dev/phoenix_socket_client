@@ -1,11 +1,11 @@
-defmodule PhoenixSocketClient.Socket do
+defmodule Phoenix.SocketClient.Socket do
   use GenServer
 
-  alias PhoenixSocketClient.ChannelManager
-  alias PhoenixSocketClient.Message
-  alias PhoenixSocketClient.Telemetry
+  alias Phoenix.SocketClient.ChannelManager
+  alias Phoenix.SocketClient.Message
+  alias Phoenix.SocketClient.Telemetry
 
-  import PhoenixSocketClient, only: [get_state: 2, put_state: 3, get_process_pid: 2]
+  import Phoenix.SocketClient, only: [get_state: 2, put_state: 3, get_process_pid: 2]
 
   def start_link(opts) do
     GenServer.start_link(__MODULE__, opts)
@@ -256,7 +256,7 @@ defmodule PhoenixSocketClient.Socket do
 
     if transport_pid do
       protocol_vsn = get_state(sup_pid, :vsn)
-      serializer = PhoenixSocketClient.Message.serializer(protocol_vsn)
+      serializer = Phoenix.SocketClient.Message.serializer(protocol_vsn)
       json_library = get_state(sup_pid, :json_library) || Jason
 
       send(transport_pid, {:send, Message.encode!(serializer, message, json_library)})
@@ -274,7 +274,7 @@ defmodule PhoenixSocketClient.Socket do
 
   defp transport_receive(message, %{sup_pid: sup_pid} = _state) do
     protocol_vsn = get_state(sup_pid, :vsn)
-    serializer = PhoenixSocketClient.Message.serializer(protocol_vsn)
+    serializer = Phoenix.SocketClient.Message.serializer(protocol_vsn)
     json_library = get_state(sup_pid, :json_library) || Jason
     decoded = Message.decode!(serializer, message, json_library)
 
@@ -298,7 +298,7 @@ defmodule PhoenixSocketClient.Socket do
 
     if transport_pid do
       protocol_vsn = get_state(sup_pid, :vsn)
-      serializer = PhoenixSocketClient.Message.serializer(protocol_vsn)
+      serializer = Phoenix.SocketClient.Message.serializer(protocol_vsn)
       json_library = get_state(sup_pid, :json_library) || Jason
 
       send(transport_pid, {:send, Message.encode!(serializer, message, json_library)})

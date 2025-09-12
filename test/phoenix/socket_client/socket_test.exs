@@ -1,7 +1,7 @@
-defmodule PhoenixSocketClient.SocketTest do
+defmodule Phoenix.SocketClient.SocketTest do
   use ExUnit.Case, async: false
 
-  alias PhoenixSocketClient.Socket
+  alias Phoenix.SocketClient.Socket
 
   defp get_port do
     Application.get_env(:phoenix_socket_client_test, :port, 5807)
@@ -34,7 +34,7 @@ defmodule PhoenixSocketClient.SocketTest do
       name = :"socket_connect_#{System.unique_integer([:positive])}"
 
       {:ok, _pid} =
-        PhoenixSocketClient.start_link(Keyword.put(get_socket_config(), :name, name))
+        Phoenix.SocketClient.Supervisor.start_link(Keyword.put(get_socket_config(), :name, name))
 
       wait_for_socket(name)
       assert Socket.connected?(name)
@@ -44,7 +44,7 @@ defmodule PhoenixSocketClient.SocketTest do
       name = :"socket_auto_#{System.unique_integer([:positive])}"
 
       {:ok, _pid} =
-        PhoenixSocketClient.start_link(Keyword.put(get_socket_config(), :name, name))
+        Phoenix.SocketClient.Supervisor.start_link(Keyword.put(get_socket_config(), :name, name))
 
       # Default auto_connect is true, should connect automatically
       wait_for_socket(name)
@@ -60,7 +60,7 @@ defmodule PhoenixSocketClient.SocketTest do
         |> Keyword.put(:name, name)
         |> Keyword.put(:auto_connect, false)
 
-      {:ok, _pid} = PhoenixSocketClient.start_link(config)
+      {:ok, _pid} = Phoenix.SocketClient.Supervisor.start_link(config)
 
       # Should not connect automatically - give it a moment to ensure
       Process.sleep(500)
@@ -71,7 +71,7 @@ defmodule PhoenixSocketClient.SocketTest do
       name = :"socket_status_#{System.unique_integer([:positive])}"
 
       {:ok, _pid} =
-        PhoenixSocketClient.start_link(Keyword.put(get_socket_config(), :name, name))
+        Phoenix.SocketClient.Supervisor.start_link(Keyword.put(get_socket_config(), :name, name))
 
       # Initially disconnected/connecting
       refute Socket.connected?(name)
@@ -91,7 +91,7 @@ defmodule PhoenixSocketClient.SocketTest do
         reconnect_interval: 100
       ]
 
-      {:ok, _pid} = PhoenixSocketClient.start_link(config)
+      {:ok, _pid} = Phoenix.SocketClient.Supervisor.start_link(config)
 
       # Should not be connected to invalid URL
       refute Socket.connected?(name)
@@ -105,7 +105,7 @@ defmodule PhoenixSocketClient.SocketTest do
         |> Keyword.put(:name, name)
         |> Keyword.put(:params, %{"custom" => "param"})
 
-      {:ok, _pid} = PhoenixSocketClient.start_link(config)
+      {:ok, _pid} = Phoenix.SocketClient.Supervisor.start_link(config)
       wait_for_socket(name)
       assert Socket.connected?(name)
     end
@@ -118,14 +118,14 @@ defmodule PhoenixSocketClient.SocketTest do
         |> Keyword.put(:name, name)
         |> Keyword.put(:headers, [{"x-custom", "header"}])
 
-      {:ok, _pid} = PhoenixSocketClient.start_link(config)
+      {:ok, _pid} = Phoenix.SocketClient.Supervisor.start_link(config)
       wait_for_socket(name)
       assert Socket.connected?(name)
     end
   end
 
   defmodule MyTestChannel do
-    use PhoenixSocketClient.Channel
+    use Phoenix.SocketClient.Channel
 
     @impl true
     def init({_sup_pid, _socket_pid, topic, params}) do
@@ -145,13 +145,13 @@ defmodule PhoenixSocketClient.SocketTest do
       |> Keyword.put(:name, name)
       |> Keyword.put(:topic_channel_map, %{topic => MyTestChannel})
 
-    {:ok, sup_pid} = PhoenixSocketClient.start_link(config)
+    {:ok, sup_pid} = Phoenix.SocketClient.Supervisor.start_link(config)
 
     # The channel needs the socket to be connected to join
     wait_for_socket(name)
 
     {:ok, _, _channel_pid} =
-      PhoenixSocketClient.Channel.join(sup_pid, topic, %{"test_pid" => self()})
+      Phoenix.SocketClient.Channel.join(sup_pid, topic, %{"test_pid" => self()})
 
     assert_receive {:channel_started, ^topic}, 5000
   end

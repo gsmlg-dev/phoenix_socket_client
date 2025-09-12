@@ -1,4 +1,4 @@
-# PhoenixSocketClient
+# Phoenix.SocketClient
 
 [![release](https://github.com/gsmlg-dev/phoenix_socket_client/actions/workflows/release.yml/badge.svg)](https://github.com/gsmlg-dev/phoenix_socket_client/actions/workflows/release.yml)
 [![Hex.pm](https://img.shields.io/hexpm/v/phoenix_socket_client.svg)](https://hex.pm/packages/phoenix_socket_client)
@@ -24,7 +24,7 @@ end
 ### Basic Connection
 
 ```elixir
-{:ok, socket} = PhoenixSocketClient.start_link(
+{:ok, socket} = Phoenix.SocketClient.start_link(
   url: "ws://localhost:4000/socket/websocket",
   params: %{"token" => "your-token"},
   headers: [{"Authorization", "Bearer your-token"}]
@@ -34,32 +34,32 @@ end
 ### Joining Channels
 
 ```elixir
-{:ok, response, channel} = PhoenixSocketClient.Channel.join(socket, "rooms:lobby", %{user_id: 123})
+{:ok, response, channel} = Phoenix.SocketClient.Channel.join(socket, "rooms:lobby", %{user_id: 123})
 
 # Handle incoming messages via message passing
-# Messages are received as PhoenixSocketClient.Message structs
+# Messages are received as Phoenix.SocketClient.Message structs
 receive do
-  %PhoenixSocketClient.Message{event: "new_msg", payload: payload} ->
+  %Phoenix.SocketClient.Message{event: "new_msg", payload: payload} ->
     IO.inspect(payload)
-  %PhoenixSocketClient.Message{event: "user:joined", payload: payload} ->
+  %Phoenix.SocketClient.Message{event: "user:joined", payload: payload} ->
     IO.puts("User joined: #{inspect(payload)}")
 end
 
 # Or in tests/explicit handling:
-assert_receive %PhoenixSocketClient.Message{event: "new_msg", payload: %{"body" => body}}
+assert_receive %Phoenix.SocketClient.Message{event: "new_msg", payload: %{"body" => body}}
 
 # Push messages to the channel
-PhoenixSocketClient.Channel.push(channel, "new_msg", %{"body" => "Hello"})
+Phoenix.SocketClient.Channel.push(channel, "new_msg", %{"body" => "Hello"})
 ```
 
 ### Custom Channels
 
 You can create your own channel modules to handle channel logic in a more structured way.
-The easiest way to create a custom channel is to `use PhoenixSocketClient.Channel`:
+The easiest way to create a custom channel is to `use Phoenix.SocketClient.Channel`:
 
 ```elixir
 defmodule MyChannel do
-  use PhoenixSocketClient.Channel
+  use Phoenix.SocketClient.Channel
 
   @impl true
   def init({sup_pid, socket_pid, topic, params}) do
@@ -74,7 +74,7 @@ end
 Then, you can use the `topic_channel_map` option when starting the socket to map a topic to your custom channel:
 
 ```elixir
-{:ok, socket} = PhoenixSocketClient.start_link(
+{:ok, socket} = Phoenix.SocketClient.start_link(
   url: "ws://localhost:4000/socket/websocket",
   topic_channel_map: %{
     "rooms:lobby" => MyChannel
@@ -87,15 +87,15 @@ Then, you can use the `topic_channel_map` option when starting the socket to map
 You can also handle incoming messages using hooks. This is useful when you want to handle messages in a more direct way, without using message passing.
 
 ```elixir
-{:ok, response, channel} = PhoenixSocketClient.Channel.join(socket, "rooms:lobby")
+{:ok, response, channel} = Phoenix.SocketClient.Channel.join(socket, "rooms:lobby")
 
 # Register a hook for the "new_msg" event
-PhoenixSocketClient.Channel.on(channel, "new_msg", fn payload ->
+Phoenix.SocketClient.Channel.on(channel, "new_msg", fn payload ->
   IO.inspect(payload)
 end)
 
 # Unregister the hook
-PhoenixSocketClient.Channel.off(channel, "new_msg")
+Phoenix.SocketClient.Channel.off(channel, "new_msg")
 ```
 
 You can also use a module as a hook. The module must implement a `handle_in/2` function, which will be called with the event and the payload.
@@ -107,10 +107,10 @@ defmodule MyHook do
   end
 end
 
-{:ok, response, channel} = PhoenixSocketClient.Channel.join(socket, "rooms:lobby")
+{:ok, response, channel} = Phoenix.SocketClient.Channel.join(socket, "rooms:lobby")
 
 # Register a module hook for the "new_msg" event
-PhoenixSocketClient.Channel.on(channel, "new_msg", MyHook)
+Phoenix.SocketClient.Channel.on(channel, "new_msg", MyHook)
 ```
 
 ### Configuration Options
@@ -120,7 +120,7 @@ PhoenixSocketClient.Channel.on(channel, "new_msg", MyHook)
 | `:url` | `String.t()` | **Required** | WebSocket URL (e.g., "ws://localhost:4000/socket/websocket") |
 | `:params` | `map() \| keyword()` | `%{}` | Query parameters for connection |
 | `:headers` | `[{String.t(), String.t()}]` | `[]` | HTTP headers for connection |
-| `:transport` | `module()` | `PhoenixSocketClient.Transports.Websocket` | Transport module |
+| `:transport` | `module()` | `Phoenix.SocketClient.Transports.Websocket` | Transport module |
 | `:heartbeat_interval` | `integer()` | `30_000` | Keep-alive interval in milliseconds |
 | `:reconnect_interval` | `integer()` | `60_000` | Reconnection delay in milliseconds |
 | `:reconnect?` | `boolean()` | `true` | Enable automatic reconnection |
@@ -133,22 +133,22 @@ PhoenixSocketClient.Channel.on(channel, "new_msg", MyHook)
 
 ```elixir
 # Using in a GenServer or other process
-{:ok, response, channel} = PhoenixSocketClient.Channel.join(socket, "rooms:lobby")
+{:ok, response, channel} = Phoenix.SocketClient.Channel.join(socket, "rooms:lobby")
 
 # In your GenServer handle_info or process loop:
-def handle_info(%PhoenixSocketClient.Message{event: "new_msg", payload: payload}, state) do
+def handle_info(%Phoenix.SocketClient.Message{event: "new_msg", payload: payload}, state) do
   IO.puts("New message: #{inspect(payload)}")
   {:noreply, state}
 end
 
-def handle_info(%PhoenixSocketClient.Message{event: "user:joined", payload: %{"user" => user}}, state) do
+def handle_info(%Phoenix.SocketClient.Message{event: "user:joined", payload: %{"user" => user}}, state) do
   IO.puts("User #{user} joined the room")
   {:noreply, state}
 end
 
 # For simple usage, use receive blocks:
 receive do
-  %PhoenixSocketClient.Message{event: event, payload: payload} ->
+  %Phoenix.SocketClient.Message{event: event, payload: payload} ->
     IO.puts("Received event: #{event} with payload: #{inspect(payload)}")
 after
   5_000 -> IO.puts("No messages received")
@@ -159,20 +159,20 @@ end
 
 ```elixir
 # Handle connection errors
-{:ok, socket} = PhoenixSocketClient.start_link(
+{:ok, socket} = Phoenix.SocketClient.start_link(
   url: "ws://localhost:4000/socket/websocket",
   params: %{"token" => "invalid-token"}
 )
 
 # Check connection status
-if PhoenixSocketClient.Socket.connected?(socket) do
-  {:ok, _response, channel} = PhoenixSocketClient.Channel.join(socket, "rooms:lobby")
+if Phoenix.SocketClient.Socket.connected?(socket) do
+  {:ok, _response, channel} = Phoenix.SocketClient.Channel.join(socket, "rooms:lobby")
 else
   IO.puts("Failed to connect to server")
 end
 
 # Handle channel join errors
-case PhoenixSocketClient.Channel.join(socket, "rooms:private", %{user_id: 123}) do
+case Phoenix.SocketClient.Channel.join(socket, "rooms:private", %{user_id: 123}) do
   {:ok, response, channel} ->
     # Successfully joined channel
     IO.inspect(response)
@@ -191,7 +191,7 @@ case PhoenixSocketClient.Channel.join(socket, "rooms:private", %{user_id: 123}) 
 end
 
 # Handle message push errors
-case PhoenixSocketClient.Channel.push(channel, "new_msg", %{body: "Hello"}, 5000) do
+case Phoenix.SocketClient.Channel.push(channel, "new_msg", %{body: "Hello"}, 5000) do
   {:ok, response} ->
     # Message sent successfully
     IO.inspect(response)
@@ -210,7 +210,7 @@ end
 
 ```elixir
 # Monitor connection status
-PhoenixSocketClient.Telemetry.attach_debug_handler()
+Phoenix.SocketClient.Telemetry.attach_debug_handler()
 
 # Implement custom reconnection logic
 :telemetry.attach(
@@ -218,7 +218,7 @@ PhoenixSocketClient.Telemetry.attach_debug_handler()
   [:phoenix_socket_client, :socket, :disconnected],
   fn _event, _measurements, _metadata, _config ->
     Process.sleep(1000)
-    PhoenixSocketClient.connect(socket)
+    Phoenix.SocketClient.connect(socket)
   end,
   %{}
 )
@@ -296,7 +296,7 @@ The library includes comprehensive telemetry events for monitoring and debugging
 )
 
 # Use built-in debug handler
-PhoenixSocketClient.Telemetry.attach_debug_handler()
+Phoenix.SocketClient.Telemetry.attach_debug_handler()
 ```
 
 ### Dependencies

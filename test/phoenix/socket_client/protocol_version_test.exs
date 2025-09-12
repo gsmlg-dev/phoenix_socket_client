@@ -1,7 +1,7 @@
-defmodule PhoenixSocketClient.ProtocolVersionTest do
+defmodule Phoenix.SocketClient.ProtocolVersionTest do
   use ExUnit.Case, async: true
 
-  alias PhoenixSocketClient.Message
+  alias Phoenix.SocketClient.Message
 
   describe "Message serialization" do
     test "V1 protocol serialization" do

@@ -1,4 +1,4 @@
-defmodule PhoenixSocketClient.QuickTest do
+defmodule Phoenix.SocketClient.QuickTest do
   use ExUnit.Case, async: false
 
   defp get_port do
@@ -17,7 +17,7 @@ defmodule PhoenixSocketClient.QuickTest do
     IO.inspect(name)
     # Test basic startup without connection
     {:ok, pid} =
-      PhoenixSocketClient.start_link(
+      Phoenix.SocketClient.Supervisor.start_link(
         name: name,
         url: "ws://127.0.0.1:#{get_port()}/ws/admin/websocket",
         serializer: Jason,
@@ -29,11 +29,11 @@ defmodule PhoenixSocketClient.QuickTest do
     assert Process.alive?(pid)
 
     # Test state retrieval
-    assert url = PhoenixSocketClient.get_state(pid, :url)
+    assert url = Phoenix.SocketClient.get_state(pid, :url)
     assert url =~ "ws://127.0.0.1"
 
     # Test process pid retrieval
-    assert state_pid = PhoenixSocketClient.get_process_pid(pid, :socket_state)
+    assert state_pid = Phoenix.SocketClient.get_process_pid(pid, :socket_state)
     assert is_pid(state_pid)
 
     Process.exit(pid, :normal)

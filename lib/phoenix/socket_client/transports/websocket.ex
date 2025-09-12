@@ -1,5 +1,5 @@
-defmodule PhoenixSocketClient.Transports.Websocket do
-  @behaviour PhoenixSocketClient.Transport
+defmodule Phoenix.SocketClient.Transports.Websocket do
+  @behaviour Phoenix.SocketClient.Transport
 
   require Logger
 

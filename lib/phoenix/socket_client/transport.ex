@@ -1,4 +1,4 @@
-defmodule PhoenixSocketClient.Transport do
+defmodule Phoenix.SocketClient.Transport do
   @callback open(url :: String.t(), opts :: Keyword.t()) ::
               {:ok, pid}
               | {:error, any}
