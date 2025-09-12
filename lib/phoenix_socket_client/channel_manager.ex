@@ -23,7 +23,7 @@ defmodule PhoenixSocketClient.ChannelManager do
   use DynamicSupervisor
 
   alias PhoenixSocketClient.Channel
-  import PhoenixSocketClient, only: [get_process_pid: 2]
+  import PhoenixSocketClient, only: [get_process_pid: 2, get_state: 2]
 
   @doc """
   Starts the ChannelManager dynamic supervisor.
@@ -86,6 +86,10 @@ defmodule PhoenixSocketClient.ChannelManager do
   def start_channel(sup_pid, topic, params, channel_module \\ Channel) do
     socket_pid = get_process_pid(sup_pid, :socket)
     cm_pid = get_process_pid(sup_pid, :channel_manager)
+
+    channel_module =
+      (get_state(sup_pid, :topic_channel_map) || %{})
+      |> Map.get(topic, channel_module)
 
     spec =
       {channel_module, {sup_pid, socket_pid, topic, params}}

@@ -87,34 +87,20 @@ defmodule PhoenixSocketClient.SocketState do
   end
 
   defp init_state(opts) do
-    opts = if is_map(opts), do: Map.to_list(opts), else: opts
-
     transport = Keyword.get(opts, :transport, @default_transport)
     json_library = Keyword.get(opts, :json_library, Jason)
     reconnect? = Keyword.get(opts, :reconnect?, true)
-
     auto_connect = Keyword.get(opts, :auto_connect, true)
-
     protocol_vsn = Keyword.get(opts, :vsn, "2.0.0")
     serializer = Message.serializer(protocol_vsn)
-
-    url =
-      case Keyword.get(opts, :url) do
-        nil -> "ws://localhost:4000/socket/websocket"
-        url -> url
-      end
-
+    url = Keyword.get(opts, :url, "ws://localhost:4000/socket/websocket")
     uri = URI.parse(url)
-
     params = Keyword.get(opts, :params, %{})
-
     query_params = Map.merge(%{"vsn" => protocol_vsn}, params)
     query = URI.encode_query(query_params)
 
-    # Construct final URL properly - ensure we always have a valid base URL
     base_url =
       if uri.query do
-        # If URL already has query params, preserve them
         url_parts = String.split(url, "?", parts: 2)
         base = Enum.at(url_parts, 0)
         existing_query = Enum.at(url_parts, 1)
@@ -128,17 +114,15 @@ defmodule PhoenixSocketClient.SocketState do
         url <> "?" <> query
       end
 
-    opts = Keyword.put_new(opts, :headers, [])
     heartbeat_interval = Keyword.get(opts, :heartbeat_interval, @heartbeat_interval)
     reconnect_interval = Keyword.get(opts, :reconnect_interval, @reconnect_interval)
 
     transport_opts =
       Keyword.get(opts, :transport_opts, [])
-      |> Keyword.put(:extra_headers, Keyword.get(opts, :headers))
+      |> Keyword.put(:extra_headers, Keyword.get(opts, :headers, []))
       |> Keyword.put(:keepalive, heartbeat_interval)
 
-    %{
-      opts: opts,
+    state = %{
       url: base_url,
       json_library: json_library,
       params: params,
@@ -155,5 +139,7 @@ defmodule PhoenixSocketClient.SocketState do
       to_send_r: [],
       ref: 0
     }
+
+    Map.merge(Enum.into(opts, %{}), state)
   end
 end

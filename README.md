@@ -52,6 +52,36 @@ assert_receive %PhoenixSocketClient.Message{event: "new_msg", payload: %{"body" 
 PhoenixSocketClient.Channel.push(channel, "new_msg", %{"body" => "Hello"})
 ```
 
+### Custom Channels
+
+You can create your own channel modules to handle channel logic in a more structured way.
+The easiest way to create a custom channel is to `use PhoenixSocketClient.Channel`:
+
+```elixir
+defmodule MyChannel do
+  use PhoenixSocketClient.Channel
+
+  @impl true
+  def init({sup_pid, socket_pid, topic, params}) do
+    # initialize your channel state
+    {:ok, %{sup_pid: sup_pid, socket_pid: socket_pid, topic: topic, params: params}}
+  end
+
+  # optional callbacks
+end
+```
+
+Then, you can use the `topic_channel_map` option when starting the socket to map a topic to your custom channel:
+
+```elixir
+{:ok, socket} = PhoenixSocketClient.start_link(
+  url: "ws://localhost:4000/socket/websocket",
+  topic_channel_map: %{
+    "rooms:lobby" => MyChannel
+  }
+)
+```
+
 ### Handling Incoming Messages with Hooks
 
 You can also handle incoming messages using hooks. This is useful when you want to handle messages in a more direct way, without using message passing.
@@ -97,6 +127,7 @@ PhoenixSocketClient.Channel.on(channel, "new_msg", MyHook)
 | `:auto_connect` | `boolean()` | `true` | Connect automatically on startup |
 | `:serializer` | `module()` | `Jason` | JSON serializer module |
 | `:vsn` | `String.t()` | `"2.0.0"` | Phoenix Channels protocol version (V1 is deprecated) |
+| `:topic_channel_map` | `map()` | `%_` | A map from a topic string to a channel module. |
 
 ### Message Handling Examples
 
