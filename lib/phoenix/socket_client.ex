@@ -135,4 +135,19 @@ defmodule Phoenix.SocketClient do
         GenServer.call(pid, {:push_message, message})
     end
   end
+
+  @doc """
+  Disconnects the socket.
+  """
+  @spec disconnect(pid | atom) :: :ok
+  def disconnect(sup_pid) do
+    case get_process_pid(sup_pid, :socket) do
+      nil ->
+        :ok
+
+      socket_pid ->
+        send(socket_pid, :disconnect)
+        :ok
+    end
+  end
 end

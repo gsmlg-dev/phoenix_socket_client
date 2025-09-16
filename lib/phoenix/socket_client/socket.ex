@@ -36,6 +36,10 @@ defmodule Phoenix.SocketClient.Socket do
   end
 
   @impl true
+  def handle_info(:disconnect, state) do
+    {:noreply, close(:normal, state)}
+  end
+
   def handle_info(:connect, %{sup_pid: sup_pid} = state) do
     case get_state(sup_pid, :url) do
       nil ->

@@ -120,6 +120,21 @@ defmodule Phoenix.SocketClient.SocketTest do
       wait_for_socket(name)
       assert Phoenix.SocketClient.connected?(name)
     end
+
+    test "socket can be disconnected" do
+      name = :"socket_disconnect_#{System.unique_integer([:positive])}"
+
+      {:ok, _pid} =
+        Phoenix.SocketClient.Supervisor.start_link(Keyword.put(get_socket_config(), :name, name))
+
+      wait_for_socket(name)
+      assert Phoenix.SocketClient.connected?(name)
+
+      assert :ok = Phoenix.SocketClient.disconnect(name)
+      # Give it a moment to disconnect
+      Process.sleep(100)
+      refute Phoenix.SocketClient.connected?(name)
+    end
   end
 
   defmodule MyTestChannel do
