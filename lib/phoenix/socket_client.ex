@@ -1,11 +1,28 @@
 defmodule Phoenix.SocketClient do
   @moduledoc """
-  A Supervisor for starting, supervising, and managing socket connections.
+  The main API for the Phoenix Socket Client.
   """
 
-  @spec child_spec(keyword) :: Supervisor.child_spec()
+  @doc """
+  Starts the socket client supervisor.
+
+  Delegates to `Phoenix.SocketClient.Supervisor.start_link/1`.
+  """
+  @spec start_link(keyword()) :: Supervisor.on_start()
+  defdelegate start_link(options), to: Phoenix.SocketClient.Supervisor
+
+  @doc """
+  Returns a child specification for the socket client supervisor.
+
+  Delegates to `Phoenix.SocketClient.Supervisor.child_spec/1`.
+  """
+  @spec child_spec(keyword()) :: Supervisor.child_spec()
   defdelegate child_spec(options), to: Phoenix.SocketClient.Supervisor
 
+  @doc """
+  Connects the socket.
+  """
+  @spec connect(pid() | atom()) :: :ok | {:error, :no_socket_found}
   def connect(sup_pid) do
     case get_process_pid(sup_pid, :socket) do
       nil ->
@@ -13,9 +30,11 @@ defmodule Phoenix.SocketClient do
 
       socket_pid ->
         send(socket_pid, :connect)
+        :ok
     end
   end
 
+  @doc false
   def get_process_pid(sup_name, name) when is_atom(sup_name) do
     case Process.whereis(sup_name) do
       nil ->
@@ -49,6 +68,10 @@ defmodule Phoenix.SocketClient do
     end
   end
 
+  @doc """
+  Gets a value from the socket state.
+  """
+  @spec get_state(pid() | atom(), atom()) :: any()
   def get_state(name, key) when is_atom(name) do
     case Process.whereis(name) do
       nil ->
@@ -64,6 +87,10 @@ defmodule Phoenix.SocketClient do
     Phoenix.SocketClient.Agent.get(state_pid, key)
   end
 
+  @doc """
+  Puts a value into the socket state.
+  """
+  @spec put_state(pid() | atom(), atom(), any()) :: :ok
   def put_state(name, key, value) when is_atom(name) do
     case Process.whereis(name) do
       nil ->

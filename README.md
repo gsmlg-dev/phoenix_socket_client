@@ -2,19 +2,19 @@
 
 [![release](https://github.com/gsmlg-dev/phoenix_socket_client/actions/workflows/release.yml/badge.svg)](https://github.com/gsmlg-dev/phoenix_socket_client/actions/workflows/release.yml)
 [![Hex.pm](https://img.shields.io/hexpm/v/phoenix_socket_client.svg)](https://hex.pm/packages/phoenix_socket_client)
-[![Documentation](https://img.shields.io/badge/documentation-gray)](https://hexdocs.pm/phoenix_socket_client)
-
+[![Documentation](https://img.shields.io/badge/documentation-grey)](https://hexdocs.pm/phoenix_socket_client)
 
 Elixir client for Phoenix Channels WebSocket connections.
 
 ## Installation
 
-Add `phoenix_socket_client` to your list of dependencies in `mix.exs`:
+Add `phoenix_socket_client` to your list of dependencies in `mix.exs`.
+The package is available on [Hex.pm](https://hex.pm/packages/phoenix_socket_client).
 
 ```elixir
 def deps do
   [
-    {:phoenix_socket_client, "~> 0.3"}
+    {:phoenix_socket_client, "~> 0.4.0"}
   ]
 end
 ```
@@ -23,7 +23,20 @@ end
 
 ### Basic Connection
 
+The socket can be started as a supervised process by adding it to your supervision tree.
+You can also start it as a standalone process.
+
 ```elixir
+# As a supervised process
+def start(_type, _args) do
+  children = [
+    {Phoenix.SocketClient, url: "ws://localhost:4000/socket/websocket", name: MyApp.Socket}
+  ]
+
+  Supervisor.start_link(children, strategy: :one_for_one, name: MyApp.Supervisor)
+end
+
+# As a standalone process
 {:ok, socket} = Phoenix.SocketClient.start_link(
   url: "ws://localhost:4000/socket/websocket",
   params: %{"token" => "your-token"},
@@ -62,12 +75,17 @@ defmodule MyChannel do
   use Phoenix.SocketClient.Channel
 
   @impl true
-  def init({sup_pid, socket_pid, topic, params}) do
+  def init(args) do
     # initialize your channel state
-    {:ok, %{sup_pid: sup_pid, socket_pid: socket_pid, topic: topic, params: params}}
+    # args: {sup_pid, socket_pid, topic, params}
+    {:ok, args}
   end
 
   # optional callbacks
+  # @impl true
+  # def handle_in(event, payload, state) do
+  #   {:noreply, state}
+  # end
 end
 ```
 
@@ -117,6 +135,7 @@ Phoenix.SocketClient.Channel.on(channel, "new_msg", MyHook)
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
+| `:name` | `atom()` | `nil` | The name to register the socket supervisor. |
 | `:url` | `String.t()` | **Required** | WebSocket URL (e.g., "ws://localhost:4000/socket/websocket") |
 | `:params` | `map() \| keyword()` | `%{}` | Query parameters for connection |
 | `:headers` | `[{String.t(), String.t()}]` | `[]` | HTTP headers for connection |

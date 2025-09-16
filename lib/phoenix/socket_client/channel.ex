@@ -26,9 +26,30 @@ defmodule Phoenix.SocketClient.Channel do
 
   alias Phoenix.SocketClient.{Message, Telemetry}
 
+  @type t :: %__MODULE__{
+          caller: pid() | nil,
+          sup_pid: pid(),
+          socket_pid: pid(),
+          topic: String.t(),
+          params: map(),
+          pushes: list(),
+          join_ref: String.t() | nil,
+          hooks: map()
+        }
+
+  defstruct caller: nil,
+            sup_pid: nil,
+            socket_pid: nil,
+            topic: nil,
+            params: %{},
+            pushes: [],
+            join_ref: nil,
+            hooks: %{}
+
   @timeout 5_000
 
   @doc false
+  @spec start_link(map()) :: GenServer.on_start()
   def start_link(args) do
     GenServer.start_link(__MODULE__, args)
   end
@@ -83,7 +104,8 @@ defmodule Phoenix.SocketClient.Channel do
   The server must be configured to return `{:reply, _, socket}`
   otherwise, the call will timeout.
   """
-  @spec push(pid, binary, map, non_neg_integer) :: term()
+  @spec push(pid, binary, map, non_neg_integer) ::
+          {:ok, map()} | {:error, map() | :timeout}
   def push(pid, event, payload, timeout \\ @timeout) do
     GenServer.call(pid, {:push, event, payload}, timeout)
   end
@@ -134,21 +156,19 @@ defmodule Phoenix.SocketClient.Channel do
 
   # Callbacks
   @impl true
+  @spec init({pid(), pid(), String.t(), map()}) :: {:ok, t()}
   def init({sup_pid, socket_pid, topic, params}) do
     {:ok,
-     %{
-       caller: nil,
+     %__MODULE__{
        sup_pid: sup_pid,
        socket_pid: socket_pid,
        topic: topic,
-       params: params,
-       pushes: [],
-       join_ref: nil,
-       hooks: %{}
+       params: params
      }}
   end
 
   @impl true
+  @spec handle_call(:join, GenServer.from(), t()) :: {:noreply, t()}
   def handle_call(
         :join,
         {_pid, _ref} = from,
@@ -160,7 +180,7 @@ defmodule Phoenix.SocketClient.Channel do
     Telemetry.channel_joined(self(), topic, nil, %{}, %{params: params})
 
     {:noreply,
-     %{
+     %__MODULE__{
        state
        | join_ref: push.ref,
          caller: elem(from, 0),
@@ -169,6 +189,7 @@ defmodule Phoenix.SocketClient.Channel do
   end
 
   @impl true
+  @spec handle_call(:leave, GenServer.from(), t()) :: {:stop, :normal, :ok, t()}
   def handle_call(
         :leave,
         _from,
@@ -183,6 +204,7 @@ defmodule Phoenix.SocketClient.Channel do
   end
 
   @impl true
+  @spec handle_call({:push, String.t(), map()}, GenServer.from(), t()) :: {:noreply, t()}
   def handle_call({:push, event, payload}, from, %{sup_pid: sup_pid, topic: topic} = state) do
     message = %Message{
       topic: topic,
@@ -194,22 +216,25 @@ defmodule Phoenix.SocketClient.Channel do
 
     push = Phoenix.SocketClient.push(sup_pid, message)
     Telemetry.message_sent(self(), topic, event, payload)
-    {:noreply, %{state | pushes: [{from, push} | state.pushes]}}
+    {:noreply, %__MODULE__{state | pushes: [{from, push} | state.pushes]}}
   end
 
   @impl true
+  @spec handle_cast({:on, String.t(), (map() -> any()) | module()}, t()) :: {:noreply, t()}
   def handle_cast({:on, event, callback}, state) do
     hooks = Map.put(state.hooks, event, callback)
-    {:noreply, %{state | hooks: hooks}}
+    {:noreply, %__MODULE__{state | hooks: hooks}}
   end
 
   @impl true
+  @spec handle_cast({:off, String.t()}, t()) :: {:noreply, t()}
   def handle_cast({:off, event}, state) do
     hooks = Map.delete(state.hooks, event)
-    {:noreply, %{state | hooks: hooks}}
+    {:noreply, %__MODULE__{state | hooks: hooks}}
   end
 
   @impl true
+  @spec handle_cast({:push, String.t(), map()}, t()) :: {:noreply, t()}
   def handle_cast({:push, event, payload}, %{sup_pid: sup_pid, topic: topic} = state) do
     message = %Message{
       topic: topic,
@@ -225,6 +250,7 @@ defmodule Phoenix.SocketClient.Channel do
   end
 
   @impl true
+  @spec handle_info(Message.t(), t()) :: {:noreply, t()}
   def handle_info(
         %Message{event: "phx_reply", ref: ref} = msg,
         %{pushes: pushes, topic: topic} = s
@@ -253,10 +279,11 @@ defmodule Phoenix.SocketClient.Channel do
           pushes
       end
 
-    {:noreply, %{s | pushes: pushes}}
+    {:noreply, %__MODULE__{s | pushes: pushes}}
   end
 
   @impl true
+  @spec handle_info(Message.t(), t()) :: {:noreply, t()}
   def handle_info(%Message{} = message, state) do
     %{caller: pid, topic: topic, hooks: hooks} = state
 
