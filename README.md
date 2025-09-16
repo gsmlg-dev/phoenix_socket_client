@@ -14,7 +14,7 @@ Add `phoenix_socket_client` to your list of dependencies in `mix.exs`:
 ```elixir
 def deps do
   [
-    {:phoenix_socket_client, "~> 0.1.0"}
+    {:phoenix_socket_client, "~> 0.3"}
   ]
 end
 ```
