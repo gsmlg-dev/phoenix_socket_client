@@ -104,6 +104,7 @@ defmodule Phoenix.SocketClientTest.AdminSocket do
 
   channel("rooms:*", Phoenix.SocketClientTest.RoomChannel)
   channel("topic:*", Phoenix.SocketClientTest.TopicChannel)
+  channel("custom:*", Phoenix.SocketClientTest.RoomChannel)
 
   def connect(params, socket, connect_info) do
     on_connect(self(), %{
@@ -168,6 +169,10 @@ defmodule Phoenix.SocketClientTest.RoomChannel do
 
   def join("rooms:crash", _message, _socket) do
     raise "crash"
+  end
+
+  def join("custom:" <> _, message, socket) do
+    {:ok, message, socket}
   end
 
   def handle_info({:after_join, user_id}, socket) do
