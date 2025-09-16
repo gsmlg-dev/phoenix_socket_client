@@ -1,8 +1,31 @@
 defmodule Phoenix.SocketClient.Supervisor do
+  @moduledoc """
+  The main supervisor for the Phoenix Socket Client.
+  """
   import Phoenix.SocketClient, only: [connect: 1, get_state: 2]
 
   use Supervisor
 
+  @doc """
+  Starts the socket client supervisor.
+
+  ## Options
+
+    * `:name` - The name to register the supervisor.
+    * `:url` - The WebSocket URL.
+    * `:params` - The parameters to send on connection.
+    * `:headers` - The headers to send on connection.
+    * `:transport` - The transport to use.
+    * `:heartbeat_interval` - The heartbeat interval in milliseconds.
+    * `:reconnect_interval` - The reconnect interval in milliseconds.
+    * `:reconnect?` - Whether to reconnect automatically.
+    * `:auto_connect` - Whether to connect automatically on startup.
+    * `:serializer` - The serializer to use.
+    * `:vsn` - The Phoenix Channels protocol version.
+    * `:topic_channel_map` - A map from a topic string to a channel module.
+
+  """
+  @spec start_link(keyword()) :: Supervisor.on_start()
   def start_link(opts) do
     opts = Map.new(opts)
     name = Map.get(opts, :name)
