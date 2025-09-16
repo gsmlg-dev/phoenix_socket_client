@@ -24,7 +24,7 @@ defmodule Phoenix.SocketClient.Channel do
 
   use GenServer
 
-  alias Phoenix.SocketClient.{Socket, Message, Telemetry}
+  alias Phoenix.SocketClient.{Message, Telemetry}
 
   @timeout 5_000
 
@@ -58,8 +58,8 @@ defmodule Phoenix.SocketClient.Channel do
   def join(nil, _topic, _params, _timeout), do: {:error, :socket_not_started}
 
   def join(sup_pid, topic, params, timeout) do
-    if Socket.connected?(sup_pid) do
-      case Socket.channel_join(sup_pid, topic, params) do
+    if Phoenix.SocketClient.connected?(sup_pid) do
+      case Phoenix.SocketClient.channel_join(sup_pid, topic, params) do
         {:ok, pid} -> do_join(pid, timeout)
         {:error, {:already_started, _}} = error -> error
         error -> error
@@ -156,7 +156,7 @@ defmodule Phoenix.SocketClient.Channel do
       ) do
     message = Message.join(topic, params)
 
-    push = Socket.push(sup_pid, message)
+    push = Phoenix.SocketClient.push(sup_pid, message)
     Telemetry.channel_joined(self(), topic, nil, %{}, %{params: params})
 
     {:noreply,
@@ -176,7 +176,7 @@ defmodule Phoenix.SocketClient.Channel do
       ) do
     message = Message.leave(topic)
 
-    _push = Socket.push(sup_pid, message)
+    _push = Phoenix.SocketClient.push(sup_pid, message)
 
     Telemetry.channel_left(self(), topic, :leave)
     {:stop, :normal, :ok, state}
@@ -192,7 +192,7 @@ defmodule Phoenix.SocketClient.Channel do
       join_ref: state.join_ref
     }
 
-    push = Socket.push(sup_pid, message)
+    push = Phoenix.SocketClient.push(sup_pid, message)
     Telemetry.message_sent(self(), topic, event, payload)
     {:noreply, %{state | pushes: [{from, push} | state.pushes]}}
   end
@@ -219,7 +219,7 @@ defmodule Phoenix.SocketClient.Channel do
       join_ref: state.join_ref
     }
 
-    Socket.push(sup_pid, message)
+    Phoenix.SocketClient.push(sup_pid, message)
     Telemetry.message_sent(self(), topic, event, payload)
     {:noreply, state}
   end

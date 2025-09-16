@@ -1,8 +1,6 @@
 defmodule Phoenix.SocketClient.ConnectionFailureTest do
   use ExUnit.Case, async: false
 
-  alias Phoenix.SocketClient.Socket
-
   @invalid_url "ws://127.0.0.1:9999/nonexistent/socket"
 
   test "handles connection failure gracefully" do
@@ -17,7 +15,7 @@ defmodule Phoenix.SocketClient.ConnectionFailureTest do
       )
 
     # Should not be connected to invalid URL
-    refute Socket.connected?(name)
+    refute Phoenix.SocketClient.connected?(name)
 
     # Should return error for unconnected socket
     assert {:error, :socket_not_connected} == Phoenix.SocketClient.Channel.join(name, "rooms:any")

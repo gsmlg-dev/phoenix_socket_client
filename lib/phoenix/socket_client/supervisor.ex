@@ -20,7 +20,7 @@ defmodule Phoenix.SocketClient.Supervisor do
     opts = opts |> Map.put(:sup_pid, sup_pid)
 
     children = [
-      {Phoenix.SocketClient.SocketState, opts}
+      {Phoenix.SocketClient.Agent, opts}
       |> Supervisor.child_spec(id: :socket_state),
       {Phoenix.SocketClient.Socket, opts}
       |> Supervisor.child_spec(id: :socket),

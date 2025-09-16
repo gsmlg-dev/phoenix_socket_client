@@ -165,7 +165,7 @@ end
 )
 
 # Check connection status
-if Phoenix.SocketClient.Socket.connected?(socket) do
+if Phoenix.SocketClient.connected?(socket) do
   {:ok, _response, channel} = Phoenix.SocketClient.Channel.join(socket, "rooms:lobby")
 else
   IO.puts("Failed to connect to server")

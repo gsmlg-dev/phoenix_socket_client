@@ -1,7 +1,7 @@
 defmodule Phoenix.SocketClientTest do
   use ExUnit.Case, async: false
 
-  alias Phoenix.SocketClient.{Socket, Channel, Message}
+  alias Phoenix.SocketClient.{Channel, Message}
 
   @socket_config [
     # Will be set dynamically
@@ -276,7 +276,7 @@ defmodule Phoenix.SocketClientTest do
       raise "Socket did not connect in time"
     end
 
-    case Socket.connected?(socket_name) do
+    case Phoenix.SocketClient.connected?(socket_name) do
       true ->
         :ok
 
