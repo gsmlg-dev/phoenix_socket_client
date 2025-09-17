@@ -59,6 +59,7 @@ defmodule Phoenix.SocketClient.Socket do
   @spec handle_info(:connect, t()) :: {:noreply, t()}
   def handle_info(:connect, %{sup_pid: sup_pid} = state) do
     socket_state = Phoenix.SocketClient.get_state(sup_pid)
+
     case socket_state.url do
       nil ->
         Telemetry.debug(self(), "Connection: no URL provided, skipping connection")
@@ -108,7 +109,10 @@ defmodule Phoenix.SocketClient.Socket do
   @spec handle_info({:connected, pid()}, t()) :: {:noreply, t()}
   def handle_info({:connected, transport_pid}, %{sup_pid: sup_pid} = state) do
     socket_state = Phoenix.SocketClient.get_state(sup_pid)
-    Telemetry.debug(self(), "Connection: connected", socket_state.url, %{transport_pid: transport_pid})
+
+    Telemetry.debug(self(), "Connection: connected", socket_state.url, %{
+      transport_pid: transport_pid
+    })
 
     Telemetry.socket_connected(self(), socket_state.url)
     put_state(sup_pid, :reconnecting, false)
@@ -154,6 +158,7 @@ defmodule Phoenix.SocketClient.Socket do
     Telemetry.debug(self(), "Connection: received message struct", url, %{message: message})
     # Handle message structs that might be sent directly
     socket_state = Phoenix.SocketClient.get_state(sup_pid)
+
     case Registry.lookup(socket_state.registry_name, message.topic) do
       [{pid, _}] -> send(pid, message)
       [] -> :noop

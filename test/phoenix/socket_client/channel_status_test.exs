@@ -88,11 +88,13 @@ defmodule Phoenix.SocketClient.ChannelStatusTest do
       params = %{"foo" => "bar"}
       {:ok, _, channel_pid} = Phoenix.SocketClient.Channel.join(sup_pid, "topic:status", params)
 
-      Process.sleep(100) # wait for join
+      # wait for join
+      Process.sleep(100)
 
       :ok = Phoenix.SocketClient.Channel.leave(channel_pid)
 
-      Process.sleep(100) # wait for leave
+      # wait for leave
+      Process.sleep(100)
 
       assert nil ==
                get_in(Phoenix.SocketClient.get_state(sup_pid, :joined_channels), ["topic:status"])

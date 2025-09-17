@@ -51,7 +51,7 @@ defmodule Phoenix.SocketClient.Agent do
   end
 
   def get_state(pid) do
-    Agent.get(pid, &(&1))
+    Agent.get(pid, & &1)
   end
 
   @doc """
