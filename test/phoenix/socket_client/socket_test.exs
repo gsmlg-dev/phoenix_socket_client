@@ -7,11 +7,13 @@ defmodule Phoenix.SocketClient.SocketTest do
 
   defp get_socket_config do
     port = get_port()
+    registry_name = :"Registry.Channel_#{System.unique_integer([:positive])}"
 
     [
       url: "ws://127.0.0.1:#{port}/ws/admin/websocket",
       serializer: Jason,
-      reconnect_interval: 10
+      reconnect_interval: 10,
+      registry_name: registry_name
     ]
   end
 
@@ -135,13 +137,70 @@ defmodule Phoenix.SocketClient.SocketTest do
       Process.sleep(100)
       refute Phoenix.SocketClient.connected?(name)
     end
+
+    test "socket tracks joined channels" do
+      name = :"socket_tracks_channels_#{System.unique_integer([:positive])}"
+      config = get_socket_config() |> Keyword.put(:name, name)
+      {:ok, sup_pid} = Phoenix.SocketClient.Supervisor.start_link(config)
+
+      wait_for_socket(name)
+
+      assert Phoenix.SocketClient.get_state(sup_pid, :joined_channels) == %{}
+
+      params = %{"foo" => "bar"}
+      {:ok, _, channel_pid} = Phoenix.SocketClient.Channel.join(sup_pid, "topic:test", params)
+
+      # Give it a moment to join
+      Process.sleep(100)
+
+      assert Phoenix.SocketClient.get_state(sup_pid, :joined_channels) ==
+               %{"topic:test" => %{params: params, status: :joined}}
+
+      :ok = Phoenix.SocketClient.Channel.leave(channel_pid)
+
+      # Give it a moment to leave
+      Process.sleep(100)
+
+      assert Phoenix.SocketClient.get_state(sup_pid, :joined_channels) == %{}
+    end
+
+    test "rejoins channels after reconnect" do
+      name = :"socket_rejoin_#{System.unique_integer([:positive])}"
+      config = get_socket_config() |> Keyword.put(:name, name)
+      {:ok, sup_pid} = Phoenix.SocketClient.Supervisor.start_link(config)
+
+      wait_for_socket(name)
+
+      params = %{"foo" => "bar"}
+      {:ok, _, _channel_pid} = Phoenix.SocketClient.Channel.join(sup_pid, "topic:rejoin", params)
+
+      Process.sleep(100)
+
+      assert Phoenix.SocketClient.get_state(sup_pid, :joined_channels) ==
+               %{"topic:rejoin" => %{params: params, status: :joined}}
+
+      socket_pid = Phoenix.SocketClient.get_process_pid(sup_pid, :socket)
+      socket_state = GenServer.call(socket_pid, :get_state)
+      transport_pid = socket_state.transport_pid
+
+      # Stop the transport to simulate a disconnection
+      GenServer.stop(transport_pid)
+
+      # Give it a moment to reconnect and rejoin
+      Process.sleep(200)
+      wait_for_socket(name)
+
+      assert Phoenix.SocketClient.get_state(sup_pid, :joined_channels) ==
+               %{"topic:rejoin" => %{params: params, status: :joined}}
+    end
   end
 
   defmodule MyTestChannel do
     use Phoenix.SocketClient.Channel
 
     @impl true
-    def init({_sup_pid, _socket_pid, topic, params}) do
+    def init({_sup_pid, _socket_pid, topic, params, _registry_name} = args) do
+      IO.inspect(args, label: "MyTestChannel init")
       test_pid_name = Map.get(params, "test_pid_name")
       send(Process.whereis(String.to_atom(test_pid_name)), {:channel_started, topic})
       {:ok, %{}}

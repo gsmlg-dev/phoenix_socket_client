@@ -104,6 +104,8 @@ defmodule Phoenix.SocketClientTest.AdminSocket do
 
   channel("rooms:*", Phoenix.SocketClientTest.RoomChannel)
   channel("topic:*", Phoenix.SocketClientTest.TopicChannel)
+  channel("topic:rejoin", Phoenix.SocketClientTest.TopicChannel)
+  channel("topic:status", Phoenix.SocketClientTest.TopicChannel)
   channel("custom:*", Phoenix.SocketClientTest.RoomChannel)
 
   def connect(params, socket, connect_info) do
@@ -200,6 +202,14 @@ end
 
 defmodule Phoenix.SocketClientTest.TopicChannel do
   use Phoenix.Channel
+
+  def join("topic:fail", _message, _socket) do
+    {:error, %{reason: "join failed"}}
+  end
+
+  def join("topic:crash", _message, _socket) do
+    raise "crash"
+  end
 
   def join("topic:" <> _ = topic, message, socket) do
     {:ok, %{topic: topic, message: message}, socket}

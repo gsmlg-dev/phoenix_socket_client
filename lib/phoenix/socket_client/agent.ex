@@ -50,6 +50,10 @@ defmodule Phoenix.SocketClient.Agent do
     end)
   end
 
+  def get_state(pid) do
+    Agent.get(pid, &(&1))
+  end
+
   @doc """
   Updates the state with a new key-value pair.
 
@@ -84,6 +88,30 @@ defmodule Phoenix.SocketClient.Agent do
     end)
   end
 
+  def update_channel_status(pid, topic, status, params \\ nil) do
+    Agent.update(pid, fn state ->
+      channel_data = Map.get(state.joined_channels, topic, %{})
+
+      new_channel_data =
+        if params do
+          Map.put(channel_data, :params, params)
+        else
+          channel_data
+        end
+        |> Map.put(:status, status)
+
+      joined_channels = Map.put(state.joined_channels, topic, new_channel_data)
+      %State{state | joined_channels: joined_channels}
+    end)
+  end
+
+  def remove_channel(pid, topic) do
+    Agent.update(pid, fn state ->
+      joined_channels = Map.delete(state.joined_channels, topic)
+      %State{state | joined_channels: joined_channels}
+    end)
+  end
+
   defp init_state(opts) do
     defaults = %{
       json_library: Jason,
@@ -103,7 +131,8 @@ defmodule Phoenix.SocketClient.Agent do
       transport_pid: nil,
       to_send_r: [],
       ref: 0,
-      custom: %{}
+      custom: %{},
+      registry_name: Registry.Channel
     }
 
     config = Map.merge(defaults, Enum.into(opts, %{}))
@@ -153,7 +182,8 @@ defmodule Phoenix.SocketClient.Agent do
       ref: config.ref,
       sup_pid: config.sup_pid,
       headers: config.headers,
-      custom: config.custom
+      custom: config.custom,
+      registry_name: config.registry_name
     }
   end
 end

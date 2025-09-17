@@ -24,7 +24,15 @@ defmodule Phoenix.SocketClient.State do
           ref: integer(),
           sup_pid: pid() | nil,
           headers: list({String.t(), String.t()}),
-          custom: map()
+          custom: map(),
+          joined_channels: %{
+            String.t() => %{
+              params: map(),
+              status: :joining | :joined | :leaving | :left | :errored
+            }
+          },
+          reconnecting: boolean(),
+          registry_name: atom()
         }
 
   @derive {Jason.Encoder,
@@ -36,7 +44,10 @@ defmodule Phoenix.SocketClient.State do
              :reconnect,
              :reconnect_interval,
              :status,
-             :custom
+             :custom,
+             :joined_channels,
+             :reconnecting,
+             :registry_name
            ]}
   defstruct [
     :url,
@@ -56,6 +67,9 @@ defmodule Phoenix.SocketClient.State do
     :ref,
     :sup_pid,
     :headers,
-    custom: %{}
+    custom: %{},
+    joined_channels: %{},
+    reconnecting: false,
+    registry_name: nil
   ]
 end

@@ -6,12 +6,15 @@ defmodule Phoenix.SocketClient.ConnectionFailureTest do
   test "handles connection failure gracefully" do
     name = :"test_failure_#{System.unique_integer([:positive])}"
 
+    registry_name = :"Registry.Channel_#{System.unique_integer([:positive])}"
+
     {:ok, _pid} =
       Phoenix.SocketClient.Supervisor.start_link(
         name: name,
         url: @invalid_url,
         serializer: Jason,
-        reconnect_interval: 100
+        reconnect_interval: 100,
+        registry_name: registry_name
       )
 
     # Should not be connected to invalid URL

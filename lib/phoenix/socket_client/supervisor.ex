@@ -28,21 +28,21 @@ defmodule Phoenix.SocketClient.Supervisor do
   @spec start_link(keyword()) :: Supervisor.on_start()
   def start_link(opts) do
     opts = Map.new(opts)
-    name = Map.get(opts, :name)
+    name = Map.get(opts, :name, Phoenix.SocketClient)
+    opts = Map.put(opts, :name, name)
 
-    if is_nil(name) do
-      Supervisor.start_link(__MODULE__, opts)
-    else
-      Supervisor.start_link(__MODULE__, opts, name: name)
-    end
+    Supervisor.start_link(__MODULE__, opts, name: name)
   end
 
   @impl true
   def init(opts) do
     sup_pid = self()
     opts = opts |> Map.put(:sup_pid, sup_pid)
+    registry_name = Map.get(opts, :registry_name, Registry.Channel)
+    opts = opts |> Map.put(:registry_name, registry_name)
 
     children = [
+      {Registry, keys: :unique, name: registry_name},
       {Phoenix.SocketClient.Agent, opts}
       |> Supervisor.child_spec(id: :socket_state),
       {Phoenix.SocketClient.Socket, opts}
