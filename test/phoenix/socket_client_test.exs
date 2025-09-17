@@ -18,7 +18,11 @@ defmodule Phoenix.SocketClientTest do
 
   defp get_socket_config do
     port = get_port()
-    Keyword.put(@socket_config, :url, "ws://127.0.0.1:#{port}/ws/admin/websocket")
+    registry_name = :"Registry.Channel_#{System.unique_integer([:positive])}"
+
+    @socket_config
+    |> Keyword.put(:url, "ws://127.0.0.1:#{port}/ws/admin/websocket")
+    |> Keyword.put(:registry_name, registry_name)
   end
 
   setup_all do
@@ -146,11 +150,14 @@ defmodule Phoenix.SocketClientTest do
       name = :"test_socket_#{System.unique_integer([:positive])}"
       port = get_port()
 
+      registry_name = :"Registry.Channel_#{System.unique_integer([:positive])}"
+
       {:ok, _pid} =
         Phoenix.SocketClient.Supervisor.start_link(
           name: name,
           url: "ws://127.0.0.1:#{port}/ws/admin/websocket",
-          serializer: Jason
+          serializer: Jason,
+          registry_name: registry_name
         )
 
       # Test retrieving socket_state pid
@@ -175,12 +182,15 @@ defmodule Phoenix.SocketClientTest do
     test "get_state retrieves state values from socket_state" do
       name = :"test_socket_#{System.unique_integer([:positive])}"
 
+      registry_name = :"Registry.Channel_#{System.unique_integer([:positive])}"
+
       {:ok, _pid} =
         Phoenix.SocketClient.Supervisor.start_link(
           name: name,
           url: "ws://127.0.0.1:#{get_port()}/ws/admin/websocket",
           serializer: Jason,
-          params: %{"test" => "value"}
+          params: %{"test" => "value"},
+          registry_name: registry_name
         )
 
       # Test retrieving URL
@@ -208,11 +218,14 @@ defmodule Phoenix.SocketClientTest do
       name = :"test_socket_#{System.unique_integer([:positive])}"
       port = get_port()
 
+      registry_name = :"Registry.Channel_#{System.unique_integer([:positive])}"
+
       {:ok, _pid} =
         Phoenix.SocketClient.Supervisor.start_link(
           name: name,
           url: "ws://127.0.0.1:#{port}/ws/admin/websocket",
-          serializer: Jason
+          serializer: Jason,
+          registry_name: registry_name
         )
 
       # Test updating a custom state value
@@ -243,18 +256,24 @@ defmodule Phoenix.SocketClientTest do
       name1 = :"test_socket_1_#{System.unique_integer([:positive])}"
       name2 = :"test_socket_2_#{System.unique_integer([:positive])}"
 
+      registry_name1 = :"Registry.Channel_#{System.unique_integer([:positive])}"
+
       {:ok, _pid1} =
         Phoenix.SocketClient.Supervisor.start_link(
           name: name1,
           url: "ws://127.0.0.1:#{get_port()}/ws/admin/websocket",
-          serializer: Jason
+          serializer: Jason,
+          registry_name: registry_name1
         )
+
+      registry_name2 = :"Registry.Channel_#{System.unique_integer([:positive])}"
 
       {:ok, _pid2} =
         Phoenix.SocketClient.Supervisor.start_link(
           name: name2,
           url: "ws://127.0.0.1:#{get_port()}/ws/admin/websocket",
-          serializer: Jason
+          serializer: Jason,
+          registry_name: registry_name2
         )
 
       # Test state isolation

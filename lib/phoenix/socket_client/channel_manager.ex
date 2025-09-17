@@ -86,21 +86,32 @@ defmodule Phoenix.SocketClient.ChannelManager do
   def start_channel(sup_pid, topic, params, channel_module \\ Channel) do
     socket_pid = get_process_pid(sup_pid, :socket)
     cm_pid = get_process_pid(sup_pid, :channel_manager)
+    registry_name = get_state(sup_pid, :registry_name)
 
     channel_module =
       (get_state(sup_pid, :topic_channel_map) || %{})
       |> Map.get(topic, channel_module)
 
     spec =
-      {channel_module, {sup_pid, socket_pid, topic, params}}
+      {channel_module, {sup_pid, socket_pid, topic, params, registry_name}}
       |> Supervisor.child_spec(id: topic)
 
     case DynamicSupervisor.start_child(cm_pid, spec) do
-      {:ok, channel_pid} -> {:ok, channel_pid}
-      {:error, {:already_started, channel_pid}} -> {:error, {:already_started, channel_pid}}
-      {:error, {:already_started, _, channel_pid}} -> {:error, {:already_started, channel_pid}}
-      {:error, {:already_registered, channel_pid}} -> {:error, {:already_started, channel_pid}}
-      error -> error
+      {:ok, channel_pid} ->
+        Phoenix.SocketClient.update_channel_status(sup_pid, topic, :joining, params)
+        {:ok, channel_pid}
+
+      {:error, {:already_started, channel_pid}} ->
+        {:error, {:already_started, channel_pid}}
+
+      {:error, {:already_started, _, channel_pid}} ->
+        {:error, {:already_started, channel_pid}}
+
+      {:error, {:already_registered, channel_pid}} ->
+        {:error, {:already_started, channel_pid}}
+
+      error ->
+        error
     end
   end
 

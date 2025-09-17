@@ -34,7 +34,8 @@ defmodule Phoenix.SocketClient.Channel do
           params: map(),
           pushes: list(),
           join_ref: String.t() | nil,
-          hooks: map()
+          hooks: map(),
+          registry_name: atom()
         }
 
   defstruct caller: nil,
@@ -44,7 +45,8 @@ defmodule Phoenix.SocketClient.Channel do
             params: %{},
             pushes: [],
             join_ref: nil,
-            hooks: %{}
+            hooks: %{},
+            registry_name: nil
 
   @timeout 5_000
 
@@ -81,7 +83,7 @@ defmodule Phoenix.SocketClient.Channel do
   def join(sup_pid, topic, params, timeout) do
     if Phoenix.SocketClient.connected?(sup_pid) do
       case Phoenix.SocketClient.channel_join(sup_pid, topic, params) do
-        {:ok, pid} -> do_join(pid, timeout)
+        {:ok, pid} -> do_join(pid, sup_pid, topic, timeout)
         {:error, {:already_started, _}} = error -> error
         error -> error
       end
@@ -156,14 +158,17 @@ defmodule Phoenix.SocketClient.Channel do
 
   # Callbacks
   @impl true
-  @spec init({pid(), pid(), String.t(), map()}) :: {:ok, t()}
-  def init({sup_pid, socket_pid, topic, params}) do
+  @spec init({pid(), pid(), String.t(), map(), atom()}) :: {:ok, t()}
+  def init({sup_pid, socket_pid, topic, params, registry_name}) do
+    Registry.register(registry_name, topic, self())
+
     {:ok,
      %__MODULE__{
        sup_pid: sup_pid,
        socket_pid: socket_pid,
        topic: topic,
-       params: params
+       params: params,
+       registry_name: registry_name
      }}
   end
 
@@ -195,11 +200,9 @@ defmodule Phoenix.SocketClient.Channel do
         _from,
         %{sup_pid: sup_pid, socket_pid: _socket_pid, topic: topic} = state
       ) do
+    Phoenix.SocketClient.update_channel_status(sup_pid, topic, :leaving)
     message = Message.leave(topic)
-
     _push = Phoenix.SocketClient.push(sup_pid, message)
-
-    Telemetry.channel_left(self(), topic, :leave)
     {:stop, :normal, :ok, state}
   end
 
@@ -253,7 +256,7 @@ defmodule Phoenix.SocketClient.Channel do
   @spec handle_info(Message.t(), t()) :: {:noreply, t()}
   def handle_info(
         %Message{event: "phx_reply", ref: ref} = msg,
-        %{pushes: pushes, topic: topic} = s
+        %{pushes: pushes, topic: topic, join_ref: join_ref, params: _params} = s
       ) do
     pushes =
       case Enum.split_with(pushes, &(elem(&1, 1).ref == ref)) do
@@ -262,9 +265,15 @@ defmodule Phoenix.SocketClient.Channel do
 
           case status do
             "ok" ->
+              if ref == join_ref,
+                do: Phoenix.SocketClient.update_channel_status(s.sup_pid, s.topic, :joined)
+
               Telemetry.message_received(self(), topic, "phx_reply", msg.payload)
 
             "error" ->
+              if ref == join_ref,
+                do: Phoenix.SocketClient.update_channel_status(s.sup_pid, s.topic, :errored)
+
               Telemetry.message_received(self(), topic, "phx_reply", msg.payload)
 
             _ ->
@@ -304,26 +313,50 @@ defmodule Phoenix.SocketClient.Channel do
     {:noreply, state}
   end
 
-  defp do_join(pid, timeout) do
+  @impl true
+  def terminate(reason, %{sup_pid: sup_pid, topic: topic, registry_name: registry_name}) do
+    Registry.unregister(registry_name, topic)
+
+    if sup_pid && topic do
+      joined_channels = Phoenix.SocketClient.get_state(sup_pid, :joined_channels)
+      channel_data = Map.get(joined_channels, topic)
+
+      if reason == :normal and (channel_data && channel_data.status != :errored) do
+        Phoenix.SocketClient.remove_channel(sup_pid, topic)
+      else
+        Phoenix.SocketClient.update_channel_status(sup_pid, topic, :errored)
+      end
+
+      Telemetry.channel_left(self(), topic, reason)
+    end
+
+    :ok
+  end
+
+  defp do_join(pid, sup_pid, topic, timeout) do
     try do
       case GenServer.call(pid, :join, timeout) do
         {:ok, reply} ->
           {:ok, reply, pid}
 
-        error ->
+        {:error, _} = error ->
+          Phoenix.SocketClient.update_channel_status(sup_pid, topic, :errored)
           GenServer.stop(pid)
           error
       end
     catch
       :exit, {:timeout, _} ->
+        Phoenix.SocketClient.update_channel_status(sup_pid, topic, :errored)
         GenServer.stop(pid, :normal)
         {:error, :timeout}
 
       :exit, {:noproc, _} ->
+        Phoenix.SocketClient.update_channel_status(sup_pid, topic, :errored)
         GenServer.stop(pid, :normal)
         {:error, :noproc}
 
       :exit, reason ->
+        Phoenix.SocketClient.update_channel_status(sup_pid, topic, :errored)
         GenServer.stop(pid, :normal)
         {:error, exit_reason(reason)}
     end
