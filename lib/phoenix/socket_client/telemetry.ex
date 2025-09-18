@@ -19,7 +19,7 @@ defmodule Phoenix.SocketClient.Telemetry do
   """
   @spec socket_connected(pid(), String.t(), map()) :: :ok
   def socket_connected(pid, url, _metadata \\ %{}) do
-    emit_event([:phoenix_socket_client, :socket, :connected], %{}, %{
+    emit_event([:phoenix_socket_client, :socket_connected], %{}, %{
       pid: pid,
       url: url,
       timestamp: System.system_time(:millisecond)
@@ -31,7 +31,7 @@ defmodule Phoenix.SocketClient.Telemetry do
   """
   @spec socket_disconnected(pid(), String.t(), atom(), map()) :: :ok
   def socket_disconnected(pid, url, reason, _metadata \\ %{}) do
-    emit_event([:phoenix_socket_client, :socket, :disconnected], %{}, %{
+    emit_event([:phoenix_socket_client, :socket_disconnected], %{}, %{
       pid: pid,
       url: url,
       reason: reason,
@@ -44,7 +44,7 @@ defmodule Phoenix.SocketClient.Telemetry do
   """
   @spec socket_connecting(pid(), String.t(), map()) :: :ok
   def socket_connecting(pid, url, _metadata \\ %{}) do
-    emit_event([:phoenix_socket_client, :socket, :connecting], %{}, %{
+    emit_event([:phoenix_socket_client, :socket_connecting], %{}, %{
       pid: pid,
       url: url,
       timestamp: System.system_time(:millisecond)
@@ -56,7 +56,7 @@ defmodule Phoenix.SocketClient.Telemetry do
   """
   @spec socket_connection_error(pid(), String.t(), any(), map()) :: :ok
   def socket_connection_error(pid, url, error, _metadata \\ %{}) do
-    emit_event([:phoenix_socket_client, :socket, :connection_error], %{}, %{
+    emit_event([:phoenix_socket_client, :socket_connection_error], %{}, %{
       pid: pid,
       url: url,
       error: error,
@@ -69,7 +69,7 @@ defmodule Phoenix.SocketClient.Telemetry do
   """
   @spec channel_joined(pid(), String.t(), String.t(), map(), map()) :: :ok
   def channel_joined(pid, topic, channel_pid, response, _metadata \\ %{}) do
-    emit_event([:phoenix_socket_client, :channel, :joined], %{}, %{
+    emit_event([:phoenix_socket_client, :channel_joined], %{}, %{
       pid: pid,
       topic: topic,
       channel_pid: channel_pid,
@@ -83,7 +83,7 @@ defmodule Phoenix.SocketClient.Telemetry do
   """
   @spec channel_join_error(pid(), String.t(), any(), map()) :: :ok
   def channel_join_error(pid, topic, error, _metadata \\ %{}) do
-    emit_event([:phoenix_socket_client, :channel, :join_error], %{}, %{
+    emit_event([:phoenix_socket_client, :channel_join_error], %{}, %{
       pid: pid,
       topic: topic,
       error: error,
@@ -96,7 +96,7 @@ defmodule Phoenix.SocketClient.Telemetry do
   """
   @spec channel_left(pid(), String.t(), String.t(), map()) :: :ok
   def channel_left(pid, topic, reason, _metadata \\ %{}) do
-    emit_event([:phoenix_socket_client, :channel, :left], %{}, %{
+    emit_event([:phoenix_socket_client, :channel_left], %{}, %{
       pid: pid,
       topic: topic,
       reason: reason,
@@ -109,7 +109,7 @@ defmodule Phoenix.SocketClient.Telemetry do
   """
   @spec message_sent(pid(), String.t(), String.t(), map(), map()) :: :ok
   def message_sent(pid, topic, event, payload, _metadata \\ %{}) do
-    emit_event([:phoenix_socket_client, :message, :sent], %{}, %{
+    emit_event([:phoenix_socket_client, :message_sent], %{}, %{
       pid: pid,
       topic: topic,
       event: event,
@@ -123,7 +123,7 @@ defmodule Phoenix.SocketClient.Telemetry do
   """
   @spec message_received(pid(), String.t(), String.t(), map(), map()) :: :ok
   def message_received(pid, topic, event, payload, _metadata \\ %{}) do
-    emit_event([:phoenix_socket_client, :message, :received], %{}, %{
+    emit_event([:phoenix_socket_client, :message_received], %{}, %{
       pid: pid,
       topic: topic,
       event: event,
@@ -137,7 +137,7 @@ defmodule Phoenix.SocketClient.Telemetry do
   """
   @spec heartbeat_sent(pid(), String.t(), map()) :: :ok
   def heartbeat_sent(pid, url, _metadata \\ %{}) do
-    emit_event([:phoenix_socket_client, :socket, :heartbeat], %{}, %{
+    emit_event([:phoenix_socket_client, :socket_heartbeat], %{}, %{
       pid: pid,
       url: url,
       timestamp: System.system_time(:millisecond)
@@ -149,7 +149,7 @@ defmodule Phoenix.SocketClient.Telemetry do
   """
   @spec reconnecting(pid(), String.t(), integer(), map()) :: :ok
   def reconnecting(pid, url, attempt, _metadata \\ %{}) do
-    emit_event([:phoenix_socket_client, :socket, :reconnecting], %{}, %{
+    emit_event([:phoenix_socket_client, :socket_reconnecting], %{}, %{
       pid: pid,
       url: url,
       attempt: attempt,
@@ -183,17 +183,17 @@ defmodule Phoenix.SocketClient.Telemetry do
     :telemetry.attach_many(
       "phoenix-socket-client-debug",
       [
-        [:phoenix_socket_client, :socket, :connected],
-        [:phoenix_socket_client, :socket, :disconnected],
-        [:phoenix_socket_client, :socket, :connecting],
-        [:phoenix_socket_client, :socket, :connection_error],
-        [:phoenix_socket_client, :channel, :joined],
-        [:phoenix_socket_client, :channel, :join_error],
-        [:phoenix_socket_client, :channel, :left],
-        [:phoenix_socket_client, :message, :sent],
-        [:phoenix_socket_client, :message, :received],
-        [:phoenix_socket_client, :socket, :heartbeat],
-        [:phoenix_socket_client, :socket, :reconnecting],
+        [:phoenix_socket_client, :socket_connected],
+        [:phoenix_socket_client, :socket_disconnected],
+        [:phoenix_socket_client, :socket_connecting],
+        [:phoenix_socket_client, :socket_connection_error],
+        [:phoenix_socket_client, :channel_joined],
+        [:phoenix_socket_client, :channel_join_error],
+        [:phoenix_socket_client, :channel_left],
+        [:phoenix_socket_client, :message_sent],
+        [:phoenix_socket_client, :message_received],
+        [:phoenix_socket_client, :socket_heartbeat],
+        [:phoenix_socket_client, :socket_reconnecting],
         [:phoenix_socket_client, :debug]
       ],
       &debug_handler/4,
