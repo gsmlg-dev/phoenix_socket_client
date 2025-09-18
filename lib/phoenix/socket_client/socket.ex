@@ -266,7 +266,11 @@ defmodule Phoenix.SocketClient.Socket do
     %__MODULE__{state | status: :disconnected}
   end
 
-  defp update_socket_state_status(sup_pid, status) do
-    put_state(sup_pid, :status, status)
+  defp update_socket_state_status(sup_pid, new_status) do
+    old_status = get_state(sup_pid, :status)
+    url = get_state(sup_pid, :url)
+    socket_pid = get_process_pid(sup_pid, :socket)
+    Telemetry.socket_status_changed(socket_pid, url, old_status, new_status)
+    put_state(sup_pid, :status, new_status)
   end
 end

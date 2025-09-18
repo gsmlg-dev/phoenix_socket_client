@@ -98,7 +98,7 @@ defmodule Phoenix.SocketClient.ChannelManager do
 
     case DynamicSupervisor.start_child(cm_pid, spec) do
       {:ok, channel_pid} ->
-        Phoenix.SocketClient.update_channel_status(sup_pid, topic, :joining, params)
+        Phoenix.SocketClient.update_channel_status(sup_pid, channel_pid, topic, :joining, params)
         {:ok, channel_pid}
 
       {:error, {:already_started, channel_pid}} ->

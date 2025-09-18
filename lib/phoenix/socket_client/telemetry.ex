@@ -158,6 +158,35 @@ defmodule Phoenix.SocketClient.Telemetry do
   end
 
   @doc """
+  Emits socket status change event.
+  """
+  @spec socket_status_changed(pid(), String.t(), atom(), atom(), map()) :: :ok
+  def socket_status_changed(pid, url, old_status, new_status, _metadata \\ %{}) do
+    emit_event([:phoenix_socket_client, :socket_status_changed], %{}, %{
+      pid: pid,
+      url: url,
+      old_status: old_status,
+      new_status: new_status,
+      timestamp: System.system_time(:millisecond)
+    })
+  end
+
+  @doc """
+  Emits channel status change event.
+  """
+  @spec channel_status_changed(pid(), String.t(), pid(), atom(), atom(), map()) :: :ok
+  def channel_status_changed(pid, topic, channel_pid, old_status, new_status, _metadata \\ %{}) do
+    emit_event([:phoenix_socket_client, :channel_status_changed], %{}, %{
+      pid: pid,
+      topic: topic,
+      channel_pid: channel_pid,
+      old_status: old_status,
+      new_status: new_status,
+      timestamp: System.system_time(:millisecond)
+    })
+  end
+
+  @doc """
   Attaches a telemetry handler for debugging purposes.
 
   ## Example
@@ -173,9 +202,11 @@ defmodule Phoenix.SocketClient.Telemetry do
         [:phoenix_socket_client, :socket_disconnected],
         [:phoenix_socket_client, :socket_connecting],
         [:phoenix_socket_client, :socket_connection_error],
+        [:phoenix_socket_client, :socket_status_changed],
         [:phoenix_socket_client, :channel_joined],
         [:phoenix_socket_client, :channel_join_error],
         [:phoenix_socket_client, :channel_left],
+        [:phoenix_socket_client, :channel_status_changed],
         [:phoenix_socket_client, :message_sent],
         [:phoenix_socket_client, :message_received],
         [:phoenix_socket_client, :socket_heartbeat],

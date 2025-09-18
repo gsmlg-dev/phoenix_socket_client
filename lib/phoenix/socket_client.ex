@@ -171,10 +171,10 @@ defmodule Phoenix.SocketClient do
   @doc """
   Updates the status of a channel. For internal use.
   """
-  @spec update_channel_status(pid, String.t(), atom(), map() | nil) :: :ok
-  def update_channel_status(sup_pid, topic, status, params \\ nil) do
+  @spec update_channel_status(pid, pid, String.t(), atom(), map() | nil) :: :ok
+  def update_channel_status(sup_pid, channel_pid, topic, status, params \\ nil) do
     state_pid = get_process_pid(sup_pid, :socket_state)
-    Phoenix.SocketClient.Agent.update_channel_status(state_pid, topic, status, params)
+    Phoenix.SocketClient.Agent.update_channel_status(state_pid, sup_pid, channel_pid, topic, status, params)
   end
 
   @doc """

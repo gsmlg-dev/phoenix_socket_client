@@ -88,9 +88,10 @@ defmodule Phoenix.SocketClient.Agent do
     end)
   end
 
-  def update_channel_status(pid, topic, status, params \\ nil) do
+  def update_channel_status(pid, sup_pid, channel_pid, topic, status, params \\ nil) do
     Agent.update(pid, fn state ->
       channel_data = Map.get(state.joined_channels, topic, %{})
+      old_status = Map.get(channel_data, :status)
 
       new_channel_data =
         if params do
@@ -101,6 +102,10 @@ defmodule Phoenix.SocketClient.Agent do
         |> Map.put(:status, status)
 
       joined_channels = Map.put(state.joined_channels, topic, new_channel_data)
+
+      socket_pid = Phoenix.SocketClient.get_process_pid(sup_pid, :socket)
+      Phoenix.SocketClient.Telemetry.channel_status_changed(socket_pid, topic, channel_pid, old_status, status)
+
       %State{state | joined_channels: joined_channels}
     end)
   end
