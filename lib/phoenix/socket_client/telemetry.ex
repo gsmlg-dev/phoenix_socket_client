@@ -158,20 +158,6 @@ defmodule Phoenix.SocketClient.Telemetry do
   end
 
   @doc """
-  Emits debug event for socket lifecycle debugging.
-  """
-  @spec debug(pid(), String.t(), String.t(), map()) :: :ok
-  def debug(pid, message, url \\ nil, metadata \\ %{}) do
-    emit_event([:phoenix_socket_client, :debug], %{}, %{
-      pid: pid,
-      message: message,
-      url: url,
-      metadata: metadata,
-      timestamp: System.system_time(:millisecond)
-    })
-  end
-
-  @doc """
   Attaches a telemetry handler for debugging purposes.
 
   ## Example
@@ -193,8 +179,7 @@ defmodule Phoenix.SocketClient.Telemetry do
         [:phoenix_socket_client, :message_sent],
         [:phoenix_socket_client, :message_received],
         [:phoenix_socket_client, :socket_heartbeat],
-        [:phoenix_socket_client, :socket_reconnecting],
-        [:phoenix_socket_client, :debug]
+        [:phoenix_socket_client, :socket_reconnecting]
       ],
       &debug_handler/4,
       %{}
