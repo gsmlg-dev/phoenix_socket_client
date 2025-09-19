@@ -226,5 +226,4 @@ defmodule Phoenix.SocketClient do
         :ok
     end
   end
-
 end

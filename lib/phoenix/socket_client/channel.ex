@@ -265,7 +265,14 @@ defmodule Phoenix.SocketClient.Channel do
           case status do
             "ok" ->
               if ref == join_ref do
-                Phoenix.SocketClient.update_channel_status(s.sup_pid, self(), s.topic, :joined, params)
+                Phoenix.SocketClient.update_channel_status(
+                  s.sup_pid,
+                  self(),
+                  s.topic,
+                  :joined,
+                  params
+                )
+
                 Telemetry.channel_joined(s.sup_pid, s.topic, self(), msg.payload, %{})
               end
 
@@ -273,7 +280,14 @@ defmodule Phoenix.SocketClient.Channel do
 
             "error" ->
               if ref == join_ref do
-                Phoenix.SocketClient.update_channel_status(s.sup_pid, self(), s.topic, :errored, params)
+                Phoenix.SocketClient.update_channel_status(
+                  s.sup_pid,
+                  self(),
+                  s.topic,
+                  :errored,
+                  params
+                )
+
                 Telemetry.channel_join_error(s.sup_pid, s.topic, msg.payload, %{})
               end
 
@@ -317,7 +331,10 @@ defmodule Phoenix.SocketClient.Channel do
   end
 
   @impl true
-  def terminate(reason, %{sup_pid: sup_pid, topic: topic, params: params, registry_name: registry_name} = _state) do
+  def terminate(
+        reason,
+        %{sup_pid: sup_pid, topic: topic, params: params, registry_name: registry_name} = _state
+      ) do
     Registry.unregister(registry_name, topic)
 
     if sup_pid && topic do

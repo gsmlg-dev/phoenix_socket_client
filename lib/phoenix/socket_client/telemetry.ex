@@ -26,7 +26,11 @@ defmodule Phoenix.SocketClient.Telemetry do
       timestamp: System.system_time(:millisecond)
     }
 
-    emit_event([:phoenix_socket_client, :socket], %{}, Map.merge(base_metadata, Map.put(metadata, :action, action)))
+    emit_event(
+      [:phoenix_socket_client, :socket],
+      %{},
+      Map.merge(base_metadata, Map.put(metadata, :action, action))
+    )
   end
 
   @doc """
@@ -39,7 +43,11 @@ defmodule Phoenix.SocketClient.Telemetry do
       timestamp: System.system_time(:millisecond)
     }
 
-    emit_event([:phoenix_socket_client, :channel], %{}, Map.merge(base_metadata, Map.put(metadata, :action, action)))
+    emit_event(
+      [:phoenix_socket_client, :channel],
+      %{},
+      Map.merge(base_metadata, Map.put(metadata, :action, action))
+    )
   end
 
   @doc """
@@ -54,7 +62,11 @@ defmodule Phoenix.SocketClient.Telemetry do
       timestamp: System.system_time(:millisecond)
     }
 
-    emit_event([:phoenix_socket_client, :message], %{}, Map.merge(base_metadata, Map.put(metadata, :action, action)))
+    emit_event(
+      [:phoenix_socket_client, :message],
+      %{},
+      Map.merge(base_metadata, Map.put(metadata, :action, action))
+    )
   end
 
   @doc """
@@ -68,9 +80,12 @@ defmodule Phoenix.SocketClient.Telemetry do
       timestamp: System.system_time(:millisecond)
     }
 
-    emit_event([:phoenix_socket_client, :state_change], %{}, Map.merge(base_metadata, Map.put(metadata, :type, type)))
+    emit_event(
+      [:phoenix_socket_client, :state_change],
+      %{},
+      Map.merge(base_metadata, Map.put(metadata, :type, type))
+    )
   end
-
 
   # Specific Event Functions
 
@@ -111,7 +126,12 @@ defmodule Phoenix.SocketClient.Telemetry do
   """
   @spec channel_joined(pid(), String.t(), pid(), map(), map()) :: :ok
   def channel_joined(pid, topic, channel_pid, response, metadata \\ %{}) do
-    channel_event(:joined, pid, topic, Map.merge(metadata, %{channel_pid: channel_pid, response: response}))
+    channel_event(
+      :joined,
+      pid,
+      topic,
+      Map.merge(metadata, %{channel_pid: channel_pid, response: response})
+    )
   end
 
   @doc """
@@ -177,7 +197,6 @@ defmodule Phoenix.SocketClient.Telemetry do
   def channel_status_changed(pid, topic, old_status, new_status) do
     state_change_event(:channel, topic, old_status, new_status, %{pid: pid})
   end
-
 
   @doc """
   Attaches a telemetry handler for debugging purposes.
