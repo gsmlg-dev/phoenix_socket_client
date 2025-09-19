@@ -13,6 +13,7 @@ defmodule Phoenix.SocketClient.Agent do
 
   alias Phoenix.SocketClient.Message
   alias Phoenix.SocketClient.State
+  alias Phoenix.SocketClient.Telemetry
 
   @heartbeat_interval 30_000
   @reconnect_interval 60_000
@@ -88,19 +89,26 @@ defmodule Phoenix.SocketClient.Agent do
     end)
   end
 
-  def update_channel_status(pid, topic, status, params \\ nil) do
+  def update_channel_status(pid, channel_pid, topic, status, params \\ nil) do
     Agent.update(pid, fn state ->
-      channel_data = Map.get(state.joined_channels, topic, %{})
+      old_channel_data = Map.get(state.joined_channels, topic, %{})
+      old_status = Map.get(old_channel_data, :status)
 
       new_channel_data =
         if params do
-          Map.put(channel_data, :params, params)
+          Map.put(old_channel_data, :params, params)
         else
-          channel_data
+          old_channel_data
         end
         |> Map.put(:status, status)
+        |> Map.put(:pid, channel_pid)
 
       joined_channels = Map.put(state.joined_channels, topic, new_channel_data)
+
+      if old_status != status do
+        Telemetry.channel_status_changed(channel_pid, topic, old_status, status)
+      end
+
       %State{state | joined_channels: joined_channels}
     end)
   end

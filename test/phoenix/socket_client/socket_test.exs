@@ -153,8 +153,12 @@ defmodule Phoenix.SocketClient.SocketTest do
       # Give it a moment to join
       Process.sleep(100)
 
-      assert Phoenix.SocketClient.get_state(sup_pid, :joined_channels) ==
-               %{"topic:test" => %{params: params, status: :joined}}
+      channel_data =
+        get_in(Phoenix.SocketClient.get_state(sup_pid, :joined_channels), ["topic:test"])
+
+      assert channel_data.status == :joined
+      assert channel_data.params == params
+      assert is_pid(channel_data.pid)
 
       :ok = Phoenix.SocketClient.Channel.leave(channel_pid)
 
@@ -176,8 +180,12 @@ defmodule Phoenix.SocketClient.SocketTest do
 
       Process.sleep(100)
 
-      assert Phoenix.SocketClient.get_state(sup_pid, :joined_channels) ==
-               %{"topic:rejoin" => %{params: params, status: :joined}}
+      channel_data_before =
+        get_in(Phoenix.SocketClient.get_state(sup_pid, :joined_channels), ["topic:rejoin"])
+
+      assert channel_data_before.status == :joined
+      assert channel_data_before.params == params
+      assert is_pid(channel_data_before.pid)
 
       socket_pid = Phoenix.SocketClient.get_process_pid(sup_pid, :socket)
       socket_state = GenServer.call(socket_pid, :get_state)
@@ -190,8 +198,12 @@ defmodule Phoenix.SocketClient.SocketTest do
       Process.sleep(200)
       wait_for_socket(name)
 
-      assert Phoenix.SocketClient.get_state(sup_pid, :joined_channels) ==
-               %{"topic:rejoin" => %{params: params, status: :joined}}
+      channel_data_after =
+        get_in(Phoenix.SocketClient.get_state(sup_pid, :joined_channels), ["topic:rejoin"])
+
+      assert channel_data_after.status == :joined
+      assert channel_data_after.params == params
+      assert is_pid(channel_data_after.pid)
     end
   end
 

@@ -19,7 +19,8 @@ defmodule Phoenix.SocketClient.Socket do
             status: :disconnected,
             transport_ref: nil,
             transport_pid: nil,
-            to_send_r: []
+            to_send_r: [],
+            connect_start_time: nil
 
   @doc false
   @spec start_link(keyword()) :: GenServer.on_start()
@@ -62,7 +63,6 @@ defmodule Phoenix.SocketClient.Socket do
 
     case socket_state.url do
       nil ->
-        Telemetry.debug(self(), "Connection: no URL provided, skipping connection")
         {:noreply, state}
 
       url ->
@@ -77,10 +77,6 @@ defmodule Phoenix.SocketClient.Socket do
 
         case transport.open(url, transport_opts) do
           {:ok, transport_pid} ->
-            Telemetry.debug(self(), "Connection: transport started", url, %{
-              transport_pid: transport_pid
-            })
-
             transport_ref = Process.monitor(transport_pid)
 
             state =
@@ -88,17 +84,14 @@ defmodule Phoenix.SocketClient.Socket do
                 state
                 | transport_pid: transport_pid,
                   status: :connecting,
-                  transport_ref: transport_ref
+                  transport_ref: transport_ref,
+                  connect_start_time: System.monotonic_time()
               }
 
             update_socket_state_status(sup_pid, :connecting)
             {:noreply, state}
 
           {:error, reason} ->
-            Telemetry.debug(self(), "Connection: transport failed to start", url, %{
-              reason: reason
-            })
-
             Telemetry.socket_connection_error(self(), url, reason)
             {:noreply, close(reason, state)}
         end
@@ -107,12 +100,17 @@ defmodule Phoenix.SocketClient.Socket do
 
   @impl true
   @spec handle_info({:connected, pid()}, t()) :: {:noreply, t()}
-  def handle_info({:connected, transport_pid}, %{sup_pid: sup_pid} = state) do
-    socket_state = Phoenix.SocketClient.get_state(sup_pid)
+  def handle_info(
+        {:connected, transport_pid},
+        %{sup_pid: sup_pid, connect_start_time: start_time} = state
+      ) do
+    if start_time do
+      duration = System.monotonic_time() - start_time
+      socket_state = Phoenix.SocketClient.get_state(sup_pid)
+      Telemetry.socket_connection_duration(self(), socket_state.url, duration)
+    end
 
-    Telemetry.debug(self(), "Connection: connected", socket_state.url, %{
-      transport_pid: transport_pid
-    })
+    socket_state = Phoenix.SocketClient.get_state(sup_pid)
 
     Telemetry.socket_connected(self(), socket_state.url)
     put_state(sup_pid, :reconnecting, false)
@@ -125,9 +123,8 @@ defmodule Phoenix.SocketClient.Socket do
   @impl true
   @spec handle_info({:disconnected, any(), pid()}, t()) :: {:noreply, t()}
   def handle_info({:disconnected, reason, _transport_pid}, %{sup_pid: sup_pid} = state) do
-    socket_state = Phoenix.SocketClient.get_state(sup_pid)
-    Telemetry.debug(self(), "Connection: disconnected", socket_state.url, %{reason: reason})
-    Telemetry.socket_disconnected(self(), socket_state.url, reason)
+    url = get_state(sup_pid, :url)
+    Telemetry.socket_disconnected(self(), url, reason)
     cm_pid = get_process_pid(sup_pid, :channel_manager)
     ChannelManager.terminate(cm_pid)
     {:noreply, close(reason, state)}
@@ -135,18 +132,14 @@ defmodule Phoenix.SocketClient.Socket do
 
   @impl true
   @spec handle_info({:receive, String.t()}, t()) :: {:noreply, t()}
-  def handle_info({:receive, message}, %{sup_pid: sup_pid} = state) do
-    socket_state = Phoenix.SocketClient.get_state(sup_pid)
-    Telemetry.debug(self(), "Connection: received", socket_state.url, %{message: message})
+  def handle_info({:receive, message}, %{sup_pid: _sup_pid} = state) do
     transport_receive(message, state)
     {:noreply, state}
   end
 
   @impl true
   @spec handle_info(:flush, t()) :: {:noreply, t()}
-  def handle_info(:flush, %{sup_pid: sup_pid} = state) do
-    socket_state = Phoenix.SocketClient.get_state(sup_pid)
-    Telemetry.debug(self(), "Connection: flushing messages", socket_state.url)
+  def handle_info(:flush, %{sup_pid: _sup_pid} = state) do
     to_send = state.to_send_r || []
     Enum.each(to_send, &transport_send(&1, state))
     {:noreply, %__MODULE__{state | to_send_r: []}}
@@ -154,8 +147,6 @@ defmodule Phoenix.SocketClient.Socket do
 
   @spec handle_info(Message.t(), t()) :: {:noreply, t()}
   def handle_info(%Message{} = message, %{sup_pid: sup_pid} = state) do
-    url = get_state(sup_pid, :url)
-    Telemetry.debug(self(), "Connection: received message struct", url, %{message: message})
     # Handle message structs that might be sent directly
     socket_state = Phoenix.SocketClient.get_state(sup_pid)
 
@@ -169,27 +160,17 @@ defmodule Phoenix.SocketClient.Socket do
 
   @impl true
   @spec handle_info({:closed, any(), pid()}, t()) :: {:noreply, t()}
-  def handle_info({:closed, reason, _transport_pid}, %{sup_pid: sup_pid} = state) do
-    socket_state = Phoenix.SocketClient.get_state(sup_pid)
-    Telemetry.debug(self(), "Connection: closed", socket_state.url, %{reason: reason})
+  def handle_info({:closed, reason, _transport_pid}, %{sup_pid: _sup_pid} = state) do
     {:noreply, close(reason, state)}
   end
 
   @impl true
   @spec handle_info({:DOWN, reference(), :process, pid(), any()}, t()) :: {:noreply, t()}
   def handle_info(
-        {:DOWN, ref, :process, _pid, reason},
-        %{sup_pid: sup_pid, transport_ref: transport_ref, transport_pid: transport_pid} = state
+        {:DOWN, ref, :process, _pid, _reason},
+        %{sup_pid: _sup_pid, transport_ref: transport_ref, transport_pid: _transport_pid} = state
       ) do
     if ref == transport_ref do
-      socket_state = Phoenix.SocketClient.get_state(sup_pid)
-
-      Telemetry.debug(self(), "Connection process: DOWN", socket_state.url, %{
-        reason: reason,
-        transport_pid: transport_pid,
-        transport_ref: transport_ref
-      })
-
       {:noreply, close(:shutdown, state)}
     else
       {:noreply, state}
@@ -280,19 +261,14 @@ defmodule Phoenix.SocketClient.Socket do
     end
   end
 
-  defp close(reason, %{sup_pid: sup_pid} = state) do
+  defp close(_reason, %{sup_pid: sup_pid} = state) do
     socket_state = Phoenix.SocketClient.get_state(sup_pid)
-    Telemetry.debug(self(), "Connection: closing connection", socket_state.url, %{reason: reason})
 
     # Update socket state status
     update_socket_state_status(sup_pid, :disconnected)
 
     if socket_state.reconnect do
       put_state(sup_pid, :reconnecting, true)
-
-      Telemetry.debug(self(), "Connection: reconnecting", socket_state.url, %{
-        interval: socket_state.reconnect_interval
-      })
 
       Telemetry.reconnecting(self(), socket_state.url, 1)
       Process.send_after(self(), :connect, socket_state.reconnect_interval)
@@ -301,7 +277,11 @@ defmodule Phoenix.SocketClient.Socket do
     %__MODULE__{state | status: :disconnected}
   end
 
-  defp update_socket_state_status(sup_pid, status) do
-    put_state(sup_pid, :status, status)
+  defp update_socket_state_status(sup_pid, new_status) do
+    old_status = get_state(sup_pid, :status)
+    url = get_state(sup_pid, :url)
+    socket_pid = get_process_pid(sup_pid, :socket)
+    Telemetry.socket_status_changed(socket_pid, url, old_status, new_status)
+    put_state(sup_pid, :status, new_status)
   end
 end
