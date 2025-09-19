@@ -55,6 +55,7 @@ defmodule Phoenix.SocketClient.TelemetryTest do
 
       handler_id = "test-handler-#{System.unique_integer()}"
       test_pid = self()
+
       :telemetry.attach(
         handler_id,
         [:phoenix_socket_client, :socket],
@@ -84,6 +85,7 @@ defmodule Phoenix.SocketClient.TelemetryTest do
 
       handler_id = "test-handler-#{System.unique_integer()}"
       test_pid = self()
+
       :telemetry.attach(
         handler_id,
         [:phoenix_socket_client, :channel],
@@ -116,6 +118,7 @@ defmodule Phoenix.SocketClient.TelemetryTest do
 
       handler_id = "test-handler-#{System.unique_integer()}"
       test_pid = self()
+
       :telemetry.attach(
         handler_id,
         [:phoenix_socket_client, :channel],
