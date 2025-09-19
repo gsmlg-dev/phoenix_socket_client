@@ -11,7 +11,9 @@ defmodule Phoenix.SocketClient.Agent do
 
   use Agent
 
+  alias Phoenix.SocketClient.Message
   alias Phoenix.SocketClient.State
+  alias Phoenix.SocketClient.Telemetry
 
   @heartbeat_interval 30_000
   @reconnect_interval 60_000
@@ -87,63 +89,27 @@ defmodule Phoenix.SocketClient.Agent do
     end)
   end
 
-  def update_channel_status(pid, sup_pid, channel_pid, topic, status, params \\ nil) do
+  def update_channel_status(pid, channel_pid, topic, status, params \\ nil) do
     Agent.update(pid, fn state ->
-      channel_data = Map.get(state.joined_channels, topic, %{})
-      old_status = Map.get(channel_data, :status)
+      old_channel_data = Map.get(state.joined_channels, topic, %{})
+      old_status = Map.get(old_channel_data, :status)
 
       new_channel_data =
         if params do
-          Map.put(channel_data, :params, params)
+          Map.put(old_channel_data, :params, params)
         else
-          channel_data
+          old_channel_data
         end
         |> Map.put(:status, status)
+        |> Map.put(:pid, channel_pid)
 
       joined_channels = Map.put(state.joined_channels, topic, new_channel_data)
 
-      socket_pid = Phoenix.SocketClient.get_process_pid(sup_pid, :socket)
-
-      Phoenix.SocketClient.Telemetry.channel_status_changed(
-        socket_pid,
-        topic,
-        channel_pid,
-        old_status,
-        status
-      )
+      if old_status != status do
+        Telemetry.channel_status_changed(channel_pid, topic, old_status, status)
+      end
 
       %State{state | joined_channels: joined_channels}
-    end)
-  end
-
-  def reconfigure(pid, new_opts) do
-    Agent.get_and_update(pid, fn old_state ->
-      new_opts_map = Enum.into(new_opts, %{})
-
-      merged_config =
-        Map.merge(Map.from_struct(old_state), old_state.custom) |> Map.merge(new_opts_map)
-
-      new_state = prepare_state(merged_config)
-
-      connection_keys = [
-        :url,
-        :params,
-        :headers,
-        :transport,
-        :transport_opts,
-        :vsn,
-        :heartbeat_interval
-      ]
-
-      old_map = Map.from_struct(old_state) |> Map.merge(old_state.custom)
-      new_map = Map.from_struct(new_state) |> Map.merge(new_state.custom)
-
-      restart_needed =
-        Enum.any?(connection_keys, fn key ->
-          Map.get(old_map, key) != Map.get(new_map, key)
-        end)
-
-      {restart_needed, new_state}
     end)
   end
 
@@ -178,11 +144,7 @@ defmodule Phoenix.SocketClient.Agent do
     }
 
     config = Map.merge(defaults, Enum.into(opts, %{}))
-    prepare_state(config)
-  end
-
-  def prepare_state(config) do
-    custom_opts = Map.drop(config, Map.keys(State.__struct__()))
+    custom_opts = Map.drop(config, Map.keys(defaults))
     config = Map.put(config, :custom, custom_opts)
 
     url = config.url
@@ -210,12 +172,26 @@ defmodule Phoenix.SocketClient.Agent do
       |> Keyword.put_new(:extra_headers, config.headers)
       |> Keyword.put_new(:keepalive, config.heartbeat_interval)
 
-    serializer = Phoenix.SocketClient.Message.serializer(config.vsn)
-
-    struct(
-      State,
-      Map.to_list(config) ++
-        [url: base_url, transport_opts: transport_opts, serializer: serializer]
-    )
+    %State{
+      url: base_url,
+      json_library: config.json_library,
+      params: config.params,
+      vsn: config.vsn,
+      auto_connect: config.auto_connect,
+      reconnect: config.reconnect,
+      reconnect_interval: config.reconnect_interval,
+      reconnect_timer: config.reconnect_timer,
+      status: config.status,
+      serializer: Message.serializer(config.vsn),
+      transport: config.transport,
+      transport_opts: transport_opts,
+      transport_pid: config.transport_pid,
+      to_send_r: config.to_send_r,
+      ref: config.ref,
+      sup_pid: config.sup_pid,
+      headers: config.headers,
+      custom: config.custom,
+      registry_name: config.registry_name
+    }
   end
 end

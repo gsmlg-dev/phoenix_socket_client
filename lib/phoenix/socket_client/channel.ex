@@ -182,7 +182,6 @@ defmodule Phoenix.SocketClient.Channel do
     message = Message.join(topic, params)
 
     push = Phoenix.SocketClient.push(sup_pid, message)
-    Telemetry.channel_joined(self(), topic, nil, %{}, %{params: params})
 
     {:noreply,
      %__MODULE__{
@@ -198,9 +197,9 @@ defmodule Phoenix.SocketClient.Channel do
   def handle_call(
         :leave,
         _from,
-        %{sup_pid: sup_pid, socket_pid: _socket_pid, topic: topic, params: params} = state
+        %{sup_pid: sup_pid, socket_pid: _socket_pid, topic: topic} = state
       ) do
-    Phoenix.SocketClient.update_channel_status(sup_pid, self(), topic, :leaving, params)
+    Phoenix.SocketClient.update_channel_status(sup_pid, self(), topic, :leaving)
     message = Message.leave(topic)
     _push = Phoenix.SocketClient.push(sup_pid, message)
     {:stop, :normal, :ok, state}
@@ -256,7 +255,7 @@ defmodule Phoenix.SocketClient.Channel do
   @spec handle_info(Message.t(), t()) :: {:noreply, t()}
   def handle_info(
         %Message{event: "phx_reply", ref: ref} = msg,
-        %{pushes: pushes, topic: topic, join_ref: join_ref, params: _params} = s
+        %{pushes: pushes, topic: topic, join_ref: join_ref, params: params} = s
       ) do
     pushes =
       case Enum.split_with(pushes, &(elem(&1, 1).ref == ref)) do
@@ -265,28 +264,18 @@ defmodule Phoenix.SocketClient.Channel do
 
           case status do
             "ok" ->
-              if ref == join_ref,
-                do:
-                  Phoenix.SocketClient.update_channel_status(
-                    s.sup_pid,
-                    self(),
-                    s.topic,
-                    :joined,
-                    s.params
-                  )
+              if ref == join_ref do
+                Phoenix.SocketClient.update_channel_status(s.sup_pid, self(), s.topic, :joined, params)
+                Telemetry.channel_joined(s.sup_pid, s.topic, self(), msg.payload, %{})
+              end
 
               Telemetry.message_received(self(), topic, "phx_reply", msg.payload)
 
             "error" ->
-              if ref == join_ref,
-                do:
-                  Phoenix.SocketClient.update_channel_status(
-                    s.sup_pid,
-                    self(),
-                    s.topic,
-                    :errored,
-                    s.params
-                  )
+              if ref == join_ref do
+                Phoenix.SocketClient.update_channel_status(s.sup_pid, self(), s.topic, :errored, params)
+                Telemetry.channel_join_error(s.sup_pid, s.topic, msg.payload, %{})
+              end
 
               Telemetry.message_received(self(), topic, "phx_reply", msg.payload)
 
@@ -328,7 +317,7 @@ defmodule Phoenix.SocketClient.Channel do
   end
 
   @impl true
-  def terminate(reason, %{sup_pid: sup_pid, topic: topic, registry_name: registry_name}) do
+  def terminate(reason, %{sup_pid: sup_pid, topic: topic, params: params, registry_name: registry_name} = _state) do
     Registry.unregister(registry_name, topic)
 
     if sup_pid && topic do
@@ -338,7 +327,7 @@ defmodule Phoenix.SocketClient.Channel do
       if reason == :normal and (channel_data && channel_data.status != :errored) do
         Phoenix.SocketClient.remove_channel(sup_pid, topic)
       else
-        Phoenix.SocketClient.update_channel_status(sup_pid, self(), topic, :errored)
+        Phoenix.SocketClient.update_channel_status(sup_pid, self(), topic, :errored, params)
       end
 
       Telemetry.channel_left(self(), topic, reason)

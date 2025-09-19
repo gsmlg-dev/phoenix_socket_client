@@ -58,8 +58,12 @@ defmodule Phoenix.SocketClient.ChannelStatusTest do
       # Give it a moment to join
       Process.sleep(100)
 
-      assert %{status: :joined, params: ^params} =
-               get_in(Phoenix.SocketClient.get_state(sup_pid, :joined_channels), ["topic:status"])
+      channel_data =
+        get_in(Phoenix.SocketClient.get_state(sup_pid, :joined_channels), ["topic:status"])
+
+      assert channel_data.status == :joined
+      assert channel_data.params == params
+      assert is_pid(channel_data.pid)
     end
 
     test "transitions to errored state on join failure" do
@@ -74,8 +78,12 @@ defmodule Phoenix.SocketClient.ChannelStatusTest do
 
       Process.sleep(300)
 
-      assert %{status: :errored, params: ^params} =
-               get_in(Phoenix.SocketClient.get_state(sup_pid, :joined_channels), ["topic:fail"])
+      channel_data =
+        get_in(Phoenix.SocketClient.get_state(sup_pid, :joined_channels), ["topic:fail"])
+
+      assert channel_data.status == :errored
+      assert channel_data.params == params
+      assert is_pid(channel_data.pid)
     end
 
     test "transitions through leaving and then is removed" do
@@ -112,8 +120,12 @@ defmodule Phoenix.SocketClient.ChannelStatusTest do
 
       Process.sleep(300)
 
-      assert %{status: :errored, params: ^params} =
-               get_in(Phoenix.SocketClient.get_state(sup_pid, :joined_channels), ["topic:crash"])
+      channel_data =
+        get_in(Phoenix.SocketClient.get_state(sup_pid, :joined_channels), ["topic:crash"])
+
+      assert channel_data.status == :errored
+      assert channel_data.params == params
+      assert is_pid(channel_data.pid)
     end
   end
 end

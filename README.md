@@ -131,6 +131,19 @@ end
 Phoenix.SocketClient.Channel.on(channel, "new_msg", MyHook)
 ```
 
+### Reconfiguring the Socket
+
+You can reconfigure the socket client at runtime using the `reconfigure/2` function.
+If any connection-related options are changed, the socket will be restarted.
+
+```elixir
+# Change the url
+Phoenix.SocketClient.reconfigure(socket, url: "ws://new.example.com/socket")
+
+# Change the connection params
+Phoenix.SocketClient.reconfigure(socket, params: %{"token" => "new-token"})
+```
+
 ### Configuration Options
 
 | Option | Type | Default | Description |
@@ -225,24 +238,6 @@ case Phoenix.SocketClient.Channel.push(channel, "new_msg", %{body: "Hello"}, 500
 end
 ```
 
-### Connection Recovery
-
-```elixir
-# Monitor connection status
-Phoenix.SocketClient.Telemetry.attach_debug_handler()
-
-# Implement custom reconnection logic
-:telemetry.attach(
-  "reconnection-handler",
-  [:phoenix_socket_client, :socket, :disconnected],
-  fn _event, _measurements, _metadata, _config ->
-    Process.sleep(1000)
-    Phoenix.SocketClient.connect(socket)
-  end,
-  %{}
-)
-```
-
 ## Development
 
 ### Setup
@@ -278,38 +273,29 @@ All processes are properly supervised with automatic restart strategies.
 
 ## Telemetry
 
-The library includes comprehensive telemetry events for monitoring and debugging:
+The library includes comprehensive telemetry events for monitoring and debugging.
+The events are structured as follows:
 
-### Socket Events
-- `[:phoenix_socket_client, :socket, :connecting]` - Connection attempt started
-- `[:phoenix_socket_client, :socket, :connected]` - Connection established
-- `[:phoenix_socket_client, :socket, :disconnected]` - Connection lost
-- `[:phoenix_socket_client, :socket, :connection_error]` - Connection failed
-- `[:phoenix_socket_client, :socket, :reconnecting]` - Reconnection attempt
-- `[:phoenix_socket_client, :socket, :heartbeat]` - Heartbeat sent
+- `[:phoenix_socket_client, :socket]` - Events related to the socket lifecycle.
+- `[:phoenix_socket_client, :channel]` - Events related to channel lifecycle.
+- `[:phoenix_socket_client, :message]` - Events related to messages.
+- `[:phoenix_socket_client, :state]` - Events related to state changes.
 
-### Channel Events
-- `[:phoenix_socket_client, :channel, :joined]` - Successfully joined channel
-- `[:phoenix_socket_client, :channel, :join_error]` - Failed to join channel
-- `[:phoenix_socket_client, :channel, :left]` - Left channel
-
-### Message Events
-- `[:phoenix_socket_client, :message, :sent]` - Message sent to server
-- `[:phoenix_socket_client, :message, :received]` - Message received from server
+The `action` key in the metadata distinguishes the specific event.
+For example, a socket connection event is emitted as `[:phoenix_socket_client, :socket]`
+with metadata `%{action: :connected, ...}`.
 
 ### Example Usage
 
 ```elixir
 # Attach a telemetry handler
-:telemetry.attach_many(
+:telemetry.attach(
   "my-handler",
-  [
-    [:phoenix_socket_client, :socket, :connected],
-    [:phoenix_socket_client, :socket, :disconnected],
-    [:phoenix_socket_client, :channel, :joined]
-  ],
-  fn event_name, measurements, metadata, _config ->
-    IO.inspect({event_name, metadata})
+  [:phoenix_socket_client, :socket],
+  fn _event_name, _measurements, metadata, _config ->
+    if metadata.action == :connected do
+      IO.puts("Socket connected!")
+    end
   end,
   %{}
 )

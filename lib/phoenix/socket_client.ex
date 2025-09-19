@@ -177,7 +177,6 @@ defmodule Phoenix.SocketClient do
 
     Phoenix.SocketClient.Agent.update_channel_status(
       state_pid,
-      sup_pid,
       channel_pid,
       topic,
       status,
@@ -228,22 +227,4 @@ defmodule Phoenix.SocketClient do
     end
   end
 
-  @doc """
-  Reconfigures the socket with new options.
-
-  If any connection-related options are changed, the socket will be restarted.
-  """
-  @spec reconfigure(pid | atom, keyword() | map()) :: :ok
-  def reconfigure(sup_pid, new_opts) do
-    state_pid = get_process_pid(sup_pid, :socket_state)
-    restart_needed = Phoenix.SocketClient.Agent.reconfigure(state_pid, new_opts)
-    IO.inspect(restart_needed, label: "restart_needed in reconfigure")
-
-    if restart_needed do
-      IO.inspect("restarting socket")
-      Supervisor.terminate_child(sup_pid, :socket)
-    end
-
-    :ok
-  end
 end
