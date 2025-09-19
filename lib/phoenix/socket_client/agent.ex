@@ -103,7 +103,14 @@ defmodule Phoenix.SocketClient.Agent do
       joined_channels = Map.put(state.joined_channels, topic, new_channel_data)
 
       socket_pid = Phoenix.SocketClient.get_process_pid(sup_pid, :socket)
-      Phoenix.SocketClient.Telemetry.channel_status_changed(socket_pid, topic, channel_pid, old_status, status)
+
+      Phoenix.SocketClient.Telemetry.channel_status_changed(
+        socket_pid,
+        topic,
+        channel_pid,
+        old_status,
+        status
+      )
 
       %State{state | joined_channels: joined_channels}
     end)
@@ -112,7 +119,10 @@ defmodule Phoenix.SocketClient.Agent do
   def reconfigure(pid, new_opts) do
     Agent.get_and_update(pid, fn old_state ->
       new_opts_map = Enum.into(new_opts, %{})
-      merged_config = Map.merge(Map.from_struct(old_state), old_state.custom) |> Map.merge(new_opts_map)
+
+      merged_config =
+        Map.merge(Map.from_struct(old_state), old_state.custom) |> Map.merge(new_opts_map)
+
       new_state = prepare_state(merged_config)
 
       connection_keys = [
@@ -202,6 +212,10 @@ defmodule Phoenix.SocketClient.Agent do
 
     serializer = Phoenix.SocketClient.Message.serializer(config.vsn)
 
-    struct(State, Map.to_list(config) ++ [url: base_url, transport_opts: transport_opts, serializer: serializer])
+    struct(
+      State,
+      Map.to_list(config) ++
+        [url: base_url, transport_opts: transport_opts, serializer: serializer]
+    )
   end
 end
