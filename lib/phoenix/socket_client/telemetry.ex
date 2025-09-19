@@ -19,7 +19,7 @@ defmodule Phoenix.SocketClient.Telemetry do
   @doc """
   Emits a generic socket event.
   """
-  def socket_event(action, pid, url, metadata \\ %{}) do
+  def socket_event(action, pid, url, measurements, metadata) do
     base_metadata = %{
       pid: pid,
       url: url,
@@ -28,7 +28,7 @@ defmodule Phoenix.SocketClient.Telemetry do
 
     emit_event(
       [:phoenix_socket_client, :socket],
-      %{},
+      measurements,
       Map.merge(base_metadata, Map.put(metadata, :action, action))
     )
   end
@@ -36,7 +36,7 @@ defmodule Phoenix.SocketClient.Telemetry do
   @doc """
   Emits a generic channel event.
   """
-  def channel_event(action, pid, topic, metadata \\ %{}) do
+  def channel_event(action, pid, topic, measurements, metadata) do
     base_metadata = %{
       pid: pid,
       topic: topic,
@@ -45,7 +45,7 @@ defmodule Phoenix.SocketClient.Telemetry do
 
     emit_event(
       [:phoenix_socket_client, :channel],
-      %{},
+      measurements,
       Map.merge(base_metadata, Map.put(metadata, :action, action))
     )
   end
@@ -94,7 +94,7 @@ defmodule Phoenix.SocketClient.Telemetry do
   """
   @spec socket_connected(pid(), String.t(), map()) :: :ok
   def socket_connected(pid, url, metadata \\ %{}) do
-    socket_event(:connected, pid, url, metadata)
+    socket_event(:connected, pid, url, %{}, metadata)
   end
 
   @doc """
@@ -102,7 +102,7 @@ defmodule Phoenix.SocketClient.Telemetry do
   """
   @spec socket_disconnected(pid(), String.t(), atom(), map()) :: :ok
   def socket_disconnected(pid, url, reason, metadata \\ %{}) do
-    socket_event(:disconnected, pid, url, Map.put(metadata, :reason, reason))
+    socket_event(:disconnected, pid, url, %{}, Map.put(metadata, :reason, reason))
   end
 
   @doc """
@@ -110,7 +110,7 @@ defmodule Phoenix.SocketClient.Telemetry do
   """
   @spec socket_connecting(pid(), String.t(), map()) :: :ok
   def socket_connecting(pid, url, metadata \\ %{}) do
-    socket_event(:connecting, pid, url, metadata)
+    socket_event(:connecting, pid, url, %{}, metadata)
   end
 
   @doc """
@@ -118,7 +118,7 @@ defmodule Phoenix.SocketClient.Telemetry do
   """
   @spec socket_connection_error(pid(), String.t(), any(), map()) :: :ok
   def socket_connection_error(pid, url, error, metadata \\ %{}) do
-    socket_event(:connection_error, pid, url, Map.put(metadata, :error, error))
+    socket_event(:connection_error, pid, url, %{}, Map.put(metadata, :error, error))
   end
 
   @doc """
@@ -130,6 +130,7 @@ defmodule Phoenix.SocketClient.Telemetry do
       :joined,
       pid,
       topic,
+      %{},
       Map.merge(metadata, %{channel_pid: channel_pid, response: response})
     )
   end
@@ -139,7 +140,7 @@ defmodule Phoenix.SocketClient.Telemetry do
   """
   @spec channel_join_error(pid(), String.t(), any(), map()) :: :ok
   def channel_join_error(pid, topic, error, metadata \\ %{}) do
-    channel_event(:join_error, pid, topic, Map.put(metadata, :error, error))
+    channel_event(:join_error, pid, topic, %{}, Map.put(metadata, :error, error))
   end
 
   @doc """
@@ -147,7 +148,7 @@ defmodule Phoenix.SocketClient.Telemetry do
   """
   @spec channel_left(pid(), String.t(), atom(), map()) :: :ok
   def channel_left(pid, topic, reason, metadata \\ %{}) do
-    channel_event(:left, pid, topic, Map.put(metadata, :reason, reason))
+    channel_event(:left, pid, topic, %{}, Map.put(metadata, :reason, reason))
   end
 
   @doc """
@@ -171,7 +172,7 @@ defmodule Phoenix.SocketClient.Telemetry do
   """
   @spec heartbeat_sent(pid(), String.t(), map()) :: :ok
   def heartbeat_sent(pid, url, metadata \\ %{}) do
-    socket_event(:heartbeat, pid, url, metadata)
+    socket_event(:heartbeat, pid, url, %{}, metadata)
   end
 
   @doc """
@@ -179,7 +180,7 @@ defmodule Phoenix.SocketClient.Telemetry do
   """
   @spec reconnecting(pid(), String.t(), integer(), map()) :: :ok
   def reconnecting(pid, url, attempt, metadata \\ %{}) do
-    socket_event(:reconnecting, pid, url, Map.put(metadata, :attempt, attempt))
+    socket_event(:reconnecting, pid, url, %{}, Map.put(metadata, :attempt, attempt))
   end
 
   @doc """
@@ -196,6 +197,30 @@ defmodule Phoenix.SocketClient.Telemetry do
   @spec channel_status_changed(pid(), String.t(), atom(), atom()) :: :ok
   def channel_status_changed(pid, topic, old_status, new_status) do
     state_change_event(:channel, topic, old_status, new_status, %{pid: pid})
+  end
+
+  @doc """
+  Emits socket connection duration event.
+  """
+  @spec socket_connection_duration(pid(), String.t(), integer()) :: :ok
+  def socket_connection_duration(pid, url, duration) do
+    socket_event(:connection_duration, pid, url, %{duration: duration}, %{})
+  end
+
+  @doc """
+  Emits channel join duration event.
+  """
+  @spec channel_join_duration(pid(), String.t(), integer()) :: :ok
+  def channel_join_duration(pid, topic, duration) do
+    channel_event(:join_duration, pid, topic, %{duration: duration}, %{})
+  end
+
+  @doc """
+  Emits channel leave duration event.
+  """
+  @spec channel_leave_duration(pid(), String.t(), integer()) :: :ok
+  def channel_leave_duration(pid, topic, duration) do
+    channel_event(:leave_duration, pid, topic, %{duration: duration}, %{})
   end
 
   @doc """

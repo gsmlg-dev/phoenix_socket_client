@@ -19,7 +19,8 @@ defmodule Phoenix.SocketClient.Socket do
             status: :disconnected,
             transport_ref: nil,
             transport_pid: nil,
-            to_send_r: []
+            to_send_r: [],
+            connect_start_time: nil
 
   @doc false
   @spec start_link(keyword()) :: GenServer.on_start()
@@ -83,7 +84,8 @@ defmodule Phoenix.SocketClient.Socket do
                 state
                 | transport_pid: transport_pid,
                   status: :connecting,
-                  transport_ref: transport_ref
+                  transport_ref: transport_ref,
+                  connect_start_time: System.monotonic_time()
               }
 
             update_socket_state_status(sup_pid, :connecting)
@@ -98,7 +100,16 @@ defmodule Phoenix.SocketClient.Socket do
 
   @impl true
   @spec handle_info({:connected, pid()}, t()) :: {:noreply, t()}
-  def handle_info({:connected, transport_pid}, %{sup_pid: sup_pid} = state) do
+  def handle_info(
+        {:connected, transport_pid},
+        %{sup_pid: sup_pid, connect_start_time: start_time} = state
+      ) do
+    if start_time do
+      duration = System.monotonic_time() - start_time
+      socket_state = Phoenix.SocketClient.get_state(sup_pid)
+      Telemetry.socket_connection_duration(self(), socket_state.url, duration)
+    end
+
     socket_state = Phoenix.SocketClient.get_state(sup_pid)
 
     Telemetry.socket_connected(self(), socket_state.url)

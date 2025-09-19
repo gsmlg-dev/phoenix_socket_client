@@ -46,7 +46,9 @@ defmodule Phoenix.SocketClient.Channel do
             pushes: [],
             join_ref: nil,
             hooks: %{},
-            registry_name: nil
+            registry_name: nil,
+            join_start_time: nil,
+            leave_start_time: nil
 
   @timeout 5_000
 
@@ -188,7 +190,8 @@ defmodule Phoenix.SocketClient.Channel do
        state
        | join_ref: push.ref,
          caller: elem(from, 0),
-         pushes: [{from, push} | state.pushes]
+         pushes: [{from, push} | state.pushes],
+         join_start_time: System.monotonic_time()
      }}
   end
 
@@ -202,7 +205,7 @@ defmodule Phoenix.SocketClient.Channel do
     Phoenix.SocketClient.update_channel_status(sup_pid, self(), topic, :leaving)
     message = Message.leave(topic)
     _push = Phoenix.SocketClient.push(sup_pid, message)
-    {:stop, :normal, :ok, state}
+    {:stop, :normal, :ok, %{state | leave_start_time: System.monotonic_time()}}
   end
 
   @impl true
@@ -265,6 +268,11 @@ defmodule Phoenix.SocketClient.Channel do
           case status do
             "ok" ->
               if ref == join_ref do
+                if s.join_start_time do
+                  duration = System.monotonic_time() - s.join_start_time
+                  Telemetry.channel_join_duration(s.socket_pid, s.topic, duration)
+                end
+
                 Phoenix.SocketClient.update_channel_status(
                   s.sup_pid,
                   self(),
@@ -333,8 +341,20 @@ defmodule Phoenix.SocketClient.Channel do
   @impl true
   def terminate(
         reason,
-        %{sup_pid: sup_pid, topic: topic, params: params, registry_name: registry_name} = _state
+        %{
+          sup_pid: sup_pid,
+          socket_pid: socket_pid,
+          topic: topic,
+          params: params,
+          registry_name: registry_name,
+          leave_start_time: start_time
+        } = _state
       ) do
+    if start_time do
+      duration = System.monotonic_time() - start_time
+      Telemetry.channel_leave_duration(socket_pid, topic, duration)
+    end
+
     Registry.unregister(registry_name, topic)
 
     if sup_pid && topic do
