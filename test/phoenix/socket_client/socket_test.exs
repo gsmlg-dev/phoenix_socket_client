@@ -211,11 +211,25 @@ defmodule Phoenix.SocketClient.SocketTest do
     use Phoenix.SocketClient.Channel
 
     @impl true
-    def init({_sup_pid, _socket_pid, topic, params, _registry_name} = args) do
+    def init({sup_pid, socket_pid, topic, params, registry_name} = args) do
       IO.inspect(args, label: "MyTestChannel init")
       test_pid_name = Map.get(params, "test_pid_name")
       send(Process.whereis(String.to_atom(test_pid_name)), {:channel_started, topic})
-      {:ok, %{}}
+      Registry.register(registry_name, topic, self())
+
+      {:ok,
+       %Phoenix.SocketClient.Channel.State{
+         sup_pid: sup_pid,
+         socket_pid: socket_pid,
+         topic: topic,
+         params: params,
+         registry_name: registry_name
+       }}
+    end
+
+    @impl true
+    def handle_message(_event, _payload, state) do
+      {:noreply, state}
     end
   end
 

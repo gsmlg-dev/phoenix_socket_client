@@ -1,7 +1,7 @@
 defmodule Phoenix.SocketClientTest do
   use ExUnit.Case, async: false
 
-  alias Phoenix.SocketClient.{Channel, Message}
+  alias Phoenix.SocketClient.Channel
 
   @socket_config [
     # Will be set dynamically
@@ -82,7 +82,7 @@ defmodule Phoenix.SocketClientTest do
     wait_for_socket(name)
     user_id = "123"
     assert {:ok, _, _} = Channel.join(name, "rooms:admin-lobby", %{user: user_id})
-    assert_receive %Message{event: "user:entered", payload: %{"user" => ^user_id}}
+    assert_receive %{"user" => ^user_id}
   end
 
   test "socket can leave a channel" do
@@ -305,89 +305,4 @@ defmodule Phoenix.SocketClientTest do
     end
   end
 
-  describe "channel hooks" do
-    setup do
-      name = :"socket_#{System.unique_integer([:positive])}"
-
-      {:ok, _pid} =
-        Phoenix.SocketClient.Supervisor.start_link(Keyword.put(get_socket_config(), :name, name))
-
-      wait_for_socket(name)
-      {:ok, %{socket: name}}
-    end
-
-    test "can register a hook and receive a message", %{socket: name} do
-      {:ok, _response, channel} = Channel.join(name, "rooms:admin-lobby")
-
-      test_pid = self()
-
-      Channel.on(channel, "new_msg", fn payload ->
-        send(test_pid, {:hook_fired, payload})
-      end)
-
-      Phoenix.SocketClientTest.Endpoint.broadcast(
-        "rooms:admin-lobby",
-        "new_msg",
-        %{"hello" => "world"}
-      )
-
-      assert_receive {:hook_fired, %{"hello" => "world"}}, 1000
-    end
-
-    test "can unregister a hook", %{socket: name} do
-      {:ok, _response, channel} = Channel.join(name, "rooms:admin-lobby")
-
-      test_pid = self()
-
-      Channel.on(channel, "new_msg", fn payload ->
-        send(test_pid, {:hook_fired, payload})
-      end)
-
-      Channel.off(channel, "new_msg")
-
-      Phoenix.SocketClientTest.Endpoint.broadcast(
-        "rooms:admin-lobby",
-        "new_msg",
-        %{"hello" => "world"}
-      )
-
-      # The hook should not be fired, so the message should be sent to the test process
-      assert_receive %Message{event: "new_msg", payload: %{"hello" => "world"}}, 1000
-      refute_receive {:hook_fired, _}, 100
-    end
-
-    test "messages without hooks are sent to the parent process", %{socket: name} do
-      {:ok, _response, _channel} = Channel.join(name, "rooms:admin-lobby")
-
-      Phoenix.SocketClientTest.Endpoint.broadcast(
-        "rooms:admin-lobby",
-        "another_event",
-        %{"foo" => "bar"}
-      )
-
-      assert_receive %Message{event: "another_event", payload: %{"foo" => "bar"}}, 1000
-    end
-
-    test "can register a module hook and receive a message", %{socket: name} do
-      defmodule MyTestHook do
-        def handle_in(event, payload) do
-          send(:test_process, {:module_hook_fired, event, payload})
-        end
-      end
-
-      Process.register(self(), :test_process)
-
-      {:ok, _response, channel} = Channel.join(name, "rooms:admin-lobby")
-
-      Channel.on(channel, "new_msg", MyTestHook)
-
-      Phoenix.SocketClientTest.Endpoint.broadcast(
-        "rooms:admin-lobby",
-        "new_msg",
-        %{"hello" => "world"}
-      )
-
-      assert_receive {:module_hook_fired, "new_msg", %{"hello" => "world"}}, 1000
-    end
-  end
 end

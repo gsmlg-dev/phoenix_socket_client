@@ -1,62 +1,207 @@
 defmodule Phoenix.SocketClient.Channel do
+  @callback handle_message(event :: String.t(), payload :: map(), state :: map()) ::
+              {:noreply, new_state :: map()}
+
   defmacro __using__(_opts) do
     quote do
+      @behaviour Phoenix.SocketClient.Channel
       use GenServer
+      alias Phoenix.SocketClient.Channel.State
+      alias Phoenix.SocketClient.{Message, Telemetry}
 
       @doc false
       def start_link(args) do
         GenServer.start_link(__MODULE__, args)
       end
 
+      # Callbacks
       @impl true
-      def init(args) do
-        {:ok, args}
+      def init({sup_pid, socket_pid, topic, params, registry_name}) do
+        Registry.register(registry_name, topic, self())
+
+        {:ok,
+         %State{
+           sup_pid: sup_pid,
+           socket_pid: socket_pid,
+           topic: topic,
+           params: params,
+           registry_name: registry_name
+         }}
       end
 
       @impl true
-      def handle_call(:join, _from, state) do
-        {:reply, {:ok, %{}}, state}
+      def handle_call(
+            :join,
+            {_pid, _ref} = from,
+            %{sup_pid: sup_pid, topic: topic, params: params} = state
+          ) do
+        message = Message.join(topic, params)
+
+        push = Phoenix.SocketClient.push(sup_pid, message)
+
+        {:noreply,
+         %State{
+           state
+           | join_ref: push.ref,
+             caller: elem(from, 0),
+             pushes: [{from, push} | state.pushes],
+             join_start_time: System.monotonic_time()
+         }}
       end
 
-      defoverridable init: 1, handle_call: 3
+      @impl true
+      def handle_call(
+            :leave,
+            _from,
+            %{sup_pid: sup_pid, socket_pid: _socket_pid, topic: topic} = state
+          ) do
+        Phoenix.SocketClient.update_channel_status(sup_pid, self(), topic, :leaving)
+        message = Message.leave(topic)
+        _push = Phoenix.SocketClient.push(sup_pid, message)
+        {:stop, :normal, :ok, %{state | leave_start_time: System.monotonic_time()}}
+      end
+
+      @impl true
+      def handle_call({:push, event, payload}, from, %{sup_pid: sup_pid, topic: topic} = state) do
+        message = %Message{
+          topic: topic,
+          event: event,
+          payload: payload,
+          ref: Message.generate_ref(),
+          join_ref: state.join_ref
+        }
+
+        push = Phoenix.SocketClient.push(sup_pid, message)
+        Telemetry.message_sent(self(), topic, event, payload)
+        {:noreply, %State{state | pushes: [{from, push} | state.pushes]}}
+      end
+
+      @impl true
+      def handle_cast({:push, event, payload}, %{sup_pid: sup_pid, topic: topic} = state) do
+        message = %Message{
+          topic: topic,
+          event: event,
+          payload: payload,
+          channel_pid: self(),
+          join_ref: state.join_ref
+        }
+
+        Phoenix.SocketClient.push(sup_pid, message)
+        Telemetry.message_sent(self(), topic, event, payload)
+        {:noreply, state}
+      end
+
+      @impl true
+      def handle_info(
+            %Message{event: "phx_reply", ref: ref} = msg,
+            %{pushes: pushes, topic: topic, join_ref: join_ref, params: params} = s
+          ) do
+        pushes =
+          case Enum.split_with(pushes, &(elem(&1, 1).ref == ref)) do
+            {[{from_ref, _push}], pushes} ->
+              %{"status" => status, "response" => response} = msg.payload
+
+              case status do
+                "ok" ->
+                  if ref == join_ref do
+                    if s.join_start_time do
+                      duration = System.monotonic_time() - s.join_start_time
+                      Telemetry.channel_join_duration(s.socket_pid, s.topic, duration)
+                    end
+
+                    Phoenix.SocketClient.update_channel_status(
+                      s.sup_pid,
+                      self(),
+                      s.topic,
+                      :joined,
+                      params
+                    )
+
+                    Telemetry.channel_joined(s.sup_pid, s.topic, self(), msg.payload, %{})
+                  end
+
+                  Telemetry.message_received(self(), topic, "phx_reply", msg.payload)
+
+                "error" ->
+                  if ref == join_ref do
+                    Phoenix.SocketClient.update_channel_status(
+                      s.sup_pid,
+                      self(),
+                      s.topic,
+                      :errored,
+                      params
+                    )
+
+                    Telemetry.channel_join_error(s.sup_pid, s.topic, msg.payload, %{})
+                  end
+
+                  Telemetry.message_received(self(), topic, "phx_reply", msg.payload)
+
+                _ ->
+                  :noop
+              end
+
+              GenServer.reply(from_ref, {String.to_atom(status), response})
+              pushes
+
+            {[], pushes} ->
+              send(s.caller, %{msg | channel_pid: s.caller, topic: s.topic})
+              pushes
+          end
+
+        {:noreply, %State{s | pushes: pushes}}
+      end
+
+      @impl true
+      def handle_info(%Message{} = message, state) do
+        Telemetry.message_received(self(), state.topic, message.event, message.payload)
+        handle_message(message.event, message.payload, state)
+      end
+
+      @impl true
+      def terminate(
+            reason,
+            %{
+              sup_pid: sup_pid,
+              socket_pid: socket_pid,
+              topic: topic,
+              params: params,
+              registry_name: registry_name,
+              leave_start_time: start_time
+            } = _state
+          ) do
+        if start_time do
+          duration = System.monotonic_time() - start_time
+          Telemetry.channel_leave_duration(socket_pid, topic, duration)
+        end
+
+        Registry.unregister(registry_name, topic)
+
+        if sup_pid && topic do
+          joined_channels = Phoenix.SocketClient.get_state(sup_pid, :joined_channels)
+          channel_data = Map.get(joined_channels, topic)
+
+          if reason == :normal and (channel_data && channel_data.status != :errored) do
+            Phoenix.SocketClient.remove_channel(sup_pid, topic)
+          else
+            Phoenix.SocketClient.update_channel_status(sup_pid, self(), topic, :errored, params)
+          end
+
+          Telemetry.channel_left(self(), topic, reason)
+        end
+
+        :ok
+      end
+
+      defoverridable init: 1,
+                     handle_call: 3,
+                     handle_cast: 2,
+                     handle_info: 2,
+                     terminate: 2
     end
   end
 
-  use GenServer
-
-  alias Phoenix.SocketClient.{Message, Telemetry}
-
-  @type t :: %__MODULE__{
-          caller: pid() | nil,
-          sup_pid: pid(),
-          socket_pid: pid(),
-          topic: String.t(),
-          params: map(),
-          pushes: list(),
-          join_ref: String.t() | nil,
-          hooks: map(),
-          registry_name: atom()
-        }
-
-  defstruct caller: nil,
-            sup_pid: nil,
-            socket_pid: nil,
-            topic: nil,
-            params: %{},
-            pushes: [],
-            join_ref: nil,
-            hooks: %{},
-            registry_name: nil,
-            join_start_time: nil,
-            leave_start_time: nil
-
   @timeout 5_000
-
-  @doc false
-  @spec start_link(map()) :: GenServer.on_start()
-  def start_link(args) do
-    GenServer.start_link(__MODULE__, args)
-  end
 
   @doc false
   def stop(pid) do
@@ -120,257 +265,6 @@ defmodule Phoenix.SocketClient.Channel do
   @spec push_async(pid, binary, map) :: :ok
   def push_async(pid, event, payload) do
     GenServer.cast(pid, {:push, event, payload})
-  end
-
-  @doc """
-  Registers a callback for a specific event on the channel.
-
-  The callback can be an anonymous function of arity 1, which will be called
-  with the message payload.
-
-  ## Examples
-
-      on(channel, "new_msg", fn payload -> IO.inspect(payload) end)
-
-  It can also be a module that implements `handle_in/2`, which will be
-  called with the event and the payload.
-
-  ## Examples
-
-      defmodule MyHook do
-        def handle_in(event, payload) do
-          IO.puts("Got event \#{event} with payload \#{inspect payload}")
-        end
-      end
-
-      on(channel, "new_msg", MyHook)
-  """
-  @spec on(pid, String.t(), (map() -> any()) | module()) :: :ok
-  def on(pid, event, callback) when is_function(callback, 1) or is_atom(callback) do
-    GenServer.cast(pid, {:on, event, callback})
-  end
-
-  @doc """
-  Unregisters a callback for a specific event on the channel.
-  """
-  @spec off(pid, String.t()) :: :ok
-  def off(pid, event) do
-    GenServer.cast(pid, {:off, event})
-  end
-
-  # Callbacks
-  @impl true
-  @spec init({pid(), pid(), String.t(), map(), atom()}) :: {:ok, t()}
-  def init({sup_pid, socket_pid, topic, params, registry_name}) do
-    Registry.register(registry_name, topic, self())
-
-    {:ok,
-     %__MODULE__{
-       sup_pid: sup_pid,
-       socket_pid: socket_pid,
-       topic: topic,
-       params: params,
-       registry_name: registry_name
-     }}
-  end
-
-  @impl true
-  @spec handle_call(:join, GenServer.from(), t()) :: {:noreply, t()}
-  def handle_call(
-        :join,
-        {_pid, _ref} = from,
-        %{sup_pid: sup_pid, topic: topic, params: params} = state
-      ) do
-    message = Message.join(topic, params)
-
-    push = Phoenix.SocketClient.push(sup_pid, message)
-
-    {:noreply,
-     %__MODULE__{
-       state
-       | join_ref: push.ref,
-         caller: elem(from, 0),
-         pushes: [{from, push} | state.pushes],
-         join_start_time: System.monotonic_time()
-     }}
-  end
-
-  @impl true
-  @spec handle_call(:leave, GenServer.from(), t()) :: {:stop, :normal, :ok, t()}
-  def handle_call(
-        :leave,
-        _from,
-        %{sup_pid: sup_pid, socket_pid: _socket_pid, topic: topic} = state
-      ) do
-    Phoenix.SocketClient.update_channel_status(sup_pid, self(), topic, :leaving)
-    message = Message.leave(topic)
-    _push = Phoenix.SocketClient.push(sup_pid, message)
-    {:stop, :normal, :ok, %{state | leave_start_time: System.monotonic_time()}}
-  end
-
-  @impl true
-  @spec handle_call({:push, String.t(), map()}, GenServer.from(), t()) :: {:noreply, t()}
-  def handle_call({:push, event, payload}, from, %{sup_pid: sup_pid, topic: topic} = state) do
-    message = %Message{
-      topic: topic,
-      event: event,
-      payload: payload,
-      ref: Message.generate_ref(),
-      join_ref: state.join_ref
-    }
-
-    push = Phoenix.SocketClient.push(sup_pid, message)
-    Telemetry.message_sent(self(), topic, event, payload)
-    {:noreply, %__MODULE__{state | pushes: [{from, push} | state.pushes]}}
-  end
-
-  @impl true
-  @spec handle_cast({:on, String.t(), (map() -> any()) | module()}, t()) :: {:noreply, t()}
-  def handle_cast({:on, event, callback}, state) do
-    hooks = Map.put(state.hooks, event, callback)
-    {:noreply, %__MODULE__{state | hooks: hooks}}
-  end
-
-  @impl true
-  @spec handle_cast({:off, String.t()}, t()) :: {:noreply, t()}
-  def handle_cast({:off, event}, state) do
-    hooks = Map.delete(state.hooks, event)
-    {:noreply, %__MODULE__{state | hooks: hooks}}
-  end
-
-  @impl true
-  @spec handle_cast({:push, String.t(), map()}, t()) :: {:noreply, t()}
-  def handle_cast({:push, event, payload}, %{sup_pid: sup_pid, topic: topic} = state) do
-    message = %Message{
-      topic: topic,
-      event: event,
-      payload: payload,
-      channel_pid: self(),
-      join_ref: state.join_ref
-    }
-
-    Phoenix.SocketClient.push(sup_pid, message)
-    Telemetry.message_sent(self(), topic, event, payload)
-    {:noreply, state}
-  end
-
-  @impl true
-  @spec handle_info(Message.t(), t()) :: {:noreply, t()}
-  def handle_info(
-        %Message{event: "phx_reply", ref: ref} = msg,
-        %{pushes: pushes, topic: topic, join_ref: join_ref, params: params} = s
-      ) do
-    pushes =
-      case Enum.split_with(pushes, &(elem(&1, 1).ref == ref)) do
-        {[{from_ref, _push}], pushes} ->
-          %{"status" => status, "response" => response} = msg.payload
-
-          case status do
-            "ok" ->
-              if ref == join_ref do
-                if s.join_start_time do
-                  duration = System.monotonic_time() - s.join_start_time
-                  Telemetry.channel_join_duration(s.socket_pid, s.topic, duration)
-                end
-
-                Phoenix.SocketClient.update_channel_status(
-                  s.sup_pid,
-                  self(),
-                  s.topic,
-                  :joined,
-                  params
-                )
-
-                Telemetry.channel_joined(s.sup_pid, s.topic, self(), msg.payload, %{})
-              end
-
-              Telemetry.message_received(self(), topic, "phx_reply", msg.payload)
-
-            "error" ->
-              if ref == join_ref do
-                Phoenix.SocketClient.update_channel_status(
-                  s.sup_pid,
-                  self(),
-                  s.topic,
-                  :errored,
-                  params
-                )
-
-                Telemetry.channel_join_error(s.sup_pid, s.topic, msg.payload, %{})
-              end
-
-              Telemetry.message_received(self(), topic, "phx_reply", msg.payload)
-
-            _ ->
-              :noop
-          end
-
-          GenServer.reply(from_ref, {String.to_atom(status), response})
-          pushes
-
-        {[], pushes} ->
-          send(s.caller, %{msg | channel_pid: s.caller, topic: s.topic})
-          pushes
-      end
-
-    {:noreply, %__MODULE__{s | pushes: pushes}}
-  end
-
-  @impl true
-  @spec handle_info(Message.t(), t()) :: {:noreply, t()}
-  def handle_info(%Message{} = message, state) do
-    %{caller: pid, topic: topic, hooks: hooks} = state
-
-    Telemetry.message_received(self(), topic, message.event, message.payload)
-
-    case Map.get(hooks, message.event) do
-      nil ->
-        send(pid, %{message | channel_pid: pid, topic: topic})
-
-      callback ->
-        if is_function(callback) do
-          callback.(message.payload)
-        else
-          callback.handle_in(message.event, message.payload)
-        end
-    end
-
-    {:noreply, state}
-  end
-
-  @impl true
-  def terminate(
-        reason,
-        %{
-          sup_pid: sup_pid,
-          socket_pid: socket_pid,
-          topic: topic,
-          params: params,
-          registry_name: registry_name,
-          leave_start_time: start_time
-        } = _state
-      ) do
-    if start_time do
-      duration = System.monotonic_time() - start_time
-      Telemetry.channel_leave_duration(socket_pid, topic, duration)
-    end
-
-    Registry.unregister(registry_name, topic)
-
-    if sup_pid && topic do
-      joined_channels = Phoenix.SocketClient.get_state(sup_pid, :joined_channels)
-      channel_data = Map.get(joined_channels, topic)
-
-      if reason == :normal and (channel_data && channel_data.status != :errored) do
-        Phoenix.SocketClient.remove_channel(sup_pid, topic)
-      else
-        Phoenix.SocketClient.update_channel_status(sup_pid, self(), topic, :errored, params)
-      end
-
-      Telemetry.channel_left(self(), topic, reason)
-    end
-
-    :ok
   end
 
   defp do_join(pid, sup_pid, topic, params, timeout) do
