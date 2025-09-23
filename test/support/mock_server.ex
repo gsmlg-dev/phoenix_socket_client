@@ -107,6 +107,7 @@ defmodule Phoenix.SocketClientTest.AdminSocket do
   channel("topic:rejoin", Phoenix.SocketClientTest.TopicChannel)
   channel("topic:status", Phoenix.SocketClientTest.TopicChannel)
   channel("custom:*", Phoenix.SocketClientTest.RoomChannel)
+  channel("auto:*", Phoenix.SocketClientTest.RoomChannel)
 
   def connect(params, socket, connect_info) do
     on_connect(self(), %{
@@ -174,6 +175,10 @@ defmodule Phoenix.SocketClientTest.RoomChannel do
   end
 
   def join("custom:" <> _, message, socket) do
+    {:ok, message, socket}
+  end
+
+  def join("auto:" <> _, message, socket) do
     {:ok, message, socket}
   end
 

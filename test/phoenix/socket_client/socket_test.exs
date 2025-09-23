@@ -203,6 +203,26 @@ defmodule Phoenix.SocketClient.SocketTest do
       assert channel_data_after.params == params
       assert is_pid(channel_data_after.pid)
     end
+
+    test "socket auto-joins channels from join_channels option" do
+      name = :"socket_auto_join_#{System.unique_integer([:positive])}"
+      topics = ["auto:join1", "auto:join2"]
+
+      config =
+        get_socket_config()
+        |> Keyword.put(:name, name)
+        |> Keyword.put(:join_channels, topics)
+
+      {:ok, sup_pid} = Phoenix.SocketClient.Supervisor.start_link(config)
+      wait_for_socket(name)
+      Process.sleep(100) # Give time for channels to join
+
+      joined_channels = Phoenix.SocketClient.get_state(sup_pid, :joined_channels)
+      assert Map.has_key?(joined_channels, "auto:join1")
+      assert Map.has_key?(joined_channels, "auto:join2")
+      assert get_in(joined_channels, ["auto:join1", :status]) == :joined
+      assert get_in(joined_channels, ["auto:join2", :status]) == :joined
+    end
   end
 
   defmodule MyTestChannel do

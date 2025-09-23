@@ -114,6 +114,7 @@ defmodule Phoenix.SocketClient.Socket do
 
     Telemetry.socket_connected(self(), socket_state.url)
     put_state(sup_pid, :reconnecting, false)
+    join_initial_channels(sup_pid)
     rejoin_channels(sup_pid)
     state = %__MODULE__{state | status: :connected, transport_pid: transport_pid}
     update_socket_state_status(sup_pid, :connected)
@@ -258,6 +259,14 @@ defmodule Phoenix.SocketClient.Socket do
 
     for {topic, %{status: :joined, params: params}} <- joined_channels do
       Phoenix.SocketClient.Channel.join(sup_pid, topic, params)
+    end
+  end
+
+  defp join_initial_channels(sup_pid) do
+    join_channels = get_state(sup_pid, :join_channels)
+
+    for topic <- join_channels do
+      Task.start(fn -> Phoenix.SocketClient.Channel.join(sup_pid, topic) end)
     end
   end
 
