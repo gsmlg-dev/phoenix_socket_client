@@ -1,4 +1,11 @@
 defmodule Phoenix.SocketClient.Channel.State do
+  @moduledoc """
+  The state for a channel process.
+  """
+
+  @typedoc """
+  The channel state struct.
+  """
   @type t :: %__MODULE__{
           caller: pid() | nil,
           sup_pid: pid(),

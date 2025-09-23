@@ -73,6 +73,7 @@ defmodule Phoenix.SocketClient do
   """
   @spec get_state(pid() | atom(), atom()) :: any()
   def get_state(name, key)
+
   def get_state(name, key) when is_atom(name) do
     case Process.whereis(name) do
       nil ->
@@ -93,6 +94,7 @@ defmodule Phoenix.SocketClient do
   """
   @spec get_state(pid() | atom()) :: map()
   def get_state(name)
+
   def get_state(name) when is_atom(name) do
     case Process.whereis(name) do
       nil ->
@@ -113,6 +115,7 @@ defmodule Phoenix.SocketClient do
   """
   @spec put_state(pid() | atom(), atom(), any()) :: :ok
   def put_state(name, key, value)
+
   def put_state(name, key, value) when is_atom(name) do
     case Process.whereis(name) do
       nil ->
