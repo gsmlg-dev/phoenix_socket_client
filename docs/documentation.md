@@ -141,6 +141,7 @@ Phoenix.SocketClient.reconfigure(socket, params: %{"token" => "new-token"})
 | `:serializer` | `module()` | `Jason` | JSON serializer module |
 | `:vsn` | `String.t()` | `"2.0.0"` | Phoenix Channels protocol version (V1 is deprecated) |
 | `:topic_channel_map` | `map()` | `%_` | A map from a topic string to a channel module. |
+| `:join_channels` | `list()` | `[]` | A list of channels to automatically join on connect. |
 
 ### Message Handling Examples
 
