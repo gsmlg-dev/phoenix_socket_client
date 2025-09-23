@@ -304,5 +304,4 @@ defmodule Phoenix.SocketClientTest do
         wait_for_socket(socket_name, retries - 1)
     end
   end
-
 end
