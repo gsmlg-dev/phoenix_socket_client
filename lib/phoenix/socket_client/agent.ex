@@ -51,6 +51,10 @@ defmodule Phoenix.SocketClient.Agent do
     end)
   end
 
+  @doc """
+  Retrieves the entire state map.
+  """
+  @spec get_state(pid()) :: map()
   def get_state(pid) do
     Agent.get(pid, & &1)
   end
@@ -78,10 +82,18 @@ defmodule Phoenix.SocketClient.Agent do
     end)
   end
 
-  def connected(pid) do
+  @doc """
+  Checks if the socket is connected.
+  """
+  @spec connected?(pid()) :: boolean()
+  def connected?(pid) do
     get(pid, :status) == :connected
   end
 
+  @doc """
+  Pops all messages pending to be sent.
+  """
+  @spec pop_all_to_send(pid()) :: [Message.t()]
   def pop_all_to_send(pid) do
     Agent.get_and_update(pid, fn state ->
       to_send = state.to_send_r |> Enum.reverse()
@@ -89,6 +101,10 @@ defmodule Phoenix.SocketClient.Agent do
     end)
   end
 
+  @doc """
+  Updates the status of a channel.
+  """
+  @spec update_channel_status(pid(), pid(), String.t(), atom(), map() | nil) :: :ok
   def update_channel_status(pid, channel_pid, topic, status, params \\ nil) do
     Agent.update(pid, fn state ->
       old_channel_data = Map.get(state.joined_channels, topic, %{})
@@ -113,6 +129,10 @@ defmodule Phoenix.SocketClient.Agent do
     end)
   end
 
+  @doc """
+  Removes a channel from the state.
+  """
+  @spec remove_channel(pid(), String.t()) :: :ok
   def remove_channel(pid, topic) do
     Agent.update(pid, fn state ->
       joined_channels = Map.delete(state.joined_channels, topic)

@@ -72,6 +72,7 @@ defmodule Phoenix.SocketClient do
   Gets a value from the socket state.
   """
   @spec get_state(pid() | atom(), atom()) :: any()
+  def get_state(name, key)
   def get_state(name, key) when is_atom(name) do
     case Process.whereis(name) do
       nil ->
@@ -91,6 +92,7 @@ defmodule Phoenix.SocketClient do
   Gets the entire socket state.
   """
   @spec get_state(pid() | atom()) :: map()
+  def get_state(name)
   def get_state(name) when is_atom(name) do
     case Process.whereis(name) do
       nil ->
@@ -110,6 +112,7 @@ defmodule Phoenix.SocketClient do
   Puts a value into the socket state.
   """
   @spec put_state(pid() | atom(), atom(), any()) :: :ok
+  def put_state(name, key, value)
   def put_state(name, key, value) when is_atom(name) do
     case Process.whereis(name) do
       nil ->
@@ -146,7 +149,8 @@ defmodule Phoenix.SocketClient do
   @doc """
   Joins a channel through the socket.
   """
-  @spec channel_join(pid, binary, map) :: {:ok, pid} | {:error, term}
+  @spec channel_join(pid, binary, map) ::
+          {:ok, pid} | {:error, :channel_manager_not_found | {:already_started, pid}}
   def channel_join(sup_pid, topic, params \\ %{}) do
     case get_process_pid(sup_pid, :channel_manager) do
       nil ->
@@ -200,7 +204,8 @@ defmodule Phoenix.SocketClient do
   @doc """
   Pushes a message through the socket.
   """
-  @spec push(pid | atom, Phoenix.SocketClient.Message.t()) :: Phoenix.SocketClient.Message.t()
+  @spec push(pid | atom, Phoenix.SocketClient.Message.t()) ::
+          Phoenix.SocketClient.Message.t() | no_return()
   def push(sup_pid, message) do
     case get_process_pid(sup_pid, :socket) do
       nil ->

@@ -1,6 +1,20 @@
 defmodule Phoenix.SocketClient.Channel do
-  @callback handle_message(event :: String.t(), payload :: map(), state :: map()) ::
-              {:noreply, new_state :: map()}
+  @moduledoc """
+  A process for interacting with a Phoenix Channel.
+  """
+
+  alias Phoenix.SocketClient.Channel.State
+
+  @typedoc """
+  The state of the channel.
+  """
+  @type state :: %State{}
+
+  @doc """
+  Callback for handling incoming messages.
+  """
+  @callback handle_message(event :: String.t(), payload :: map(), state :: state()) ::
+              {:noreply, new_state :: state()}
 
   defmacro __using__(_opts) do
     quote do
@@ -74,6 +88,11 @@ defmodule Phoenix.SocketClient.Channel do
         push = Phoenix.SocketClient.push(sup_pid, message)
         Telemetry.message_sent(self(), topic, event, payload)
         {:noreply, %State{state | pushes: [{from, push} | state.pushes]}}
+      end
+
+      @impl true
+      def handle_call(:get_topic, _from, state) do
+        {:reply, state.topic, state}
       end
 
       @impl true
@@ -203,7 +222,10 @@ defmodule Phoenix.SocketClient.Channel do
 
   @timeout 5_000
 
-  @doc false
+  @doc """
+  Stops the channel process.
+  """
+  @spec stop(pid) :: :ok
   def stop(pid) do
     leave(pid)
   end
@@ -220,9 +242,10 @@ defmodule Phoenix.SocketClient.Channel do
   Calling join will link the caller to the channel process.
   """
   @spec join(pid | atom, binary, map, non_neg_integer) ::
-          {:ok, map, pid}
+          {:ok, any, pid}
           | {:error, :socket_not_connected}
           | {:error, :timeout}
+          | {:error, {:already_joined, pid}}
           | {:error, any}
   def join(sup_pid, topic, params \\ %{}, timeout \\ @timeout)
   def join(nil, _topic, _params, _timeout), do: {:error, :socket_not_started}
@@ -248,13 +271,13 @@ defmodule Phoenix.SocketClient.Channel do
   end
 
   @doc """
-  Push a message to the server and wait for a response or timeout
+  Push a message to the server and wait for a a response or timeout
 
   The server must be configured to return `{:reply, _, socket}`
   otherwise, the call will timeout.
   """
   @spec push(pid, binary, map, non_neg_integer) ::
-          {:ok, map()} | {:error, map() | :timeout}
+          {:ok, any} | {:error, any | :timeout}
   def push(pid, event, payload, timeout \\ @timeout) do
     GenServer.call(pid, {:push, event, payload}, timeout)
   end

@@ -38,13 +38,13 @@ defmodule Phoenix.SocketClient.AgentTest do
     test "connected? function works correctly" do
       {:ok, pid} = Agent.start_link([])
 
-      refute Agent.connected(pid)
+      refute Agent.connected?(pid)
 
       Agent.put(pid, :status, :connected)
-      assert Agent.connected(pid)
+      assert Agent.connected?(pid)
 
       Agent.put(pid, :status, :disconnected)
-      refute Agent.connected(pid)
+      refute Agent.connected?(pid)
     end
 
     test "pop_all_to_send returns empty list initially" do
