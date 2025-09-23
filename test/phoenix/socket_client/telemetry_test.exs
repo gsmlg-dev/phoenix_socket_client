@@ -7,13 +7,11 @@ defmodule Phoenix.SocketClient.TelemetryTest do
 
   defp get_socket_config do
     port = get_port()
-    registry_name = :"Registry.Channel_#{System.unique_integer([:positive])}"
 
     [
       url: "ws://127.0.0.1:#{port}/ws/admin/websocket",
       serializer: Jason,
-      reconnect_interval: 10,
-      registry_name: registry_name
+      reconnect_interval: 10
     ]
   end
 

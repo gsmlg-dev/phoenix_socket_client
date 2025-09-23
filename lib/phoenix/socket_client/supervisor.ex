@@ -38,7 +38,21 @@ defmodule Phoenix.SocketClient.Supervisor do
   def init(opts) do
     sup_pid = self()
     opts = opts |> Map.put(:sup_pid, sup_pid)
-    registry_name = Map.get(opts, :registry_name, Registry.Channel)
+
+    name = Map.get(opts, :name)
+
+    default_registry_name =
+      name
+      |> to_string()
+      |> String.replace_leading("Elixir.", "")
+      |> String.split(["_", "."])
+      |> Enum.map(&String.capitalize/1)
+      |> Enum.join()
+      |> (&(&1 <> "ChannelRegistry")).()
+      |> String.to_atom()
+
+    registry_name = Map.get(opts, :registry_name, default_registry_name)
+
     opts = opts |> Map.put(:registry_name, registry_name)
 
     children = [

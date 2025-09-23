@@ -18,11 +18,9 @@ defmodule Phoenix.SocketClientTest do
 
   defp get_socket_config do
     port = get_port()
-    registry_name = :"Registry.Channel_#{System.unique_integer([:positive])}"
 
     @socket_config
     |> Keyword.put(:url, "ws://127.0.0.1:#{port}/ws/admin/websocket")
-    |> Keyword.put(:registry_name, registry_name)
   end
 
   setup_all do
