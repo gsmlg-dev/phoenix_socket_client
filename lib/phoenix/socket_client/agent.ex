@@ -140,7 +140,8 @@ defmodule Phoenix.SocketClient.Agent do
       to_send_r: [],
       ref: 0,
       custom: %{},
-      registry_name: Registry.Channel
+      registry_name: Registry.Channel,
+      join_channels: []
     }
 
     config = Map.merge(defaults, Enum.into(opts, %{}))
@@ -191,7 +192,8 @@ defmodule Phoenix.SocketClient.Agent do
       sup_pid: config.sup_pid,
       headers: config.headers,
       custom: config.custom,
-      registry_name: config.registry_name
+      registry_name: config.registry_name,
+      join_channels: config.join_channels
     }
   end
 end

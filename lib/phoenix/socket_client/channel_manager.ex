@@ -22,7 +22,6 @@ defmodule Phoenix.SocketClient.ChannelManager do
 
   use DynamicSupervisor
 
-  alias Phoenix.SocketClient.Channel
   import Phoenix.SocketClient, only: [get_process_pid: 2, get_state: 2]
 
   @doc """
@@ -83,7 +82,7 @@ defmodule Phoenix.SocketClient.ChannelManager do
     end
   end
 
-  def start_channel(sup_pid, topic, params, channel_module \\ Channel) do
+  def start_channel(sup_pid, topic, params, channel_module \\ Phoenix.SocketClient.Channel.Room) do
     socket_pid = get_process_pid(sup_pid, :socket)
     cm_pid = get_process_pid(sup_pid, :channel_manager)
     registry_name = get_state(sup_pid, :registry_name)

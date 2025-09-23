@@ -7,13 +7,11 @@ defmodule Phoenix.SocketClient.SocketTest do
 
   defp get_socket_config do
     port = get_port()
-    registry_name = :"Registry.Channel_#{System.unique_integer([:positive])}"
 
     [
       url: "ws://127.0.0.1:#{port}/ws/admin/websocket",
       serializer: Jason,
-      reconnect_interval: 10,
-      registry_name: registry_name
+      reconnect_interval: 10
     ]
   end
 
@@ -205,26 +203,47 @@ defmodule Phoenix.SocketClient.SocketTest do
       assert channel_data_after.params == params
       assert is_pid(channel_data_after.pid)
     end
+
+    test "socket auto-joins channels from join_channels option" do
+      name = :"socket_auto_join_#{System.unique_integer([:positive])}"
+      topics = ["auto:join1", "auto:join2"]
+
+      config =
+        get_socket_config()
+        |> Keyword.put(:name, name)
+        |> Keyword.put(:join_channels, topics)
+
+      {:ok, sup_pid} = Phoenix.SocketClient.Supervisor.start_link(config)
+      wait_for_socket(name)
+      # Give time for channels to join
+      Process.sleep(100)
+
+      joined_channels = Phoenix.SocketClient.get_state(sup_pid, :joined_channels)
+      assert Map.has_key?(joined_channels, "auto:join1")
+      assert Map.has_key?(joined_channels, "auto:join2")
+      assert get_in(joined_channels, ["auto:join1", :status]) == :joined
+      assert get_in(joined_channels, ["auto:join2", :status]) == :joined
+    end
   end
 
   defmodule MyTestChannel do
     use Phoenix.SocketClient.Channel
 
     @impl true
-    def init({_sup_pid, _socket_pid, topic, params, _registry_name} = args) do
-      IO.inspect(args, label: "MyTestChannel init")
-      test_pid_name = Map.get(params, "test_pid_name")
-      send(Process.whereis(String.to_atom(test_pid_name)), {:channel_started, topic})
-      {:ok, %{}}
+    def handle_message("test_event", _payload, state) do
+      send(Process.whereis(:test_process), :test_event_received)
+      {:noreply, state}
+    end
+
+    def handle_message(_event, _payload, state) do
+      {:noreply, state}
     end
   end
 
   test "socket uses custom channel from topic_channel_map" do
     name = :"socket_custom_channel_#{System.unique_integer([:positive])}"
-    test_process_name = :"test_process_#{System.unique_integer([:positive])}"
-    Process.register(self(), test_process_name)
-
     topic = "custom:topic"
+    Process.register(self(), :test_process)
 
     config =
       get_socket_config()
@@ -232,16 +251,13 @@ defmodule Phoenix.SocketClient.SocketTest do
       |> Keyword.put(:topic_channel_map, %{topic => MyTestChannel})
 
     {:ok, sup_pid} = Phoenix.SocketClient.Supervisor.start_link(config)
-
-    # The channel needs the socket to be connected to join
     wait_for_socket(name)
 
-    {:ok, _, _channel_pid} =
-      Phoenix.SocketClient.Channel.join(sup_pid, topic, %{
-        "test_pid_name" => Atom.to_string(test_process_name)
-      })
+    {:ok, _, _channel_pid} = Phoenix.SocketClient.Channel.join(sup_pid, topic)
 
-    assert_receive {:channel_started, ^topic}, 5000
+    Phoenix.SocketClientTest.Endpoint.broadcast(topic, "test_event", %{})
+
+    assert_receive :test_event_received, 5000
   end
 
   defp wait_for_socket(socket_name, retries \\ 300) do
