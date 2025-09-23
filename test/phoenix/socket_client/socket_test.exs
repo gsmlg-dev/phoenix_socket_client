@@ -215,7 +215,8 @@ defmodule Phoenix.SocketClient.SocketTest do
 
       {:ok, sup_pid} = Phoenix.SocketClient.Supervisor.start_link(config)
       wait_for_socket(name)
-      Process.sleep(100) # Give time for channels to join
+      # Give time for channels to join
+      Process.sleep(100)
 
       joined_channels = Phoenix.SocketClient.get_state(sup_pid, :joined_channels)
       assert Map.has_key?(joined_channels, "auto:join1")
