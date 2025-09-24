@@ -2,7 +2,7 @@
 
 [![release](https://github.com/gsmlg-dev/phoenix_socket_client/actions/workflows/release.yml/badge.svg)](https://github.com/gsmlg-dev/phoenix_socket_client/actions/workflows/release.yml)
 [![Hex.pm](https://img.shields.io/hexpm/v/phoenix_socket_client.svg)](https://hex.pm/packages/phoenix_socket_client)
-[![Documentation](https://img.shields.io/badge/documentation-grey)](https://hexdocs.pm/phoenix_socket_client)
+[![Documentation](https://img.shields.io/badge/documentation-v0.7.0-blue)](https://hexdocs.pm/phoenix_socket_client/0.7.0)
 
 Elixir client for Phoenix Channels WebSocket connections.
 
@@ -14,7 +14,7 @@ The package is available on [Hex.pm](https://hex.pm/packages/phoenix_socket_clie
 ```elixir
 def deps do
   [
-    {:phoenix_socket_client, "~> 0.4.0"}
+    {:phoenix_socket_client, "~> 0.7.0"}
   ]
 end
 ```
@@ -160,6 +160,9 @@ Phoenix.SocketClient.reconfigure(socket, params: %{"token" => "new-token"})
 | `:serializer` | `module()` | `Jason` | JSON serializer module |
 | `:vsn` | `String.t()` | `"2.0.0"` | Phoenix Channels protocol version (V1 is deprecated) |
 | `:topic_channel_map` | `map()` | `%_` | A map from a topic string to a channel module. |
+| `:join_channels` | `list()` | `[]` | A list of channels to automatically join on connect. |
+| `:default_channel_module` | `module()` | `Phoenix.SocketClient.Channel.EchoRoom` | The default channel module to use. |
+| `:default_channel_params` | `map()` | `%_` | The default parameters to use for channels. |
 
 ### Message Handling Examples
 
@@ -208,15 +211,15 @@ case Phoenix.SocketClient.Channel.join(socket, "rooms:private", %{user_id: 123})
   {:ok, response, channel} ->
     # Successfully joined channel
     IO.inspect(response)
-    
+
   {:error, :timeout} ->
     # Join request timed out
     IO.puts("Channel join timed out")
-    
+
   {:error, :unauthorized} ->
     # Not authorized to join this channel
     IO.puts("Not authorized to join channel")
-    
+
   {:error, reason} ->
     # Other join errors
     IO.puts("Failed to join channel: #{inspect(reason)}")
@@ -227,11 +230,11 @@ case Phoenix.SocketClient.Channel.push(channel, "new_msg", %{body: "Hello"}, 500
   {:ok, response} ->
     # Message sent successfully
     IO.inspect(response)
-    
+
   {:error, :timeout} ->
     # Push request timed out
     IO.puts("Message push timed out")
-    
+
   {:error, :channel_closed} ->
     # Channel was closed
     IO.puts("Channel is no longer available")

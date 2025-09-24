@@ -66,7 +66,7 @@ defmodule Phoenix.SocketClient.ChannelManager do
           |> Enum.find_value(fn
             {_id, process_pid, _, _} ->
               # id - it is always :undefined for dynamic supervisors
-              if :sys.get_state(process_pid).topic == topic do
+              if GenServer.call(process_pid, :get_topic) == topic do
                 process_pid
               else
                 nil
@@ -82,14 +82,24 @@ defmodule Phoenix.SocketClient.ChannelManager do
     end
   end
 
-  def start_channel(sup_pid, topic, params, channel_module \\ Phoenix.SocketClient.Channel.Room) do
+  @doc """
+  Starts a channel process.
+  """
+  @spec start_channel(pid(), String.t(), map(), module() | nil) :: {:ok, pid()} | {:error, term()}
+  def start_channel(sup_pid, topic, params, channel_module \\ nil) do
     socket_pid = get_process_pid(sup_pid, :socket)
     cm_pid = get_process_pid(sup_pid, :channel_manager)
     registry_name = get_state(sup_pid, :registry_name)
 
+    default_channel_module = get_state(sup_pid, :default_channel_module)
+    default_channel_params = get_state(sup_pid, :default_channel_params)
+
     channel_module =
-      (get_state(sup_pid, :topic_channel_map) || %{})
-      |> Map.get(topic, channel_module)
+      channel_module ||
+        (get_state(sup_pid, :topic_channel_map) || %{})
+        |> Map.get(topic, default_channel_module)
+
+    params = Map.merge(default_channel_params, params)
 
     spec =
       {channel_module, {sup_pid, socket_pid, topic, params, registry_name}}
@@ -118,10 +128,15 @@ defmodule Phoenix.SocketClient.ChannelManager do
     DynamicSupervisor.terminate_child(pid, channel)
   end
 
+  @impl true
   def init(_opts) do
     DynamicSupervisor.init(strategy: :one_for_one)
   end
 
+  @doc """
+  Terminates all channel processes.
+  """
+  @spec terminate(pid()) :: :ok
   def terminate(cm_pid) when is_pid(cm_pid) do
     DynamicSupervisor.which_children(cm_pid)
     |> Enum.each(fn {_id, process_pid, _, _} ->

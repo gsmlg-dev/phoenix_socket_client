@@ -1,4 +1,7 @@
 defmodule Phoenix.SocketClient.Socket do
+  @moduledoc """
+  The socket process for handling the WebSocket connection.
+  """
   use GenServer
 
   alias Phoenix.SocketClient.ChannelManager
@@ -222,12 +225,6 @@ defmodule Phoenix.SocketClient.Socket do
     else
       {:reply, {:error, :not_connected}, state}
     end
-  end
-
-  @impl true
-  def handle_call(not_matched, from, state) do
-    IO.inspect({:not_matched_handle_call, not_matched, from, state})
-    {:noreply, state}
   end
 
   defp transport_receive(message, %{sup_pid: sup_pid} = _state) do
