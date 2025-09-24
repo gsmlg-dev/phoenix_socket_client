@@ -86,7 +86,7 @@ defmodule Phoenix.SocketClient.ChannelManager do
   Starts a channel process.
   """
   @spec start_channel(pid(), String.t(), map(), module()) :: {:ok, pid()} | {:error, term()}
-  def start_channel(sup_pid, topic, params, channel_module \\ Phoenix.SocketClient.Channel.Room) do
+  def start_channel(sup_pid, topic, params, channel_module \\ Phoenix.SocketClient.Channel.EchoRoom) do
     socket_pid = get_process_pid(sup_pid, :socket)
     cm_pid = get_process_pid(sup_pid, :channel_manager)
     registry_name = get_state(sup_pid, :registry_name)
