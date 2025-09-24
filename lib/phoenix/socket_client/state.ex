@@ -33,7 +33,9 @@ defmodule Phoenix.SocketClient.State do
           },
           reconnecting: boolean(),
           registry_name: atom(),
-          join_channels: list(String.t())
+          join_channels: list(String.t()),
+          default_channel_module: module() | nil,
+          default_channel_params: map() | nil
         }
 
   @derive {Jason.Encoder,
@@ -72,6 +74,8 @@ defmodule Phoenix.SocketClient.State do
     joined_channels: %{},
     reconnecting: false,
     registry_name: nil,
-    join_channels: []
+    join_channels: [],
+    default_channel_module: nil,
+    default_channel_params: nil
   ]
 end

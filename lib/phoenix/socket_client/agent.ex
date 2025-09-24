@@ -161,7 +161,9 @@ defmodule Phoenix.SocketClient.Agent do
       ref: 0,
       custom: %{},
       registry_name: Registry.Channel,
-      join_channels: []
+      join_channels: [],
+      default_channel_module: Phoenix.SocketClient.Channel.EchoRoom,
+      default_channel_params: %{}
     }
 
     config = Map.merge(defaults, Enum.into(opts, %{}))
@@ -213,7 +215,9 @@ defmodule Phoenix.SocketClient.Agent do
       headers: config.headers,
       custom: config.custom,
       registry_name: config.registry_name,
-      join_channels: config.join_channels
+      join_channels: config.join_channels,
+      default_channel_module: config.default_channel_module,
+      default_channel_params: config.default_channel_params
     }
   end
 end

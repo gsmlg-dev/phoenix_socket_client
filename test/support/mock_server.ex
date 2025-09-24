@@ -108,6 +108,7 @@ defmodule Phoenix.SocketClientTest.AdminSocket do
   channel("topic:status", Phoenix.SocketClientTest.TopicChannel)
   channel("custom:*", Phoenix.SocketClientTest.RoomChannel)
   channel("auto:*", Phoenix.SocketClientTest.RoomChannel)
+  channel("test:*", Phoenix.SocketClientTest.RoomChannel)
 
   def connect(params, socket, connect_info) do
     on_connect(self(), %{
@@ -182,6 +183,10 @@ defmodule Phoenix.SocketClientTest.RoomChannel do
     {:ok, message, socket}
   end
 
+  def join("test:" <> _, message, socket) do
+    {:ok, message, socket}
+  end
+
   def handle_info({:after_join, user_id}, socket) do
     push(socket, "user:entered", %{"user" => user_id})
     {:noreply, socket}
@@ -202,6 +207,11 @@ defmodule Phoenix.SocketClientTest.RoomChannel do
 
   def handle_in("foo:bar", _message, socket) do
     {:noreply, socket}
+  end
+
+  def handle_in("test_event", message, socket) do
+    broadcast!(socket, "test_event", message)
+    {:reply, {:ok, message}, socket}
   end
 end
 

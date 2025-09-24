@@ -23,6 +23,8 @@ defmodule Phoenix.SocketClient.Supervisor do
     * `:serializer` - The serializer to use.
     * `:vsn` - The Phoenix Channels protocol version.
     * `:topic_channel_map` - A map from a topic string to a channel module.
+    * `:default_channel_module` - The default channel module to use.
+    * `:default_channel_params` - The default parameters to use for channels.
 
   """
   @spec start_link(keyword()) :: Supervisor.on_start()

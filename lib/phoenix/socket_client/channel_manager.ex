@@ -85,15 +85,21 @@ defmodule Phoenix.SocketClient.ChannelManager do
   @doc """
   Starts a channel process.
   """
-  @spec start_channel(pid(), String.t(), map(), module()) :: {:ok, pid()} | {:error, term()}
-  def start_channel(sup_pid, topic, params, channel_module \\ Phoenix.SocketClient.Channel.EchoRoom) do
+  @spec start_channel(pid(), String.t(), map(), module() | nil) :: {:ok, pid()} | {:error, term()}
+  def start_channel(sup_pid, topic, params, channel_module \\ nil) do
     socket_pid = get_process_pid(sup_pid, :socket)
     cm_pid = get_process_pid(sup_pid, :channel_manager)
     registry_name = get_state(sup_pid, :registry_name)
 
+    default_channel_module = get_state(sup_pid, :default_channel_module)
+    default_channel_params = get_state(sup_pid, :default_channel_params)
+
     channel_module =
-      (get_state(sup_pid, :topic_channel_map) || %{})
-      |> Map.get(topic, channel_module)
+      channel_module ||
+        (get_state(sup_pid, :topic_channel_map) || %{})
+        |> Map.get(topic, default_channel_module)
+
+    params = Map.merge(default_channel_params, params)
 
     spec =
       {channel_module, {sup_pid, socket_pid, topic, params, registry_name}}
