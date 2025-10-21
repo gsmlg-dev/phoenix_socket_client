@@ -20,8 +20,8 @@ jobs:
       - name: Set up Elixir
         uses: erlef/setup-elixir@v1
         with:
-          elixir-version: '1.18.4'
-          otp-version: '28.0.2'
+          elixir-version: '1.18'
+          otp-version: '28'
 
       - name: Install dependencies
         run: mix deps.get
