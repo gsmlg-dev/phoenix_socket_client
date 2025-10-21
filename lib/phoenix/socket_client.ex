@@ -47,25 +47,43 @@ defmodule Phoenix.SocketClient do
 
   def get_process_pid(sup_pid, name) when is_pid(sup_pid) do
     try do
+      # First try to get registry name from the supervisor's state
       case Process.alive?(sup_pid) do
         false ->
           nil
 
         true ->
-          sup_pid
-          |> Supervisor.which_children()
-          |> Enum.find_value(fn
-            {process_name, process_pid, _, _} when is_pid(process_pid) and process_name == name ->
-              process_pid
+          # Get registry name from state for O(1) lookup
+          case get_state(sup_pid, :registry_name) do
+            nil ->
+              # Fallback to the old way if registry not found
+              fallback_process_discovery(sup_pid, name)
 
-            _ ->
-              nil
-          end)
+            registry_name ->
+              # Use Registry for O(1) lookup instead of O(n) Supervisor.which_children()
+              case Registry.lookup(registry_name, name) do
+                [{pid, _}] when is_pid(pid) -> pid
+                _ -> nil
+              end
+          end
       end
     rescue
       ArgumentError -> nil
       _ -> nil
     end
+  end
+
+  
+  # Fallback to the old discovery method (only used during transition)
+  defp fallback_process_discovery(sup_pid, name) do
+    sup_pid
+    |> Supervisor.which_children()
+    |> Enum.find_value(fn
+      {process_name, process_pid, _, _} when is_pid(process_pid) and process_name == name ->
+        process_pid
+      _ ->
+        nil
+    end)
   end
 
   @doc """

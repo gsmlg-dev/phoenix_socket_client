@@ -55,18 +55,35 @@ defmodule Phoenix.SocketClient.Supervisor do
 
     registry_name = Map.get(opts, :registry_name, default_registry_name)
 
-    opts = opts |> Map.put(:registry_name, registry_name)
+    # Get serializer from opts for MessageProcessor
+    serializer = Phoenix.SocketClient.Message.serializer(Map.get(opts, :vsn, "2.0.0"))
+    opts = opts |> Map.put(:registry_name, registry_name) |> Map.put(:serializer, serializer)
 
     children = [
       {Registry, keys: :unique, name: registry_name},
       {Phoenix.SocketClient.Agent, opts}
       |> Supervisor.child_spec(id: :socket_state),
+      {Phoenix.SocketClient.HibernationManager, opts}
+      |> Supervisor.child_spec(id: :hibernation_manager),
+      {Phoenix.SocketClient.RouteCache, opts}
+      |> Supervisor.child_spec(id: :route_cache),
+      {Phoenix.SocketClient.MessageProcessor, opts}
+      |> Supervisor.child_spec(id: :message_processor),
       {Phoenix.SocketClient.Socket, opts}
       |> Supervisor.child_spec(id: :socket),
       {Phoenix.SocketClient.ChannelManager, opts}
       |> Supervisor.child_spec(id: :channel_manager),
       {Task,
        fn ->
+         # Store registry name in agent state for fast access
+         Phoenix.SocketClient.Agent.put(self(), :registry_name, registry_name)
+
+         # Register socket process with hibernation manager
+         socket_pid = Phoenix.SocketClient.get_process_pid(sup_pid, :socket)
+         if socket_pid do
+           Phoenix.SocketClient.HibernationManager.register_process(socket_pid, {registry_name, :socket})
+         end
+
          if get_state(sup_pid, :auto_connect) do
            Process.sleep(1_000)
            connect(sup_pid)

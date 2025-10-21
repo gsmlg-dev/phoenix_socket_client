@@ -33,10 +33,12 @@ defmodule Phoenix.SocketClient.Mixfile do
       {:jason, "~> 1.2"},
       {:websocket_client, "~> 1.3"},
       {:telemetry, "~> 1.0"},
-      {:phoenix, "~> 1.7", only: :test},
-      {:phoenix_pubsub, "~> 2.0", only: :test},
-      {:bandit, "~> 1.0", only: :test},
-      {:ex_doc, "~> 0.18", only: :dev}
+      {:benchee, "~> 1.4", only: :dev},
+      {:benchee_html, "~> 1.0", only: :dev},
+      {:phoenix, "~> 1.8", only: :test},
+      {:phoenix_pubsub, "~> 2.1", only: :test},
+      {:bandit, "~> 1.8", only: :test},
+      {:ex_doc, "~> 0.38", only: :dev}
     ]
   end
 

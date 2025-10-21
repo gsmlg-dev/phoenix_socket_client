@@ -2,7 +2,7 @@ defmodule Phoenix.SocketClient.Message do
   @moduledoc """
   Defines the message structure and protocol for Phoenix Channels communication.
 
-  This module provides message encoding/decoding and handles both V1 and V2
+  This module provides message encoding/decoding for Phoenix Channels V2 protocol
   Phoenix Channels protocol versions. It defines the structure for messages
   sent between client and server.
 
@@ -18,9 +18,8 @@ defmodule Phoenix.SocketClient.Message do
 
   ## Protocol Versions
 
-  Supports both V1 and V2 Phoenix Channels protocols:
-  - V1: Legacy protocol with different message format
-  - V2: Current protocol with improved message structure
+  Supports Phoenix Channels V2 protocol:
+  - V2: Current protocol with improved message structure and performance
   """
 
   @typedoc """
@@ -46,21 +45,17 @@ defmodule Phoenix.SocketClient.Message do
   Returns the appropriate serializer module for the given protocol version.
 
   ## Parameters
-    * `vsn` - Protocol version string ("1.0.0" or "2.0.0")
+    * `vsn` - Protocol version string (supports V2 and higher)
 
   ## Returns
     * Module - Serializer module for the protocol version
 
   ## Deprecation Notice
-  V1 protocol ("1.0.0") is deprecated and will be removed in a future version.
+  V1 protocol has been removed for performance and maintainability.
   Use V2 protocol ("2.0.0") for new applications.
   """
   @spec serializer(String.t()) :: module()
-  def serializer("1.0.0") do
-    IO.warn("Phoenix Channels V1 protocol is deprecated. Use V2 (2.0.0) instead.")
-    __MODULE__.V1
-  end
-
+  
   def serializer("2.0.0"), do: __MODULE__.V2
   def serializer(_), do: __MODULE__.V2
 
@@ -68,7 +63,7 @@ defmodule Phoenix.SocketClient.Message do
   Decodes a raw message string into a Message struct.
 
   ## Parameters
-    * `serializer` - Serializer module (V1 or V2)
+    * `serializer` - Serializer module (V2)
     * `msg` - Raw JSON message string
     * `json_library` - JSON library module (e.g., Jason)
 
@@ -88,7 +83,7 @@ defmodule Phoenix.SocketClient.Message do
   Encodes a Message struct into a JSON string.
 
   ## Parameters
-    * `serializer` - Serializer module (V1 or V2)
+    * `serializer` - Serializer module (V2)
     * `msg` - Message struct to encode
     * `json_library` - JSON library module (e.g., Jason)
 

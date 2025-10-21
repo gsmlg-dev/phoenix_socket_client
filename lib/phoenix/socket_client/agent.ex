@@ -17,7 +17,7 @@ defmodule Phoenix.SocketClient.Agent do
 
   @heartbeat_interval 30_000
   @reconnect_interval 60_000
-  @default_transport Phoenix.SocketClient.Transports.Websocket
+  @default_transport Phoenix.SocketClient.Transports.OptimizedWebsocket
 
   @doc """
   Starts the Agent with the given configuration options.
@@ -31,7 +31,17 @@ defmodule Phoenix.SocketClient.Agent do
   @spec start_link(keyword() | map()) :: {:ok, pid()} | {:error, term()}
   def start_link(opts) do
     opts = if Keyword.keyword?(opts), do: opts, else: Map.to_list(opts)
-    Agent.start_link(fn -> init_state(opts) end)
+
+    # Extract registry name for process registration
+    registry_name = Keyword.get(opts, :registry_name)
+    name = Keyword.get(opts, :name, Phoenix.SocketClient)
+
+    case registry_name do
+      nil ->
+        Agent.start_link(fn -> init_state(opts) end)
+      _ ->
+        Agent.start_link(fn -> init_state(opts) end, name: {registry_name, :socket_state})
+    end
   end
 
   @doc """
@@ -140,6 +150,16 @@ defmodule Phoenix.SocketClient.Agent do
     end)
   end
 
+  @doc """
+  Updates the connection timestamp.
+  """
+  @spec update_connect_time(pid()) :: :ok
+  def update_connect_time(pid) do
+    Agent.update(pid, fn state ->
+      %{state | connect_time: System.monotonic_time(:millisecond)}
+    end)
+  end
+
   defp init_state(opts) do
     defaults = %{
       json_library: Jason,
@@ -194,6 +214,18 @@ defmodule Phoenix.SocketClient.Agent do
       config.transport_opts
       |> Keyword.put_new(:extra_headers, config.headers)
       |> Keyword.put_new(:keepalive, config.heartbeat_interval)
+      |> Keyword.put_new(:tcp_opts, [
+        nodelay: true,
+        keepalive: true,
+        buffer: 64 * 1024,
+        send_buffer: 32 * 1024,
+        recv_buffer: 32 * 1024,
+        keepalive_idle: 7200,
+        keepalive_interval: 75,
+        keepalive_count: 9
+      ])
+      |> Keyword.put_new(:connect_timeout, 10_000)
+      |> Keyword.put_new(:compression, false)  # Can be enabled by user
 
     %State{
       url: base_url,

@@ -36,7 +36,9 @@ defmodule Phoenix.SocketClient.ChannelManager do
   @spec start_link(keyword() | map()) :: {:ok, pid()} | {:error, term()}
   def start_link(opts) do
     opts = if Keyword.keyword?(opts), do: opts, else: Map.to_list(opts)
-    DynamicSupervisor.start_link(__MODULE__, opts)
+    registry_name = Keyword.get(opts, :registry_name)
+    name = if registry_name, do: {registry_name, :channel_manager}, else: nil
+    DynamicSupervisor.start_link(__MODULE__, opts, name: name)
   end
 
   @doc """
@@ -61,20 +63,30 @@ defmodule Phoenix.SocketClient.ChannelManager do
           nil
 
         true ->
-          sup_pid
-          |> Supervisor.which_children()
-          |> Enum.find_value(fn
-            {_id, process_pid, _, _} ->
-              # id - it is always :undefined for dynamic supervisors
-              if GenServer.call(process_pid, :get_topic) == topic do
-                process_pid
-              else
-                nil
-              end
+          # Fast O(1) Registry lookup instead of O(n) Supervisor.which_children()
+          case get_state(sup_pid, :registry_name) do
+            nil ->
+              # Fallback to old method during initialization
+              sup_pid
+              |> Supervisor.which_children()
+              |> Enum.find_value(fn
+                {_id, process_pid, _, _} ->
+                  # id - it is always :undefined for dynamic supervisors
+                  if GenServer.call(process_pid, :get_topic) == topic do
+                    process_pid
+                  else
+                    nil
+                  end
 
-            _ ->
-              nil
-          end)
+                _ ->
+                  nil
+                end)
+            registry_name ->
+              case Registry.lookup(registry_name, topic) do
+                [{pid, _}] -> pid
+                [] -> nil
+              end
+          end
       end
     rescue
       ArgumentError -> nil
