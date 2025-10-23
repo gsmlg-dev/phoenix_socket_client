@@ -99,6 +99,8 @@ defmodule Phoenix.SocketClient.MessageProcessor do
   def init(opts) do
     Process.flag(:trap_exit, true)
 
+    opts = if Keyword.keyword?(opts), do: opts, else: Enum.into(opts, [])
+
     serializer = Keyword.fetch!(opts, :serializer)
     json_library = Keyword.get(opts, :json_library, Jason)
     registry_name = Keyword.get(opts, :registry_name)
@@ -109,7 +111,7 @@ defmodule Phoenix.SocketClient.MessageProcessor do
       pool_size: Keyword.get(opts, :binary_pool_size, 1000),
       cleanup_interval: Keyword.get(opts, :binary_cleanup_interval, 30_000),
       max_age: Keyword.get(opts, :binary_max_age, 300_000),
-      registry_name: registry_name
+      registry_name: nil  # No registry for binary pool
     ])
 
     # Start route cache for message routing
@@ -117,7 +119,7 @@ defmodule Phoenix.SocketClient.MessageProcessor do
       cache_size: Keyword.get(opts, :route_cache_size, 1000),
       ttl: Keyword.get(opts, :route_cache_ttl, 300_000),
       cleanup_interval: Keyword.get(opts, :route_cleanup_interval, 60_000),
-      registry_name: registry_name
+      registry_name: nil  # No registry for route cache
     ])
 
     state = %__MODULE__{
@@ -249,7 +251,7 @@ defmodule Phoenix.SocketClient.MessageProcessor do
   # Private helper functions
 
   defp message_name(nil), do: __MODULE__
-  defp message_name(registry_name), do: {registry_name, :message_processor}
+  defp message_name(registry_name), do: {:via, Registry, {registry_name, :message_processor}}
 
   defp start_worker_supervisor(concurrency, serializer, json_library, binary_pool_pid) do
     children = for i <- 1..concurrency do
@@ -274,7 +276,7 @@ defmodule Phoenix.SocketClient.MessageProcessor do
   end
 
   defp process_encode_batch_sync(batch, serializer, json_library, binary_pool_pid) do
-    Enum.map(batch, fn {_op, message, caller, ref} ->
+    Enum.map(batch, fn {_op, message, _caller, ref} ->
       try do
         # Encode the message
         result = Message.encode!(serializer, message, json_library)
@@ -290,8 +292,8 @@ defmodule Phoenix.SocketClient.MessageProcessor do
     end)
   end
 
-  defp process_decode_batch_sync(batch, serializer, json_library, binary_pool_pid) do
-    Enum.map(batch, fn {_op, raw_message, caller, ref} ->
+  defp process_decode_batch_sync(batch, serializer, json_library, _binary_pool_pid) do
+    Enum.map(batch, fn {_op, raw_message, _caller, ref} ->
       try do
         result = Message.decode!(serializer, raw_message, json_library)
         {ref, {:ok, result}}

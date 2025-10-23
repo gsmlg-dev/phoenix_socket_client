@@ -4,17 +4,10 @@ defmodule Phoenix.SocketClient.ProtocolVersionTest do
   alias Phoenix.SocketClient.Message
 
   describe "Message serialization" do
-    test "V1 protocol serialization" do
-      message = Message.join("rooms:test", %{user_id: 123})
-      encoded = Message.encode!(Message.V1, message, Jason)
-
-      assert is_binary(encoded)
-
-      # Decode back and verify
-      decoded = Message.decode!(Message.V1, encoded, Jason)
-      assert decoded.topic == "rooms:test"
-      assert decoded.event == "phx_join"
-      assert decoded.payload == %{"user_id" => 123}
+    test "V1 protocol deprecated" do
+      # V1 protocol has been removed and defaults to V2
+      assert Message.serializer("1.0.0") == Message.V2
+      assert Message.serializer("2.0.0") == Message.V2
     end
 
     test "V2 protocol serialization" do

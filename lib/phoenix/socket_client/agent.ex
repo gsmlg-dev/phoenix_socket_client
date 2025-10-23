@@ -34,13 +34,13 @@ defmodule Phoenix.SocketClient.Agent do
 
     # Extract registry name for process registration
     registry_name = Keyword.get(opts, :registry_name)
-    name = Keyword.get(opts, :name, Phoenix.SocketClient)
+    _name = Keyword.get(opts, :name, Phoenix.SocketClient)
 
     case registry_name do
       nil ->
         Agent.start_link(fn -> init_state(opts) end)
       _ ->
-        Agent.start_link(fn -> init_state(opts) end, name: {registry_name, :socket_state})
+        Agent.start_link(fn -> init_state(opts) end, name: {:via, Registry, {registry_name, :socket_state}})
     end
   end
 

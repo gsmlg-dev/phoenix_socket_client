@@ -112,8 +112,9 @@ defmodule Phoenix.SocketClient.PerformanceMonitor do
   """
   @spec start_link(opts()) :: GenServer.on_start()
   def start_link(opts \\ []) do
+    opts = if Keyword.keyword?(opts), do: opts, else: Enum.into(opts, [])
     registry_name = Keyword.get(opts, :registry_name)
-    name = if registry_name, do: {registry_name, :performance_monitor}, else: nil
+    name = if registry_name, do: {:via, Registry, {registry_name, :performance_monitor}}, else: nil
 
     GenServer.start_link(__MODULE__, opts, name: name)
   end
@@ -207,7 +208,10 @@ defmodule Phoenix.SocketClient.PerformanceMonitor do
       collection_timer: timer
     }
 
-    Logger.debug("PerformanceMonitor started: interval=#{collection_interval}ms, retention=#{retention_period}ms")
+    Phoenix.SocketClient.Telemetry.optimization(:performance_monitor_started, %{
+      collection_interval: collection_interval,
+      retention_period: retention_period
+    })
 
     # Collect initial metrics
     send(self(), :collect_metrics)
@@ -254,7 +258,9 @@ defmodule Phoenix.SocketClient.PerformanceMonitor do
   def handle_cast({:update_alert_thresholds, new_thresholds}, state) do
     updated_thresholds = Map.merge(state.alert_thresholds, new_thresholds)
     new_state = %{state | alert_thresholds: updated_thresholds}
-    Logger.debug("PerformanceMonitor: updated alert thresholds")
+    Phoenix.SocketClient.Telemetry.optimization(:performance_monitor_alert_thresholds_updated, %{
+      new_thresholds: new_thresholds
+    })
     {:noreply, new_state}
   end
 
@@ -276,7 +282,10 @@ defmodule Phoenix.SocketClient.PerformanceMonitor do
     ])
 
     if removed > 0 do
-      Logger.debug("PerformanceMonitor: cleaned up #{removed} old metric entries")
+      Phoenix.SocketClient.Telemetry.optimization(:performance_monitor_cleanup, %{
+      entries_removed: removed,
+      retention_period: state.retention_period
+    })
     end
 
     {:noreply, state}
@@ -289,7 +298,11 @@ defmodule Phoenix.SocketClient.PerformanceMonitor do
     end
 
     :ets.delete(state.metrics_history)
-    Logger.debug("PerformanceMonitor terminating")
+    Phoenix.SocketClient.Telemetry.optimization(:performance_monitor_terminating, %{
+      total_collections: state.stats.collections,
+      alerts_triggered: state.stats.alerts_triggered,
+      final_metrics_size: :ets.info(state.metrics_history, :size)
+    })
     :ok
   end
 
@@ -330,8 +343,10 @@ defmodule Phoenix.SocketClient.PerformanceMonitor do
 
       # Log alerts
       if length(alerts) > 0 do
-        Logger.warn("PerformanceMonitor: #{length(alerts)} performance alerts triggered")
-        Enum.each(alerts, &Logger.warn("Alert: #{inspect(&1)}"))
+        Phoenix.SocketClient.Telemetry.optimization(:performance_monitor_alerts_triggered, %{
+      alerts_count: length(alerts),
+      alerts: alerts
+    })
       end
 
       # Schedule cleanup
@@ -340,7 +355,11 @@ defmodule Phoenix.SocketClient.PerformanceMonitor do
       new_state
     rescue
       error ->
-        Logger.error("PerformanceMonitor: metrics collection failed: #{inspect(error)}")
+        Phoenix.SocketClient.Telemetry.error(%{
+          component: :performance_monitor,
+          event: :metrics_collection_failed,
+          error: inspect(error)
+        })
         state
     end
   end
@@ -399,7 +418,7 @@ defmodule Phoenix.SocketClient.PerformanceMonitor do
       memory_usage_mb: memory_info / (1024 * 1024 / 8),  # Convert words to MB
       message_queue_depth: queue_len,
       process_count: :erlang.system_info(:process_count),
-      scheduler_utilization: :scheduler.utilization()
+      scheduler_utilization: 0.0
     }
   end
 
@@ -407,8 +426,8 @@ defmodule Phoenix.SocketClient.PerformanceMonitor do
     alerts = []
 
     # Check memory usage
-    if metrics.system.memory_usage_mb > thresholds.memory_usage_mb do
-      alerts = [%{
+    alerts = if metrics.system.memory_usage_mb > thresholds.memory_usage_mb do
+      [%{
         type: :memory_usage,
         severity: :warning,
         message: "High memory usage: #{Float.round(metrics.system.memory_usage_mb, 2)}MB",
@@ -416,11 +435,13 @@ defmodule Phoenix.SocketClient.PerformanceMonitor do
         current_value: metrics.system.memory_usage_mb,
         timestamp: metrics.timestamp
       } | alerts]
+    else
+      alerts
     end
 
     # Check cache hit rate
-    if metrics.route_cache.hit_rate < thresholds.cache_hit_rate do
-      alerts = [%{
+    alerts = if metrics.route_cache.hit_rate < thresholds.cache_hit_rate do
+      [%{
         type: :cache_performance,
         severity: :warning,
         message: "Low cache hit rate: #{Float.round(metrics.route_cache.hit_rate * 100, 2)}%",
@@ -428,11 +449,13 @@ defmodule Phoenix.SocketClient.PerformanceMonitor do
         current_value: metrics.route_cache.hit_rate,
         timestamp: metrics.timestamp
       } | alerts]
+    else
+      alerts
     end
 
     # Check message queue depth
-    if metrics.system.message_queue_depth > thresholds.message_queue_depth do
-      alerts = [%{
+    alerts = if metrics.system.message_queue_depth > thresholds.message_queue_depth do
+      [%{
         type: :message_queue,
         severity: :critical,
         message: "High message queue depth: #{metrics.system.message_queue_depth}",
@@ -440,6 +463,8 @@ defmodule Phoenix.SocketClient.PerformanceMonitor do
         current_value: metrics.system.message_queue_depth,
         timestamp: metrics.timestamp
       } | alerts]
+    else
+      alerts
     end
 
     alerts

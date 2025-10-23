@@ -25,7 +25,8 @@ defmodule Phoenix.SocketClient.ConnectionFailureTest do
   end
 
   test "handles protocol version selection" do
-    assert Phoenix.SocketClient.Message.serializer("1.0.0") == Phoenix.SocketClient.Message.V1
+    # V1 protocol has been deprecated and defaults to V2
+    assert Phoenix.SocketClient.Message.serializer("1.0.0") == Phoenix.SocketClient.Message.V2
     assert Phoenix.SocketClient.Message.serializer("2.0.0") == Phoenix.SocketClient.Message.V2
     assert Phoenix.SocketClient.Message.serializer("invalid") == Phoenix.SocketClient.Message.V2
   end

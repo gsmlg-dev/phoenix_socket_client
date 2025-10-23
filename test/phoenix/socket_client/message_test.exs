@@ -3,29 +3,11 @@ defmodule Phoenix.SocketClient.MessageTest do
 
   alias Phoenix.SocketClient.Message
 
-  describe "v1 serializer" do
-    test "encode" do
-      msg = %{
-        ref: "1",
-        topic: "1234",
-        event: "new:thing",
-        payload: %{"a" => "b"}
-      }
-
-      v1_msg = Message.V1.encode!(struct(Message, msg))
-      assert msg == v1_msg
-    end
-
-    test "decode" do
-      msg = %{
-        "ref" => "1",
-        "topic" => "1234",
-        "event" => "new:thing",
-        "payload" => %{"a" => "b"}
-      }
-
-      v1_msg = Message.V1.decode!(msg)
-      assert to_struct(Message, msg) == v1_msg
+  describe "v1 serializer deprecated" do
+    test "V1 serializer no longer available" do
+      # V1 protocol has been deprecated and removed
+      # All versions now default to V2
+      assert Message.serializer("1.0.0") == Message.V2
     end
   end
 

@@ -77,8 +77,9 @@ defmodule Phoenix.SocketClient.BinaryPool do
   """
   @spec start_link(opts()) :: GenServer.on_start()
   def start_link(opts \\ []) do
+    opts = if Keyword.keyword?(opts), do: opts, else: Enum.into(opts, [])
     registry_name = Keyword.get(opts, :registry_name)
-    name = if registry_name, do: {registry_name, :binary_pool}, else: nil
+    name = if registry_name, do: {:via, Registry, {registry_name, :binary_pool}}, else: nil
 
     GenServer.start_link(__MODULE__, opts, name: name)
   end
@@ -320,7 +321,11 @@ defmodule Phoenix.SocketClient.BinaryPool do
     }
 
     if removed_count > 0 do
-      Logger.debug("BinaryPool cleanup: removed #{removed_count} patterns, freed #{removed_memory} bytes")
+      Phoenix.SocketClient.Telemetry.optimization(:binary_pool_cleanup, %{
+      patterns_removed: removed_count,
+      memory_freed_bytes: removed_memory,
+      pool_size: map_size(state.patterns)
+    })
     end
 
     {:noreply, new_state}
@@ -328,19 +333,27 @@ defmodule Phoenix.SocketClient.BinaryPool do
 
   @impl true
   def terminate(_reason, state) do
-    Logger.debug("BinaryPool terminating with #{map_size(state.patterns)} patterns")
+    Phoenix.SocketClient.Telemetry.optimization(:binary_pool_terminating, %{
+      patterns_count: map_size(state.patterns),
+      total_memory: state.total_memory
+    })
     :ok
   end
 
   # Private helper functions
 
-  defp warm_up_common_patterns(state) do
+  defp warm_up_common_patterns(_state) do
     try do
       patterns = common_patterns()
       GenServer.call(self(), {:warm_up, patterns}, 5000)
-      Logger.debug("BinaryPool warmed up with #{length(patterns)} common patterns")
+      Phoenix.SocketClient.Telemetry.optimization(:binary_pool_warmup, %{
+      patterns_count: length(patterns)
+    })
     catch
-      :exit, _ -> Logger.debug("BinaryPool warm-up failed (server terminating)")
+      :exit, _ ->
+      Phoenix.SocketClient.Telemetry.optimization(:binary_pool_warmup_failed, %{
+        reason: :server_terminating
+      })
     end
   end
 

@@ -8,10 +8,8 @@ defmodule Phoenix.SocketClient.Performance.OptimizationTest do
 
   use ExUnit.Case, async: false
 
-  alias Phoenix.SocketClient
   alias Phoenix.SocketClient.BinaryPool
   alias Phoenix.SocketClient.RouteCache
-  alias Phoenix.SocketClient.HibernationManager
   alias Phoenix.SocketClient.Router
 
   @moduletag :performance
@@ -198,7 +196,7 @@ defmodule Phoenix.SocketClient.Performance.OptimizationTest do
       {:ok, route_cache_pid} = RouteCache.start_link(registry_name: registry_name)
 
       topic = "benchmark:test"
-      channel_pid = self()
+      _channel_pid = self()
       Registry.register(registry_name, topic, nil)
 
       # Warm up cache

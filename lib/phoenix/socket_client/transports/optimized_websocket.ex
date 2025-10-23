@@ -82,7 +82,11 @@ defmodule Phoenix.SocketClient.Transports.OptimizedWebsocket do
     |> Keyword.put(:socket_opts, tcp_opts)
     |> Keyword.put(:timeout, Keyword.get(transport_opts, :connect_timeout, 10_000))
 
-    Logger.debug("OptimizedWebsocket: connecting to #{url} with TCP optimizations")
+    Phoenix.SocketClient.Telemetry.connection_start(%{
+      url: url,
+      transport: :optimized_websocket,
+      tcp_opts: tcp_opts
+    })
 
     case :websocket_client.start_link(
       String.to_charlist(url),
@@ -91,11 +95,20 @@ defmodule Phoenix.SocketClient.Transports.OptimizedWebsocket do
       extra_headers: headers
     ) do
       {:ok, pid} ->
-        Logger.debug("OptimizedWebsocket: connected to #{url}")
+        Phoenix.SocketClient.Telemetry.connection_stop(%{
+          url: url,
+          transport: :optimized_websocket,
+          transport_pid: pid,
+          status: :connected
+        })
         {:ok, pid}
 
       {:error, reason} ->
-        Logger.warn("OptimizedWebsocket: failed to connect to #{url}: #{inspect(reason)}")
+        Phoenix.SocketClient.Telemetry.connection_error(%{
+          url: url,
+          transport: :optimized_websocket,
+          error: reason
+        })
         {:error, reason}
     end
   end
@@ -106,7 +119,11 @@ defmodule Phoenix.SocketClient.Transports.OptimizedWebsocket do
   Performs graceful shutdown with cleanup.
   """
   def close(socket) do
-    Logger.debug("OptimizedWebsocket: closing connection")
+    Phoenix.SocketClient.Telemetry.emit_event(
+      [:phoenix, :socket_client, :transport, :close],
+      %{system_time: System.system_time()},
+      %{transport: :optimized_websocket, socket: socket}
+    )
     send(socket, :close)
   end
 
@@ -149,7 +166,15 @@ defmodule Phoenix.SocketClient.Transports.OptimizedWebsocket do
   def onconnect(_req, state) do
     connect_time = System.monotonic_time(:millisecond) - state.metrics.connect_time
 
-    Logger.debug("OptimizedWebsocket: connection established in #{connect_time}ms")
+    Phoenix.SocketClient.Telemetry.emit_event(
+      [:phoenix, :socket_client, :transport, :connected],
+      %{duration: connect_time},
+      %{
+        transport: :optimized_websocket,
+        connect_time: connect_time,
+        tcp_opts: state.tcp_opts
+      }
+    )
 
     # Apply TCP socket optimizations if supported
     apply_socket_optimizations(self(), state.tcp_opts)
@@ -166,11 +191,29 @@ defmodule Phoenix.SocketClient.Transports.OptimizedWebsocket do
   Logs disconnection metrics and performs cleanup.
   """
   def ondisconnect(reason, state) do
-    Logger.debug("OptimizedWebsocket: disconnected - #{inspect(reason)}")
+    Phoenix.SocketClient.Telemetry.emit_event(
+      [:phoenix, :socket_client, :transport, :disconnected],
+      %{system_time: System.system_time()},
+      %{
+        transport: :optimized_websocket,
+        reason: reason,
+        metrics: state.metrics
+      }
+    )
 
     # Report final metrics
     final_metrics = state.metrics
-    Logger.debug("OptimizedWebsocket: session stats - sent: #{final_metrics.messages_sent}, received: #{final_metrics.messages_received}")
+    Phoenix.SocketClient.Telemetry.emit_event(
+      [:phoenix, :socket_client, :transport, :session_stats],
+      %{
+        messages_sent: final_metrics.messages_sent,
+        messages_received: final_metrics.messages_received,
+        bytes_sent: final_metrics.bytes_sent,
+        bytes_received: final_metrics.bytes_received,
+        session_duration: System.monotonic_time(:millisecond) - final_metrics.connect_time
+      },
+      %{transport: :optimized_websocket}
+    )
 
     send(state.sender, {:disconnected, reason, self()})
     {:close, :normal, state}
@@ -219,7 +262,11 @@ defmodule Phoenix.SocketClient.Transports.OptimizedWebsocket do
   end
 
   def websocket_handle(other_msg, _req, state) do
-    Logger.warning("OptimizedWebsocket: unknown message #{inspect(other_msg)}")
+    Phoenix.SocketClient.Telemetry.error(%{
+      transport: :optimized_websocket,
+      event: :unknown_message,
+      message: other_msg
+    })
     {:ok, state}
   end
 
@@ -264,7 +311,11 @@ defmodule Phoenix.SocketClient.Transports.OptimizedWebsocket do
   end
 
   def websocket_terminate(_reason, _conn_state, _state) do
-    Logger.debug("OptimizedWebsocket: connection terminated")
+    Phoenix.SocketClient.Telemetry.emit_event(
+      [:phoenix, :socket_client, :transport, :terminated],
+      %{system_time: System.system_time()},
+      %{transport: :optimized_websocket}
+    )
     :ok
   end
 
@@ -337,14 +388,26 @@ defmodule Phoenix.SocketClient.Transports.OptimizedWebsocket do
             socket when is_port(socket) ->
               apply_socket_options(socket, tcp_opts)
             _ ->
-              Logger.debug("OptimizedWebsocket: socket not accessible for optimization")
+              Phoenix.SocketClient.Telemetry.debug(%{
+                  transport: :optimized_websocket,
+                  event: :socket_not_accessible,
+                  message: "socket not accessible for optimization"
+                })
           end
         _ ->
-          Logger.debug("OptimizedWebsocket: cannot access socket for optimization")
+          Phoenix.SocketClient.Telemetry.debug(%{
+                transport: :optimized_websocket,
+                event: :socket_access_failed,
+                message: "cannot access socket for optimization"
+              })
       end
     catch
       _, error ->
-        Logger.debug("OptimizedWebsocket: socket optimization failed: #{inspect(error)}")
+      Phoenix.SocketClient.Telemetry.debug(%{
+          transport: :optimized_websocket,
+          event: :socket_optimization_failed,
+          error: inspect(error)
+        })
     end
   end
 
@@ -353,7 +416,12 @@ defmodule Phoenix.SocketClient.Transports.OptimizedWebsocket do
   defp apply_socket_options(socket, [opt | rest]) do
     case :inet.setopts(socket, [opt]) do
       :ok -> apply_socket_options(socket, rest)
-      {:error, reason} -> Logger.debug("OptimizedWebsocket: failed to set #{inspect(opt)}: #{inspect(reason)}")
+      {:error, reason} -> Phoenix.SocketClient.Telemetry.debug(%{
+                         transport: :optimized_websocket,
+                         event: :socket_option_failed,
+                         option: inspect(opt),
+                         reason: inspect(reason)
+                       })
     end
   end
 
