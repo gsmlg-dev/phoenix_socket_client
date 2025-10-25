@@ -169,7 +169,11 @@ defmodule Phoenix.SocketClient.Channel.Helpers do
 
   defp maybe_emit_join_duration(%{join_start_time: nil}), do: :ok
 
-  defp maybe_emit_join_duration(%{join_start_time: start_time, socket_pid: socket_pid, topic: topic}) do
+  defp maybe_emit_join_duration(%{
+         join_start_time: start_time,
+         socket_pid: socket_pid,
+         topic: topic
+       }) do
     duration = System.monotonic_time() - start_time
     Telemetry.channel_join_duration(socket_pid, topic, duration)
   end
