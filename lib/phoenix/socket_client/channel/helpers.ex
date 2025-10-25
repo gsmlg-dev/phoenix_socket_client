@@ -119,47 +119,7 @@ defmodule Phoenix.SocketClient.Channel.Helpers do
       case Enum.split_with(pushes, &(elem(&1, 1).ref == ref)) do
         {[{from_ref, _push}], pushes} ->
           %{"status" => status, "response" => response} = msg.payload
-
-          case status do
-            "ok" ->
-              if ref == join_ref do
-                if s.join_start_time do
-                  duration = System.monotonic_time() - s.join_start_time
-                  Telemetry.channel_join_duration(s.socket_pid, s.topic, duration)
-                end
-
-                Phoenix.SocketClient.update_channel_status(
-                  s.sup_pid,
-                  self(),
-                  s.topic,
-                  :joined,
-                  params
-                )
-
-                Telemetry.channel_joined(s.sup_pid, s.topic, self(), msg.payload, %{})
-              end
-
-              Telemetry.message_received(self(), topic, "phx_reply", msg.payload)
-
-            "error" ->
-              if ref == join_ref do
-                Phoenix.SocketClient.update_channel_status(
-                  s.sup_pid,
-                  self(),
-                  s.topic,
-                  :errored,
-                  params
-                )
-
-                Telemetry.channel_join_error(s.sup_pid, s.topic, msg.payload, %{})
-              end
-
-              Telemetry.message_received(self(), topic, "phx_reply", msg.payload)
-
-            _ ->
-              :noop
-          end
-
+          handle_reply_status(status, ref, join_ref, topic, msg, s, params)
           GenServer.reply(from_ref, {String.to_atom(status), response})
           pushes
 
@@ -169,6 +129,49 @@ defmodule Phoenix.SocketClient.Channel.Helpers do
       end
 
     {:noreply, %State{s | pushes: pushes}}
+  end
+
+  defp handle_reply_status("ok", ref, join_ref, topic, msg, s, params) do
+    if ref == join_ref do
+      maybe_emit_join_duration(s)
+
+      Phoenix.SocketClient.update_channel_status(
+        s.sup_pid,
+        self(),
+        s.topic,
+        :joined,
+        params
+      )
+
+      Telemetry.channel_joined(s.sup_pid, s.topic, self(), msg.payload, %{})
+    end
+
+    Telemetry.message_received(self(), topic, "phx_reply", msg.payload)
+  end
+
+  defp handle_reply_status("error", ref, join_ref, topic, msg, s, params) do
+    if ref == join_ref do
+      Phoenix.SocketClient.update_channel_status(
+        s.sup_pid,
+        self(),
+        s.topic,
+        :errored,
+        params
+      )
+
+      Telemetry.channel_join_error(s.sup_pid, s.topic, msg.payload, %{})
+    end
+
+    Telemetry.message_received(self(), topic, "phx_reply", msg.payload)
+  end
+
+  defp handle_reply_status(_, _, _, _, _, _, _), do: :noop
+
+  defp maybe_emit_join_duration(%{join_start_time: nil}), do: :ok
+
+  defp maybe_emit_join_duration(%{join_start_time: start_time, socket_pid: socket_pid, topic: topic}) do
+    duration = System.monotonic_time() - start_time
+    Telemetry.channel_join_duration(socket_pid, topic, duration)
   end
 
   @doc """

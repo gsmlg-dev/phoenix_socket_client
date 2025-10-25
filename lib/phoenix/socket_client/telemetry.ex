@@ -1395,33 +1395,45 @@ defmodule Phoenix.SocketClient.Telemetry do
 
   defp get_action_from_event(event_name) do
     case event_name do
-      [:phoenix, :socket_client, :connection, :start] -> "connecting"
-      [:phoenix, :socket_client, :connection, :stop] -> "connected"
-      [:phoenix, :socket_client, :connection, :error] -> "connection failed"
-      [:phoenix, :socket_client, :connection, :established, :start] -> "connection established"
-      [:phoenix, :socket_client, :connection, :established, :stop] -> "connection ended"
+      [:phoenix, :socket_client, :connection | rest] -> connection_action(rest)
       [:phoenix, :socket_client, :reconnection, :attempt] -> "reconnecting"
-      [:phoenix, :socket_client, :channel, :join, :start] -> "joining channel"
-      [:phoenix, :socket_client, :channel, :join, :stop] -> "joined channel"
-      [:phoenix, :socket_client, :channel, :join, :error] -> "channel join failed"
-      [:phoenix, :socket_client, :channel, :active, :start] -> "channel active"
-      [:phoenix, :socket_client, :channel, :active, :stop] -> "channel inactive"
-      [:phoenix, :socket_client, :channel, :leave] -> "left channel"
-      [:phoenix, :socket_client, :channel, :push] -> "pushed message"
-      [:phoenix, :socket_client, :channel, :reply] -> "received reply"
-      [:phoenix, :socket_client, :message, :sent] -> "sent message"
-      [:phoenix, :socket_client, :message, :received] -> "received message"
-      [:phoenix, :socket_client, :message, :encode, :start] -> "encoding message"
-      [:phoenix, :socket_client, :message, :encode, :stop] -> "encoded message"
-      [:phoenix, :socket_client, :message, :decode, :start] -> "decoding message"
-      [:phoenix, :socket_client, :message, :decode, :stop] -> "decoded message"
-      [:phoenix, :socket_client, :heartbeat, :sent] -> "heartbeat sent"
-      [:phoenix, :socket_client, :heartbeat, :timeout] -> "heartbeat timeout"
+      [:phoenix, :socket_client, :channel | rest] -> channel_action(rest)
+      [:phoenix, :socket_client, :message | rest] -> message_action(rest)
+      [:phoenix, :socket_client, :heartbeat | rest] -> heartbeat_action(rest)
       [:phoenix, :socket_client, :error] -> "error occurred"
       [:phoenix, :socket_client, :optimization, _type] -> "optimization event"
       _ -> "unknown event"
     end
   end
+
+  defp connection_action([:start]), do: "connecting"
+  defp connection_action([:stop]), do: "connected"
+  defp connection_action([:error]), do: "connection failed"
+  defp connection_action([:established, :start]), do: "connection established"
+  defp connection_action([:established, :stop]), do: "connection ended"
+  defp connection_action(_), do: "connection event"
+
+  defp channel_action([:join, :start]), do: "joining channel"
+  defp channel_action([:join, :stop]), do: "joined channel"
+  defp channel_action([:join, :error]), do: "channel join failed"
+  defp channel_action([:active, :start]), do: "channel active"
+  defp channel_action([:active, :stop]), do: "channel inactive"
+  defp channel_action([:leave]), do: "left channel"
+  defp channel_action([:push]), do: "pushed message"
+  defp channel_action([:reply]), do: "received reply"
+  defp channel_action(_), do: "channel event"
+
+  defp message_action([:sent]), do: "sent message"
+  defp message_action([:received]), do: "received message"
+  defp message_action([:encode, :start]), do: "encoding message"
+  defp message_action([:encode, :stop]), do: "encoded message"
+  defp message_action([:decode, :start]), do: "decoding message"
+  defp message_action([:decode, :stop]), do: "decoded message"
+  defp message_action(_), do: "message event"
+
+  defp heartbeat_action([:sent]), do: "heartbeat sent"
+  defp heartbeat_action([:timeout]), do: "heartbeat timeout"
+  defp heartbeat_action(_), do: "heartbeat event"
 
   defp get_component_from_event(event_name) do
     case event_name do
