@@ -5,7 +5,7 @@ let
   pkgs-unstable = import inputs.nixpkgs-unstable { system = pkgs.stdenv.system; };
 in
 {
-  env.GREET = "Phoenix Socket Client";
+  env.GREET = "Phoenix SocketClient";
 
   packages = [
     pkgs-stable.git
