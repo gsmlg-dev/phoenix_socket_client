@@ -24,12 +24,17 @@ defmodule Phoenix.SocketClient.StateTest do
       registry_name = :"Registry.Channel_#{System.unique_integer([:positive])}"
 
       {:ok, _pid} =
-        Phoenix.SocketClient.Supervisor.start_link(
-          name: name,
-          url: "ws://127.0.0.1:#{get_port()}/ws/admin/websocket",
-          serializer: Jason,
-          auto_connect: false,
-          registry_name: registry_name
+        start_supervised(
+          {Phoenix.SocketClient.Supervisor,
+           [
+             name: name,
+             url: "ws://127.0.0.1:#{get_port()}/ws/admin/websocket",
+             serializer: Jason,
+             auto_connect: false,
+             reconnect: false,
+             registry_name: registry_name
+           ]},
+          restart: :temporary
         )
 
       # Test retrieving socket_state pid
@@ -55,13 +60,18 @@ defmodule Phoenix.SocketClient.StateTest do
       registry_name = :"Registry.Channel_#{System.unique_integer([:positive])}"
 
       {:ok, _pid} =
-        Phoenix.SocketClient.Supervisor.start_link(
-          name: name,
-          url: "ws://127.0.0.1:#{get_port()}/ws/admin/websocket",
-          serializer: Jason,
-          params: %{"test" => "value"},
-          auto_connect: false,
-          registry_name: registry_name
+        start_supervised(
+          {Phoenix.SocketClient.Supervisor,
+           [
+             name: name,
+             url: "ws://127.0.0.1:#{get_port()}/ws/admin/websocket",
+             serializer: Jason,
+             params: %{"test" => "value"},
+             auto_connect: false,
+             reconnect: false,
+             registry_name: registry_name
+           ]},
+          restart: :temporary
         )
 
       # Test retrieving URL
@@ -82,12 +92,17 @@ defmodule Phoenix.SocketClient.StateTest do
       registry_name = :"Registry.Channel_#{System.unique_integer([:positive])}"
 
       {:ok, _pid} =
-        Phoenix.SocketClient.Supervisor.start_link(
-          name: name,
-          url: "ws://127.0.0.1:#{get_port()}/ws/admin/websocket",
-          serializer: Jason,
-          auto_connect: false,
-          registry_name: registry_name
+        start_supervised(
+          {Phoenix.SocketClient.Supervisor,
+           [
+             name: name,
+             url: "ws://127.0.0.1:#{get_port()}/ws/admin/websocket",
+             serializer: Jason,
+             auto_connect: false,
+             reconnect: false,
+             registry_name: registry_name
+           ]},
+          restart: :temporary
         )
 
       # Test updating a custom state value
@@ -106,23 +121,35 @@ defmodule Phoenix.SocketClient.StateTest do
       registry_name1 = :"Registry.Channel_#{System.unique_integer([:positive])}"
 
       {:ok, _pid1} =
-        Phoenix.SocketClient.Supervisor.start_link(
-          name: name1,
-          url: "ws://127.0.0.1:#{get_port()}/ws/admin/websocket",
-          serializer: Jason,
-          auto_connect: false,
-          registry_name: registry_name1
+        start_supervised(
+          {Phoenix.SocketClient.Supervisor,
+           [
+             name: name1,
+             url: "ws://127.0.0.1:#{get_port()}/ws/admin/websocket",
+             serializer: Jason,
+             auto_connect: false,
+             reconnect: false,
+             registry_name: registry_name1
+           ]},
+          id: :socket1,
+          restart: :temporary
         )
 
       registry_name2 = :"Registry.Channel_#{System.unique_integer([:positive])}"
 
       {:ok, _pid2} =
-        Phoenix.SocketClient.Supervisor.start_link(
-          name: name2,
-          url: "ws://127.0.0.1:#{get_port()}/ws/admin/websocket",
-          serializer: Jason,
-          auto_connect: false,
-          registry_name: registry_name2
+        start_supervised(
+          {Phoenix.SocketClient.Supervisor,
+           [
+             name: name2,
+             url: "ws://127.0.0.1:#{get_port()}/ws/admin/websocket",
+             serializer: Jason,
+             auto_connect: false,
+             reconnect: false,
+             registry_name: registry_name2
+           ]},
+          id: :socket2,
+          restart: :temporary
         )
 
       # Test state isolation
