@@ -13,6 +13,9 @@
 # If the VM crashes, it generates a dump, let's ignore it too.
 erl_crash.dump
 
+# Dialyzer PLT files
+/priv/plts/
+
 # Devenv
 .devenv*
 devenv.local.nix

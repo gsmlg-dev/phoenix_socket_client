@@ -14,7 +14,12 @@ defmodule Phoenix.SocketClient.Mixfile do
       elixirc_paths: elixirc_paths(Mix.env()),
       package: package(),
       docs: [extras: ["README.md"], main: "readme"],
-      deps: deps()
+      deps: deps(),
+      aliases: aliases(),
+      dialyzer: [
+        plt_file: {:no_warn, "priv/plts/dialyzer.plt"},
+        plt_add_apps: [:mix]
+      ]
     ]
   end
 
@@ -38,7 +43,9 @@ defmodule Phoenix.SocketClient.Mixfile do
       {:phoenix, "~> 1.8", only: :test},
       {:phoenix_pubsub, "~> 2.1", only: :test},
       {:bandit, "~> 1.8", only: :test},
-      {:ex_doc, "~> 0.38", only: :dev}
+      {:ex_doc, "~> 0.38", only: :dev},
+      {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
+      {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false}
     ]
   end
 
@@ -52,6 +59,12 @@ defmodule Phoenix.SocketClient.Mixfile do
     [
       licenses: ["MIT"],
       links: %{"GitHub" => "https://github.com/gsmlg-dev/phoenix_socket_client"}
+    ]
+  end
+
+  defp aliases do
+    [
+      lint: ["credo --strict", "dialyzer"]
     ]
   end
 end
