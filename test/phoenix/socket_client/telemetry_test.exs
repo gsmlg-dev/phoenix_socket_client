@@ -264,13 +264,15 @@ defmodule Phoenix.SocketClient.TelemetryTest do
       # Event with duration below threshold should be filtered out (50 microseconds = 0.05ms)
       assert Telemetry.passes_filters?(
                [:phoenix, :socket_client, :connection],
-               %{duration: 50_000}  # 50 microseconds in nanoseconds
+               # 50 microseconds in nanoseconds
+               %{duration: 50_000}
              ) == false
 
       # Event with duration above threshold should pass (200 milliseconds)
       assert Telemetry.passes_filters?(
                [:phoenix, :socket_client, :connection],
-               %{duration: 200_000_000}  # 200 milliseconds in nanoseconds
+               # 200 milliseconds in nanoseconds
+               %{duration: 200_000_000}
              ) == true
 
       # Event without duration should pass
@@ -295,7 +297,8 @@ defmodule Phoenix.SocketClient.TelemetryTest do
       Telemetry.update_config(%{filters: %{exclude_message_sends: true}})
 
       # Message send events should be filtered out
-      assert Telemetry.passes_filters?([:phoenix, :socket_client, :message, :send, :start]) == false
+      assert Telemetry.passes_filters?([:phoenix, :socket_client, :message, :send, :start]) ==
+               false
 
       # Other message events should pass
       assert Telemetry.passes_filters?([:phoenix, :socket_client, :message, :receive]) == true
@@ -305,7 +308,8 @@ defmodule Phoenix.SocketClient.TelemetryTest do
       Telemetry.update_config(%{filters: %{exclude_system_metrics: true}})
 
       # System metrics events should be filtered out
-      assert Telemetry.passes_filters?([:phoenix, :socket_client, :optimization, :system]) == false
+      assert Telemetry.passes_filters?([:phoenix, :socket_client, :optimization, :system]) ==
+               false
 
       # Other optimization events should pass
       assert Telemetry.passes_filters?([:phoenix, :socket_client, :optimization, :cache]) == true
@@ -332,7 +336,9 @@ defmodule Phoenix.SocketClient.TelemetryTest do
         %{test_metadata: "value"}
       )
 
-      assert_receive {[:phoenix, :socket_client, :test, :event], %{test_measurement: 123}, %{test_metadata: "value"}}, 1000
+      assert_receive {[:phoenix, :socket_client, :test, :event], %{test_measurement: 123},
+                      %{test_metadata: "value"}},
+                     1000
 
       :telemetry.detach(handler_id)
     end
@@ -364,7 +370,8 @@ defmodule Phoenix.SocketClient.TelemetryTest do
     end
 
     test "emit_event with sampling" do
-      Telemetry.update_config(%{sampler_rate: 0.0})  # 0% sampling
+      # 0% sampling
+      Telemetry.update_config(%{sampler_rate: 0.0})
 
       test_pid = self()
       handler_id = "test-emission-sampling-#{System.unique_integer()}"
@@ -420,19 +427,26 @@ defmodule Phoenix.SocketClient.TelemetryTest do
       # Ensure telemetry is enabled for this test
       Telemetry.update_config(%{enabled: true, track_durations: true, sampler_rate: 1.0})
 
-      result = Telemetry.span(
-        [:phoenix, :socket_client, :test, :operation],
-        %{test_meta: "value"},
-        fn ->
-          :timer.sleep(10)
-          {:ok, %{result: "test"}}
-        end
-      )
+      result =
+        Telemetry.span(
+          [:phoenix, :socket_client, :test, :operation],
+          %{test_meta: "value"},
+          fn ->
+            :timer.sleep(10)
+            {:ok, %{result: "test"}}
+          end
+        )
 
       assert result == {:ok, %{result: "test"}}
 
-      assert_receive {:start, [:phoenix, :socket_client, :test, :operation, :start], _, %{test_meta: "value"}}, 1000
-      assert_receive {:stop, [:phoenix, :socket_client, :test, :operation, :stop], %{duration: duration}, _}, 1000
+      assert_receive {:start, [:phoenix, :socket_client, :test, :operation, :start], _,
+                      %{test_meta: "value"}},
+                     1000
+
+      assert_receive {:stop, [:phoenix, :socket_client, :test, :operation, :stop],
+                      %{duration: duration}, _},
+                     1000
+
       assert duration > 0
 
       :telemetry.detach(handler_id)
@@ -454,13 +468,14 @@ defmodule Phoenix.SocketClient.TelemetryTest do
         %{}
       )
 
-      result = Telemetry.span(
-        [:phoenix, :socket_client, :test, :operation],
-        %{test_meta: "value"},
-        fn ->
-          {:ok, %{result: "test"}}
-        end
-      )
+      result =
+        Telemetry.span(
+          [:phoenix, :socket_client, :test, :operation],
+          %{test_meta: "value"},
+          fn ->
+            {:ok, %{result: "test"}}
+          end
+        )
 
       assert {:ok, %{result: "test"}} = result
 
@@ -498,12 +513,17 @@ defmodule Phoenix.SocketClient.TelemetryTest do
       assert token.component == :test
       assert token.operation == :test_op
 
-      assert_receive {:start, [:phoenix, :socket_client, :test, :test_op, :start], _, %{test_meta: "value"}}, 1000
+      assert_receive {:start, [:phoenix, :socket_client, :test, :test_op, :start], _,
+                      %{test_meta: "value"}},
+                     1000
 
       :timer.sleep(10)
       Telemetry.stop_duration(token, %{additional_meta: "data"})
 
-      assert_receive {:stop, [:phoenix, :socket_client, :test, :test_op, :stop], %{duration: duration}, %{additional_meta: "data"}}, 1000
+      assert_receive {:stop, [:phoenix, :socket_client, :test, :test_op, :stop],
+                      %{duration: duration}, %{additional_meta: "data"}},
+                     1000
+
       assert duration > 0
 
       :telemetry.detach(handler_id)
@@ -532,15 +552,22 @@ defmodule Phoenix.SocketClient.TelemetryTest do
         %{}
       )
 
-      result = Telemetry.measure_duration(:test, :test_op, %{test_meta: "value"}, fn ->
-        :timer.sleep(10)
-        "test_result"
-      end)
+      result =
+        Telemetry.measure_duration(:test, :test_op, %{test_meta: "value"}, fn ->
+          :timer.sleep(10)
+          "test_result"
+        end)
 
       assert result == "test_result"
 
-      assert_receive {:start, [:phoenix, :socket_client, :test, :test_op, :start], _, %{test_meta: "value"}}, 1000
-      assert_receive {:stop, [:phoenix, :socket_client, :test, :test_op, :stop], %{duration: duration}, %{status: :success}}, 1000
+      assert_receive {:start, [:phoenix, :socket_client, :test, :test_op, :start], _,
+                      %{test_meta: "value"}},
+                     1000
+
+      assert_receive {:stop, [:phoenix, :socket_client, :test, :test_op, :stop],
+                      %{duration: duration}, %{status: :success}},
+                     1000
+
       assert duration > 0
 
       :telemetry.detach(handler_id)
@@ -571,25 +598,37 @@ defmodule Phoenix.SocketClient.TelemetryTest do
       assert context.component == :test
 
       # Measure first sub-operation
-      result1 = Telemetry.measure_sub_operation(context, :sub_op1, fn ->
-        :timer.sleep(5)
-        "result1"
-      end)
+      result1 =
+        Telemetry.measure_sub_operation(context, :sub_op1, fn ->
+          :timer.sleep(5)
+          "result1"
+        end)
+
       assert result1 == "result1"
 
       # Measure second sub-operation
-      result2 = Telemetry.measure_sub_operation(context, :sub_op2, fn ->
-        :timer.sleep(5)
-        "result2"
-      end)
+      result2 =
+        Telemetry.measure_sub_operation(context, :sub_op2, fn ->
+          :timer.sleep(5)
+          "result2"
+        end)
+
       assert result2 == "result2"
 
       # Complete the context
       Telemetry.complete_duration_context(context, %{final_meta: "data"})
 
-      assert_receive {[:phoenix, :socket_client, :test, :sub_op1, :complete], %{duration: _duration1}, _}, 1000
-      assert_receive {[:phoenix, :socket_client, :test, :sub_op2, :complete], %{duration: _duration2}, _}, 1000
-      assert_receive {[:phoenix, :socket_client, :test, :context_complete], measurements, %{final_meta: "data"}}, 1000
+      assert_receive {[:phoenix, :socket_client, :test, :sub_op1, :complete],
+                      %{duration: _duration1}, _},
+                     1000
+
+      assert_receive {[:phoenix, :socket_client, :test, :sub_op2, :complete],
+                      %{duration: _duration2}, _},
+                     1000
+
+      assert_receive {[:phoenix, :socket_client, :test, :context_complete], measurements,
+                      %{final_meta: "data"}},
+                     1000
 
       assert measurements.total_duration > 0
       # Note: operation_count might be 0 due to context immutability limitations
@@ -623,9 +662,17 @@ defmodule Phoenix.SocketClient.TelemetryTest do
       Telemetry.connection_stop(%{url: "ws://test.com", duration: 100})
       Telemetry.connection_error(%{url: "ws://test.com", error: "connection_failed"})
 
-      assert_receive {[:phoenix, :socket_client, :connection, :start], _, %{url: "ws://test.com", transport: :websocket}}, 1000
-      assert_receive {[:phoenix, :socket_client, :connection, :stop], _, %{url: "ws://test.com", duration: 100}}, 1000
-      assert_receive {[:phoenix, :socket_client, :connection, :error], _, %{url: "ws://test.com", error: "connection_failed"}}, 1000
+      assert_receive {[:phoenix, :socket_client, :connection, :start], _,
+                      %{url: "ws://test.com", transport: :websocket}},
+                     1000
+
+      assert_receive {[:phoenix, :socket_client, :connection, :stop], _,
+                      %{url: "ws://test.com", duration: 100}},
+                     1000
+
+      assert_receive {[:phoenix, :socket_client, :connection, :error], _,
+                      %{url: "ws://test.com", error: "connection_failed"}},
+                     1000
 
       :telemetry.detach(handler_id)
     end
@@ -655,10 +702,19 @@ defmodule Phoenix.SocketClient.TelemetryTest do
       Telemetry.channel_left(%{topic: "rooms:lobby"})
       Telemetry.channel_active(%{topic: "rooms:lobby"})
 
-      assert_receive {[:phoenix, :socket_client, :channel, :join, :start], _, %{topic: "rooms:lobby"}}, 1000
-      assert_receive {[:phoenix, :socket_client, :channel, :join, :stop], _, %{topic: "rooms:lobby", duration: 50}}, 1000
-      assert_receive {[:phoenix, :socket_client, :channel, :leave], _, %{topic: "rooms:lobby"}}, 1000
-      assert_receive {[:phoenix, :socket_client, :channel, :active], _, %{topic: "rooms:lobby"}}, 1000
+      assert_receive {[:phoenix, :socket_client, :channel, :join, :start], _,
+                      %{topic: "rooms:lobby"}},
+                     1000
+
+      assert_receive {[:phoenix, :socket_client, :channel, :join, :stop], _,
+                      %{topic: "rooms:lobby", duration: 50}},
+                     1000
+
+      assert_receive {[:phoenix, :socket_client, :channel, :leave], _, %{topic: "rooms:lobby"}},
+                     1000
+
+      assert_receive {[:phoenix, :socket_client, :channel, :active], _, %{topic: "rooms:lobby"}},
+                     1000
 
       :telemetry.detach(handler_id)
     end
@@ -688,10 +744,21 @@ defmodule Phoenix.SocketClient.TelemetryTest do
       Telemetry.message_encoded(%{event: "new_msg", size_bytes: 25})
       Telemetry.message_decoded(%{event: "new_msg", size_bytes: 30})
 
-      assert_receive {[:phoenix, :socket_client, :message, :send], %{system_time: _}, %{topic: "rooms:lobby", event: "new_msg", ref: "1"}}, 1000
-      assert_receive {[:phoenix, :socket_client, :message, :receive], %{system_time: _}, %{topic: "rooms:lobby", event: "new_msg", ref: "1"}}, 1000
-      assert_receive {[:phoenix, :socket_client, :message, :encode], %{system_time: _}, %{event: "new_msg", size_bytes: 25}}, 1000
-      assert_receive {[:phoenix, :socket_client, :message, :decode], %{system_time: _}, %{event: "new_msg", size_bytes: 30}}, 1000
+      assert_receive {[:phoenix, :socket_client, :message, :send], %{system_time: _},
+                      %{topic: "rooms:lobby", event: "new_msg", ref: "1"}},
+                     1000
+
+      assert_receive {[:phoenix, :socket_client, :message, :receive], %{system_time: _},
+                      %{topic: "rooms:lobby", event: "new_msg", ref: "1"}},
+                     1000
+
+      assert_receive {[:phoenix, :socket_client, :message, :encode], %{system_time: _},
+                      %{event: "new_msg", size_bytes: 25}},
+                     1000
+
+      assert_receive {[:phoenix, :socket_client, :message, :decode], %{system_time: _},
+                      %{event: "new_msg", size_bytes: 30}},
+                     1000
 
       :telemetry.detach(handler_id)
     end
@@ -721,10 +788,26 @@ defmodule Phoenix.SocketClient.TelemetryTest do
       Telemetry.optimization_binary_pool_hit(%{pattern_size: 15})
       Telemetry.optimization_process_hibernated(%{process_name: :socket, memory_saved: 1024})
 
-      assert_receive {[:phoenix, :socket_client, :optimization, :cache, :hit], %{system_time: _}, %{cache_type: :route_cache, topic: "rooms:lobby"}}, 1000
-      assert_receive {[:phoenix, :socket_client, :optimization, :cache, :miss], %{system_time: _}, %{cache_type: :route_cache, topic: "rooms:new"}}, 1000
-      assert_receive {[:phoenix, :socket_client, :optimization, :binary_pool, :hit], %{system_time: _}, %{pattern_size: 15}}, 1000
-      assert_receive {[:phoenix, :socket_client, :optimization, :hibernation, :process_hibernated], %{system_time: _}, %{process_name: :socket, memory_saved: 1024}}, 1000
+      assert_receive {[:phoenix, :socket_client, :optimization, :cache, :hit], %{system_time: _},
+                      %{cache_type: :route_cache, topic: "rooms:lobby"}},
+                     1000
+
+      assert_receive {[:phoenix, :socket_client, :optimization, :cache, :miss], %{system_time: _},
+                      %{cache_type: :route_cache, topic: "rooms:new"}},
+                     1000
+
+      assert_receive {[:phoenix, :socket_client, :optimization, :binary_pool, :hit],
+                      %{system_time: _}, %{pattern_size: 15}},
+                     1000
+
+      assert_receive {[
+                        :phoenix,
+                        :socket_client,
+                        :optimization,
+                        :hibernation,
+                        :process_hibernated
+                      ], %{system_time: _}, %{process_name: :socket, memory_saved: 1024}},
+                     1000
 
       :telemetry.detach(handler_id)
     end
@@ -744,7 +827,9 @@ defmodule Phoenix.SocketClient.TelemetryTest do
 
       Telemetry.error(%{component: :socket, error: "connection_failed", reason: "timeout"})
 
-      assert_receive {[:phoenix, :socket_client, :error], _, %{component: :socket, error: "connection_failed", reason: "timeout"}}, 1000
+      assert_receive {[:phoenix, :socket_client, :error], _,
+                      %{component: :socket, error: "connection_failed", reason: "timeout"}},
+                     1000
 
       :telemetry.detach(handler_id)
     end
@@ -755,13 +840,15 @@ defmodule Phoenix.SocketClient.TelemetryTest do
       log =
         capture_log(fn ->
           Telemetry.attach_default_handler(enabled: true)
+
           Telemetry.emit_event(
             [:phoenix, :socket_client, :connection, :start],
             %{},
             %{url: "ws://test.com"}
           )
 
-          :timer.sleep(50)  # Give async handler time to process
+          # Give async handler time to process
+          :timer.sleep(50)
         end)
 
       assert log =~ "Phoenix.SocketClient"
@@ -776,13 +863,15 @@ defmodule Phoenix.SocketClient.TelemetryTest do
       log =
         capture_log(fn ->
           Telemetry.attach_default_handler(enabled: true)
+
           Telemetry.emit_event(
             [:phoenix, :socket_client, :error],
             %{},
             %{error: "test error"}
           )
 
-          :timer.sleep(50)  # Give async handler time to process
+          # Give async handler time to process
+          :timer.sleep(50)
         end)
 
       # Error events should be logged at error level
@@ -808,13 +897,16 @@ defmodule Phoenix.SocketClient.TelemetryTest do
       )
 
       # This should work for backward compatibility
-      assert :ok = Telemetry.execute(
-                      [:phoenix, :socket_client, :legacy, :event],
-                      %{test_measurement: 123},
-                      %{test_metadata: "value"}
-                    )
+      assert :ok =
+               Telemetry.execute(
+                 [:phoenix, :socket_client, :legacy, :event],
+                 %{test_measurement: 123},
+                 %{test_metadata: "value"}
+               )
 
-      assert_receive {[:phoenix, :socket_client, :legacy, :event], %{test_measurement: 123}, %{test_metadata: "value"}}, 1000
+      assert_receive {[:phoenix, :socket_client, :legacy, :event], %{test_measurement: 123},
+                      %{test_metadata: "value"}},
+                     1000
 
       :telemetry.detach(handler_id)
     end

@@ -7,7 +7,8 @@ defmodule Phoenix.SocketClient.ConnectionFailureTest do
     assert {:error, :socket_not_started} == Phoenix.SocketClient.Channel.join(nil, "rooms:any")
 
     # Test with invalid socket name returns :socket_not_connected
-    assert {:error, :socket_not_connected} == Phoenix.SocketClient.Channel.join(:nonexistent_socket, "rooms:any")
+    assert {:error, :socket_not_connected} ==
+             Phoenix.SocketClient.Channel.join(:nonexistent_socket, "rooms:any")
   end
 
   test "handles protocol version selection" do

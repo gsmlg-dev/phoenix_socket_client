@@ -36,8 +36,10 @@ defmodule Phoenix.SocketClient.PerformanceMonitor do
   use GenServer
   require Logger
 
-  @default_collection_interval 30_000  # 30 seconds
-  @default_retention_period 1_800_000  # 30 minutes
+  # 30 seconds
+  @default_collection_interval 30_000
+  # 30 minutes
+  @default_retention_period 1_800_000
   @default_alert_thresholds %{
     memory_usage_mb: 100,
     cache_hit_rate: 0.8,
@@ -49,42 +51,42 @@ defmodule Phoenix.SocketClient.PerformanceMonitor do
   Monitor configuration options
   """
   @type opts :: [
-    collection_interval: non_neg_integer(),
-    retention_period: non_neg_integer(),
-    registry_name: atom(),
-    alert_thresholds: map()
-  ]
+          collection_interval: non_neg_integer(),
+          retention_period: non_neg_integer(),
+          registry_name: atom(),
+          alert_thresholds: map()
+        ]
 
   @typedoc """
   Performance metrics structure
   """
   @type metrics :: %{
-    timestamp: integer(),
-    binary_pool: map(),
-    route_cache: map(),
-    hibernation: map(),
-    transport: map(),
-    system: map(),
-    alerts: list(map())
-  }
+          timestamp: integer(),
+          binary_pool: map(),
+          route_cache: map(),
+          hibernation: map(),
+          transport: map(),
+          system: map(),
+          alerts: list(map())
+        }
 
   @typedoc """
   Monitor state
   """
   @type t :: %__MODULE__{
-    collection_interval: non_neg_integer(),
-    retention_period: non_neg_integer(),
-    registry_name: atom() | nil,
-    alert_thresholds: map(),
-    metrics_history: :ets.tid(),
-    current_metrics: metrics(),
-    collection_timer: reference() | nil,
-    stats: %{
-      collections: non_neg_integer(),
-      alerts_triggered: non_neg_integer(),
-      uptime_start: integer()
-    }
-  }
+          collection_interval: non_neg_integer(),
+          retention_period: non_neg_integer(),
+          registry_name: atom() | nil,
+          alert_thresholds: map(),
+          metrics_history: :ets.tid(),
+          current_metrics: metrics(),
+          collection_timer: reference() | nil,
+          stats: %{
+            collections: non_neg_integer(),
+            alerts_triggered: non_neg_integer(),
+            uptime_start: integer()
+          }
+        }
 
   defstruct [
     :collection_interval,
@@ -114,7 +116,9 @@ defmodule Phoenix.SocketClient.PerformanceMonitor do
   def start_link(opts \\ []) do
     opts = if Keyword.keyword?(opts), do: opts, else: Enum.into(opts, [])
     registry_name = Keyword.get(opts, :registry_name)
-    name = if registry_name, do: {:via, Registry, {registry_name, :performance_monitor}}, else: nil
+
+    name =
+      if registry_name, do: {:via, Registry, {registry_name, :performance_monitor}}, else: nil
 
     GenServer.start_link(__MODULE__, opts, name: name)
   end
@@ -134,7 +138,8 @@ defmodule Phoenix.SocketClient.PerformanceMonitor do
 
   Returns metrics for a specified time range.
   """
-  @spec get_metrics_history(pid(), integer(), integer()) :: {:ok, list(metrics())} | {:error, term()}
+  @spec get_metrics_history(pid(), integer(), integer()) ::
+          {:ok, list(metrics())} | {:error, term()}
   def get_metrics_history(monitor_pid, from_time, to_time \\ System.monotonic_time(:millisecond)) do
     GenServer.call(monitor_pid, {:get_metrics_history, from_time, to_time}, 5000)
   end
@@ -165,7 +170,8 @@ defmodule Phoenix.SocketClient.PerformanceMonitor do
   Modifies the thresholds used for performance alerting.
   """
   @spec update_alert_thresholds(pid(), map()) :: :ok
-  def update_alert_thresholds(monitor_pid, thresholds) when is_pid(monitor_pid) and is_map(thresholds) do
+  def update_alert_thresholds(monitor_pid, thresholds)
+      when is_pid(monitor_pid) and is_map(thresholds) do
     GenServer.cast(monitor_pid, {:update_alert_thresholds, thresholds})
   end
 
@@ -189,12 +195,13 @@ defmodule Phoenix.SocketClient.PerformanceMonitor do
     alert_thresholds = Keyword.get(opts, :alert_thresholds, @default_alert_thresholds)
 
     # Create ETS table for metrics history
-    metrics_table = :ets.new(:performance_metrics, [
-      :ordered_set,
-      :protected,
-      {:read_concurrency, true},
-      {:write_concurrency, true}
-    ])
+    metrics_table =
+      :ets.new(:performance_metrics, [
+        :ordered_set,
+        :protected,
+        {:read_concurrency, true},
+        {:write_concurrency, true}
+      ])
 
     # Start collection timer
     {:ok, timer} = :timer.send_interval(collection_interval, :collect_metrics)
@@ -226,11 +233,11 @@ defmodule Phoenix.SocketClient.PerformanceMonitor do
 
   @impl true
   def handle_call({:get_metrics_history, from_time, to_time}, _from, state) do
-    history = :ets.select(state.metrics_history, [
-      {{{:timestamp, :"$1"}, :'$2'},
-       [{:andalso, {:>=, :"$1", from_time}, {:"=<", :"$1", to_time}}],
-       [:"$_"]}
-    ])
+    history =
+      :ets.select(state.metrics_history, [
+        {{{:timestamp, :"$1"}, :"$2"},
+         [{:andalso, {:>=, :"$1", from_time}, {:"=<", :"$1", to_time}}], [:"$_"]}
+      ])
 
     metrics_list = Enum.map(history, fn {{:timestamp, _timestamp}, metrics} -> metrics end)
     {:reply, {:ok, metrics_list}, state}
@@ -258,9 +265,11 @@ defmodule Phoenix.SocketClient.PerformanceMonitor do
   def handle_cast({:update_alert_thresholds, new_thresholds}, state) do
     updated_thresholds = Map.merge(state.alert_thresholds, new_thresholds)
     new_state = %{state | alert_thresholds: updated_thresholds}
+
     Phoenix.SocketClient.Telemetry.optimization(:performance_monitor_alert_thresholds_updated, %{
       new_thresholds: new_thresholds
     })
+
     {:noreply, new_state}
   end
 
@@ -275,17 +284,16 @@ defmodule Phoenix.SocketClient.PerformanceMonitor do
     cutoff_time = System.monotonic_time(:millisecond) - state.retention_period
 
     # Remove old metrics
-    removed = :ets.select_delete(state.metrics_history, [
-      {{{:timestamp, :"$1"}, :'$2'},
-       [{:"<", :"$1", cutoff_time}],
-       [true]}
-    ])
+    removed =
+      :ets.select_delete(state.metrics_history, [
+        {{{:timestamp, :"$1"}, :"$2"}, [{:<, :"$1", cutoff_time}], [true]}
+      ])
 
     if removed > 0 do
       Phoenix.SocketClient.Telemetry.optimization(:performance_monitor_cleanup, %{
-      entries_removed: removed,
-      retention_period: state.retention_period
-    })
+        entries_removed: removed,
+        retention_period: state.retention_period
+      })
     end
 
     {:noreply, state}
@@ -298,11 +306,13 @@ defmodule Phoenix.SocketClient.PerformanceMonitor do
     end
 
     :ets.delete(state.metrics_history)
+
     Phoenix.SocketClient.Telemetry.optimization(:performance_monitor_terminating, %{
       total_collections: state.stats.collections,
       alerts_triggered: state.stats.alerts_triggered,
       final_metrics_size: :ets.info(state.metrics_history, :size)
     })
+
     :ok
   end
 
@@ -331,22 +341,20 @@ defmodule Phoenix.SocketClient.PerformanceMonitor do
       :ets.insert(state.metrics_history, {{:timestamp, current_time}, final_metrics})
 
       # Update stats
-      new_stats = %{state.stats |
-        collections: state.stats.collections + 1,
-        alerts_triggered: state.stats.alerts_triggered + length(alerts)
+      new_stats = %{
+        state.stats
+        | collections: state.stats.collections + 1,
+          alerts_triggered: state.stats.alerts_triggered + length(alerts)
       }
 
-      new_state = %{state |
-        current_metrics: final_metrics,
-        stats: new_stats
-      }
+      new_state = %{state | current_metrics: final_metrics, stats: new_stats}
 
       # Log alerts
       if length(alerts) > 0 do
         Phoenix.SocketClient.Telemetry.optimization(:performance_monitor_alerts_triggered, %{
-      alerts_count: length(alerts),
-      alerts: alerts
-    })
+          alerts_count: length(alerts),
+          alerts: alerts
+        })
       end
 
       # Schedule cleanup
@@ -360,6 +368,7 @@ defmodule Phoenix.SocketClient.PerformanceMonitor do
           event: :metrics_collection_failed,
           error: inspect(error)
         })
+
         state
     end
   end
@@ -415,7 +424,8 @@ defmodule Phoenix.SocketClient.PerformanceMonitor do
 
     %{
       memory_usage_words: memory_info,
-      memory_usage_mb: memory_info / (1024 * 1024 / 8),  # Convert words to MB
+      # Convert words to MB
+      memory_usage_mb: memory_info / (1024 * 1024 / 8),
       message_queue_depth: queue_len,
       process_count: :erlang.system_info(:process_count),
       scheduler_utilization: 0.0
@@ -426,46 +436,58 @@ defmodule Phoenix.SocketClient.PerformanceMonitor do
     alerts = []
 
     # Check memory usage
-    alerts = if metrics.system.memory_usage_mb > thresholds.memory_usage_mb do
-      [%{
-        type: :memory_usage,
-        severity: :warning,
-        message: "High memory usage: #{Float.round(metrics.system.memory_usage_mb, 2)}MB",
-        threshold: thresholds.memory_usage_mb,
-        current_value: metrics.system.memory_usage_mb,
-        timestamp: metrics.timestamp
-      } | alerts]
-    else
-      alerts
-    end
+    alerts =
+      if metrics.system.memory_usage_mb > thresholds.memory_usage_mb do
+        [
+          %{
+            type: :memory_usage,
+            severity: :warning,
+            message: "High memory usage: #{Float.round(metrics.system.memory_usage_mb, 2)}MB",
+            threshold: thresholds.memory_usage_mb,
+            current_value: metrics.system.memory_usage_mb,
+            timestamp: metrics.timestamp
+          }
+          | alerts
+        ]
+      else
+        alerts
+      end
 
     # Check cache hit rate
-    alerts = if metrics.route_cache.hit_rate < thresholds.cache_hit_rate do
-      [%{
-        type: :cache_performance,
-        severity: :warning,
-        message: "Low cache hit rate: #{Float.round(metrics.route_cache.hit_rate * 100, 2)}%",
-        threshold: thresholds.cache_hit_rate,
-        current_value: metrics.route_cache.hit_rate,
-        timestamp: metrics.timestamp
-      } | alerts]
-    else
-      alerts
-    end
+    alerts =
+      if metrics.route_cache.hit_rate < thresholds.cache_hit_rate do
+        [
+          %{
+            type: :cache_performance,
+            severity: :warning,
+            message: "Low cache hit rate: #{Float.round(metrics.route_cache.hit_rate * 100, 2)}%",
+            threshold: thresholds.cache_hit_rate,
+            current_value: metrics.route_cache.hit_rate,
+            timestamp: metrics.timestamp
+          }
+          | alerts
+        ]
+      else
+        alerts
+      end
 
     # Check message queue depth
-    alerts = if metrics.system.message_queue_depth > thresholds.message_queue_depth do
-      [%{
-        type: :message_queue,
-        severity: :critical,
-        message: "High message queue depth: #{metrics.system.message_queue_depth}",
-        threshold: thresholds.message_queue_depth,
-        current_value: metrics.system.message_queue_depth,
-        timestamp: metrics.timestamp
-      } | alerts]
-    else
-      alerts
-    end
+    alerts =
+      if metrics.system.message_queue_depth > thresholds.message_queue_depth do
+        [
+          %{
+            type: :message_queue,
+            severity: :critical,
+            message: "High message queue depth: #{metrics.system.message_queue_depth}",
+            threshold: thresholds.message_queue_depth,
+            current_value: metrics.system.message_queue_depth,
+            timestamp: metrics.timestamp
+          }
+          | alerts
+        ]
+      else
+        alerts
+      end
 
     alerts
   end
@@ -525,9 +547,7 @@ defmodule Phoenix.SocketClient.PerformanceMonitor do
     Recent Alerts:
     ---------------
     #{if length(metrics.alerts) > 0 do
-      Enum.map(metrics.alerts, fn alert ->
-        "#{alert.type}: #{alert.message}"
-      end) |> Enum.join("\n")
+      Enum.map(metrics.alerts, fn alert -> "#{alert.type}: #{alert.message}" end) |> Enum.join("\n")
     else
       "No recent alerts"
     end}

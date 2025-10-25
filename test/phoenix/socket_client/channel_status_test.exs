@@ -50,7 +50,9 @@ defmodule Phoenix.SocketClient.ChannelStatusTest do
     test "transitions through joining and joined states" do
       name = :"channel_status_join_#{System.unique_integer([:positive])}"
       config = get_socket_config() |> Keyword.put(:name, name)
-      {:ok, sup_pid} = start_supervised({Phoenix.SocketClient.Supervisor, config}, restart: :temporary)
+
+      {:ok, sup_pid} =
+        start_supervised({Phoenix.SocketClient.Supervisor, config}, restart: :temporary)
 
       wait_for_socket(name)
 
@@ -71,7 +73,9 @@ defmodule Phoenix.SocketClient.ChannelStatusTest do
     test "transitions to errored state on join failure" do
       name = :"channel_status_fail_#{System.unique_integer([:positive])}"
       config = get_socket_config() |> Keyword.put(:name, name)
-      {:ok, sup_pid} = start_supervised({Phoenix.SocketClient.Supervisor, config}, restart: :temporary)
+
+      {:ok, sup_pid} =
+        start_supervised({Phoenix.SocketClient.Supervisor, config}, restart: :temporary)
 
       wait_for_socket(name)
 
@@ -91,7 +95,9 @@ defmodule Phoenix.SocketClient.ChannelStatusTest do
     test "transitions through leaving and then is removed" do
       name = :"channel_status_leave_#{System.unique_integer([:positive])}"
       config = get_socket_config() |> Keyword.put(:name, name)
-      {:ok, sup_pid} = start_supervised({Phoenix.SocketClient.Supervisor, config}, restart: :temporary)
+
+      {:ok, sup_pid} =
+        start_supervised({Phoenix.SocketClient.Supervisor, config}, restart: :temporary)
 
       wait_for_socket(name)
 
@@ -113,7 +119,9 @@ defmodule Phoenix.SocketClient.ChannelStatusTest do
     test "transitions to errored state on crash" do
       name = :"channel_status_crash_#{System.unique_integer([:positive])}"
       config = get_socket_config() |> Keyword.put(:name, name)
-      {:ok, sup_pid} = start_supervised({Phoenix.SocketClient.Supervisor, config}, restart: :temporary)
+
+      {:ok, sup_pid} =
+        start_supervised({Phoenix.SocketClient.Supervisor, config}, restart: :temporary)
 
       wait_for_socket(name)
 

@@ -31,48 +31,51 @@ defmodule Phoenix.SocketClient.HibernationManager do
   use GenServer
   require Logger
 
-  @default_idle_timeout 300_000  # 5 minutes
-  @default_check_interval 60_000  # 1 minute
-  @default_memory_threshold 10_000  # 10KB minimum memory before hibernation
+  # 5 minutes
+  @default_idle_timeout 300_000
+  # 1 minute
+  @default_check_interval 60_000
+  # 10KB minimum memory before hibernation
+  @default_memory_threshold 10_000
 
   @typedoc """
   Hibernation manager configuration options
   """
   @type opts :: [
-    idle_timeout: non_neg_integer(),
-    check_interval: non_neg_integer(),
-    memory_threshold: non_neg_integer(),
-    registry_name: atom()
-  ]
+          idle_timeout: non_neg_integer(),
+          check_interval: non_neg_integer(),
+          memory_threshold: non_neg_integer(),
+          registry_name: atom()
+        ]
 
   @typedoc """
   Tracked process information
   """
   @type process_info :: %{
-    pid: pid(),
-    last_activity: integer(),
-    memory: non_neg_integer(),
-    hibernated_count: non_neg_integer(),
-    name: atom() | {atom(), atom()}
-  }
+          pid: pid(),
+          last_activity: integer(),
+          memory: non_neg_integer(),
+          hibernated_count: non_neg_integer(),
+          name: atom() | {atom(), atom()}
+        }
 
   @typedoc """
   Hibernation manager state
   """
   @type t :: %__MODULE__{
-    idle_timeout: non_neg_integer(),
-    check_interval: non_neg_integer(),
-    memory_threshold: non_neg_integer(),
-    registry_name: atom() | nil,
-    tracked_processes: %{pid() => process_info()},
-    check_timer: reference() | nil,
-    stats: %{
-      total_hibernations: non_neg_integer(),
-      total_memory_saved: non_neg_integer(),
-      current_tracked: non_neg_integer(),
-      current_hibernated: non_neg_integer()
-    }
-  }
+          idle_timeout: non_neg_integer(),
+          check_interval: non_neg_integer(),
+          memory_threshold: non_neg_integer(),
+          registry_name: atom() | nil,
+          tracked_processes: %{pid() => process_info()},
+          check_timer: reference() | nil,
+          stats: %{
+            total_hibernations: non_neg_integer(),
+            total_memory_saved: non_neg_integer(),
+            current_tracked: non_neg_integer(),
+            current_hibernated: non_neg_integer()
+          }
+        }
 
   defstruct [
     :idle_timeout,
@@ -102,7 +105,9 @@ defmodule Phoenix.SocketClient.HibernationManager do
   def start_link(opts \\ []) do
     opts = if Keyword.keyword?(opts), do: opts, else: Enum.into(opts, [])
     registry_name = Keyword.get(opts, :registry_name)
-    name = if registry_name, do: {:via, Registry, {registry_name, :hibernation_manager}}, else: nil
+
+    name =
+      if registry_name, do: {:via, Registry, {registry_name, :hibernation_manager}}, else: nil
 
     GenServer.start_link(__MODULE__, opts, name: name)
   end
@@ -213,26 +218,29 @@ defmodule Phoenix.SocketClient.HibernationManager do
       new_tracked = Map.put(state.tracked_processes, pid, process_info)
       current_count = map_size(new_tracked)
 
-      new_state = %{state |
-        tracked_processes: new_tracked,
-        stats: %{state.stats | current_tracked: current_count}
+      new_state = %{
+        state
+        | tracked_processes: new_tracked,
+          stats: %{state.stats | current_tracked: current_count}
       }
 
       # Monitor the process for termination
       Process.monitor(pid)
 
       Phoenix.SocketClient.Telemetry.optimization(:hibernation_process_registered, %{
-      process_name: name || pid,
-      process_pid: pid,
-      memory_words: memory
-    })
+        process_name: name || pid,
+        process_pid: pid,
+        memory_words: memory
+      })
+
       {:noreply, new_state}
     else
       Phoenix.SocketClient.Telemetry.error(%{
-      component: :hibernation_manager,
-      event: :dead_process_registration_attempted,
-      process_pid: pid
-    })
+        component: :hibernation_manager,
+        event: :dead_process_registration_attempted,
+        process_pid: pid
+      })
+
       {:noreply, state}
     end
   end
@@ -247,14 +255,16 @@ defmodule Phoenix.SocketClient.HibernationManager do
         new_tracked = Map.delete(state.tracked_processes, pid)
         current_count = map_size(new_tracked)
 
-        new_state = %{state |
-          tracked_processes: new_tracked,
-          stats: %{state.stats | current_tracked: current_count}
+        new_state = %{
+          state
+          | tracked_processes: new_tracked,
+            stats: %{state.stats | current_tracked: current_count}
         }
 
         Phoenix.SocketClient.Telemetry.optimization(:hibernation_process_unregistered, %{
-      process_pid: pid
-    })
+          process_pid: pid
+        })
+
         {:noreply, new_state}
     end
   end
@@ -278,12 +288,13 @@ defmodule Phoenix.SocketClient.HibernationManager do
 
   @impl true
   def handle_call(:stats, _from, state) do
-    stats = Map.merge(state.stats, %{
-      idle_timeout: state.idle_timeout,
-      check_interval: state.check_interval,
-      memory_threshold: state.memory_threshold,
-      oldest_idle_time: find_oldest_idle_time(state.tracked_processes, state.idle_timeout)
-    })
+    stats =
+      Map.merge(state.stats, %{
+        idle_timeout: state.idle_timeout,
+        check_interval: state.check_interval,
+        memory_threshold: state.memory_threshold,
+        oldest_idle_time: find_oldest_idle_time(state.tracked_processes, state.idle_timeout)
+      })
 
     {:reply, stats, state}
   end
@@ -301,9 +312,10 @@ defmodule Phoenix.SocketClient.HibernationManager do
             new_tracked = Map.put(state.tracked_processes, pid, updated_info)
             hibernated_count = count_hibernated(new_tracked)
 
-            new_state = %{state |
-              tracked_processes: new_tracked,
-              stats: %{state.stats | current_hibernated: hibernated_count}
+            new_state = %{
+              state
+              | tracked_processes: new_tracked,
+                stats: %{state.stats | current_hibernated: hibernated_count}
             }
 
             {:reply, :ok, new_state}
@@ -327,9 +339,10 @@ defmodule Phoenix.SocketClient.HibernationManager do
         new_tracked = Map.put(state.tracked_processes, pid, updated_info)
         hibernated_count = count_hibernated(new_tracked)
 
-        new_state = %{state |
-          tracked_processes: new_tracked,
-          stats: %{state.stats | current_hibernated: hibernated_count}
+        new_state = %{
+          state
+          | tracked_processes: new_tracked,
+            stats: %{state.stats | current_hibernated: hibernated_count}
         }
 
         {:reply, :ok, new_state}
@@ -345,7 +358,7 @@ defmodule Phoenix.SocketClient.HibernationManager do
     {to_hibernate, _remaining} =
       Enum.split_with(state.tracked_processes, fn {_pid, process_info} ->
         current_time - process_info.last_activity > idle_timeout and
-        process_info.memory >= state.memory_threshold
+          process_info.memory >= state.memory_threshold
       end)
 
     # Hibernate idle processes
@@ -354,11 +367,12 @@ defmodule Phoenix.SocketClient.HibernationManager do
         case attempt_hibernation(pid, process_info, state.memory_threshold) do
           :ok ->
             Phoenix.SocketClient.Telemetry.optimization(:process_hibernated, %{
-      process_name: process_info.name,
-      process_pid: process_info.pid,
-      memory_words: process_info.memory,
-      hibernated_count: process_info.hibernated_count + 1
-    })
+              process_name: process_info.name,
+              process_pid: process_info.pid,
+              memory_words: process_info.memory,
+              hibernated_count: process_info.hibernated_count + 1
+            })
+
             {count + 1, memory + process_info.memory}
 
           {:error, _reason} ->
@@ -369,17 +383,18 @@ defmodule Phoenix.SocketClient.HibernationManager do
     # Update statistics
     if hibernated_count > 0 do
       new_stats = %{
-        state.stats |
-        total_hibernations: state.stats.total_hibernations + hibernated_count,
-        total_memory_saved: state.stats.total_memory_saved + memory_saved,
-        current_hibernated: state.stats.current_hibernated + hibernated_count
+        state.stats
+        | total_hibernations: state.stats.total_hibernations + hibernated_count,
+          total_memory_saved: state.stats.total_memory_saved + memory_saved,
+          current_hibernated: state.stats.current_hibernated + hibernated_count
       }
 
       Phoenix.SocketClient.Telemetry.optimization(:hibernation_batch_completed, %{
-      hibernated_count: hibernated_count,
-      memory_saved_words: memory_saved,
-      tracked_processes: map_size(state.tracked_processes)
-    })
+        hibernated_count: hibernated_count,
+        memory_saved_words: memory_saved,
+        tracked_processes: map_size(state.tracked_processes)
+      })
+
       {:noreply, %{state | stats: new_stats}}
     else
       {:noreply, state}
@@ -397,14 +412,16 @@ defmodule Phoenix.SocketClient.HibernationManager do
         new_tracked = Map.delete(state.tracked_processes, pid)
         current_count = map_size(new_tracked)
 
-        new_state = %{state |
-          tracked_processes: new_tracked,
-          stats: %{state.stats | current_tracked: current_count}
+        new_state = %{
+          state
+          | tracked_processes: new_tracked,
+            stats: %{state.stats | current_tracked: current_count}
         }
 
         Phoenix.SocketClient.Telemetry.optimization(:hibernation_dead_process_removed, %{
-      process_pid: pid
-    })
+          process_pid: pid
+        })
+
         {:noreply, new_state}
     end
   end
@@ -420,6 +437,7 @@ defmodule Phoenix.SocketClient.HibernationManager do
       total_hibernations: state.stats.total_hibernations,
       total_memory_saved: state.stats.total_memory_saved
     })
+
     :ok
   end
 
@@ -453,7 +471,8 @@ defmodule Phoenix.SocketClient.HibernationManager do
           _ -> false
         end
       rescue
-        ArgumentError -> false  # Process might have died
+        # Process might have died
+        ArgumentError -> false
       end
     end)
   end
@@ -461,13 +480,19 @@ defmodule Phoenix.SocketClient.HibernationManager do
   defp find_oldest_idle_time(tracked_processes, idle_timeout) do
     current_time = System.monotonic_time(:millisecond)
 
-    case Enum.min_by(tracked_processes, fn {_pid, process_info} ->
-      current_time - process_info.last_activity
-    end, fn -> nil end) do
+    case Enum.min_by(
+           tracked_processes,
+           fn {_pid, process_info} ->
+             current_time - process_info.last_activity
+           end,
+           fn -> nil end
+         ) do
       {_pid, process_info} ->
         idle_time = current_time - process_info.last_activity
         if idle_time > idle_timeout, do: idle_time, else: 0
-      nil -> 0
+
+      nil ->
+        0
     end
   end
 end

@@ -117,6 +117,7 @@ defmodule Phoenix.SocketClient.Socket do
             case transport.open(url, transport_opts) do
               {:ok, transport_pid} ->
                 transport_ref = Process.monitor(transport_pid)
+
                 new_state = %__MODULE__{
                   state
                   | transport_pid: transport_pid,
@@ -135,6 +136,7 @@ defmodule Phoenix.SocketClient.Socket do
                   error: reason,
                   transport: transport
                 })
+
                 {:error, %{reason: reason}}
             end
           end
@@ -161,6 +163,7 @@ defmodule Phoenix.SocketClient.Socket do
     # Emit connection established stop event with duration
     if start_time do
       duration = System.monotonic_time() - start_time
+
       Phoenix.SocketClient.Telemetry.connection_established_stop(%{
         socket_ref: socket_ref,
         url: socket_state.url,
@@ -293,10 +296,12 @@ defmodule Phoenix.SocketClient.Socket do
       {sup_pid, _raw_message} ->
         # Route the decoded message
         socket_state = Phoenix.SocketClient.get_state(sup_pid)
+
         case Registry.lookup(socket_state.registry_name, decoded_message.topic) do
           [{pid, _}] -> send(pid, decoded_message)
           [] -> :noop
         end
+
         Process.delete({:pending_decode, ref})
 
       nil ->
@@ -333,8 +338,10 @@ defmodule Phoenix.SocketClient.Socket do
       case get_state(sup_pid, :connect_time) do
         nil ->
           Process.delete(key)
+
         connect_time ->
           age = current_time - connect_time
+
           if age > max_age do
             Process.delete(key)
           end
@@ -342,25 +349,33 @@ defmodule Phoenix.SocketClient.Socket do
     end)
 
     # Clean up old pending messages in to_send_r
-    filtered_to_send = Enum.filter(state.to_send_r, fn {_ref, _message} ->
-      # Keep only recent messages (this is a simple heuristic)
-      # In practice, you might want to track timestamps per message
-      true  # For now, keep all messages, but limit the queue size
-    end)
+    filtered_to_send =
+      Enum.filter(state.to_send_r, fn {_ref, _message} ->
+        # Keep only recent messages (this is a simple heuristic)
+        # In practice, you might want to track timestamps per message
+        # For now, keep all messages, but limit the queue size
+        true
+      end)
 
     # Limit queue size by dropping oldest messages if needed
-    final_to_send = if length(filtered_to_send) > state.max_pending_messages do
-      Enum.take(filtered_to_send, state.max_pending_messages)
-    else
-      filtered_to_send
-    end
+    final_to_send =
+      if length(filtered_to_send) > state.max_pending_messages do
+        Enum.take(filtered_to_send, state.max_pending_messages)
+      else
+        filtered_to_send
+      end
 
     trimmed_count = length(state.to_send_r) - length(final_to_send)
+
     if trimmed_count > 0 do
-      Telemetry.execute([:phoenix_socket_client, :socket, :cleanup], %{
-        trimmed_messages: trimmed_count,
-        remaining_messages: length(final_to_send)
-      }, %{})
+      Telemetry.execute(
+        [:phoenix_socket_client, :socket, :cleanup],
+        %{
+          trimmed_messages: trimmed_count,
+          remaining_messages: length(final_to_send)
+        },
+        %{}
+      )
     end
 
     new_state = %{state | to_send_r: final_to_send}
@@ -409,6 +424,7 @@ defmodule Phoenix.SocketClient.Socket do
         pending_messages: length(state.to_send_r),
         reason: :idle_hibernation
       })
+
       {:noreply, state, :hibernate}
     else
       # Not safe to hibernate right now
@@ -418,6 +434,7 @@ defmodule Phoenix.SocketClient.Socket do
         pending_messages: length(state.to_send_r),
         reason: :not_safe_to_hibernate
       })
+
       {:noreply, state}
     end
   end
@@ -448,15 +465,26 @@ defmodule Phoenix.SocketClient.Socket do
     if state.transport_pid && state.message_processor do
       # Check queue size to prevent memory leaks
       if length(state.to_send_r) >= state.max_pending_messages do
-        Telemetry.execute([:phoenix_socket_client, :socket, :backpressure], %{
-          pending_messages: length(state.to_send_r),
-          max_pending: state.max_pending_messages
-        }, %{})
+        Telemetry.execute(
+          [:phoenix_socket_client, :socket, :backpressure],
+          %{
+            pending_messages: length(state.to_send_r),
+            max_pending: state.max_pending_messages
+          },
+          %{}
+        )
+
         {:reply, {:error, :queue_full}, state}
       else
         # Encode message asynchronously
         ref = make_ref()
-        Phoenix.SocketClient.MessageProcessor.encode(state.message_processor, message, self(), ref)
+
+        Phoenix.SocketClient.MessageProcessor.encode(
+          state.message_processor,
+          message,
+          self(),
+          ref
+        )
 
         # Store the message for sending once encoded
         new_state = %{state | to_send_r: [{ref, message} | state.to_send_r]}
@@ -502,15 +530,26 @@ defmodule Phoenix.SocketClient.Socket do
     if transport_pid && state.message_processor do
       # Check queue size to prevent memory leaks
       if length(state.to_send_r) >= state.max_pending_messages do
-        Telemetry.execute([:phoenix_socket_client, :socket, :backpressure], %{
-          pending_messages: length(state.to_send_r),
-          max_pending: state.max_pending_messages
-        }, %{})
+        Telemetry.execute(
+          [:phoenix_socket_client, :socket, :backpressure],
+          %{
+            pending_messages: length(state.to_send_r),
+            max_pending: state.max_pending_messages
+          },
+          %{}
+        )
+
         state
       else
         # Encode message asynchronously
         ref = make_ref()
-        Phoenix.SocketClient.MessageProcessor.encode(state.message_processor, message, self(), ref)
+
+        Phoenix.SocketClient.MessageProcessor.encode(
+          state.message_processor,
+          message,
+          self(),
+          ref
+        )
 
         # Store for sending once encoded
         %{state | to_send_r: [{ref, message} | state.to_send_r]}
@@ -523,6 +562,7 @@ defmodule Phoenix.SocketClient.Socket do
         json_library = socket_state.json_library || Jason
         send(transport_pid, {:send, Message.encode!(serializer, message, json_library)})
       end
+
       state
     end
   end
@@ -560,6 +600,7 @@ defmodule Phoenix.SocketClient.Socket do
         attempt: 1,
         reason: reason
       })
+
       Process.send_after(self(), :connect, socket_state.reconnect_interval)
     end
 

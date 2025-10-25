@@ -80,7 +80,8 @@ defmodule Phoenix.SocketClient.ChannelManager do
 
                 _ ->
                   nil
-                end)
+              end)
+
             registry_name ->
               case Registry.lookup(registry_name, topic) do
                 [{pid, _}] -> pid

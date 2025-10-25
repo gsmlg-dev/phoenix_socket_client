@@ -49,11 +49,16 @@ defmodule Phoenix.SocketClient.Transports.OptimizedWebsocket do
   @default_tcp_opts [
     nodelay: true,
     keepalive: true,
-    buffer: 64 * 1024,  # 64KB
-    send_buffer: 32 * 1024,  # 32KB
-    recv_buffer: 32 * 1024,  # 32KB
-    keepalive_idle: 7200,  # 2 hours
-    keepalive_interval: 75,  # 75 seconds
+    # 64KB
+    buffer: 64 * 1024,
+    # 32KB
+    send_buffer: 32 * 1024,
+    # 32KB
+    recv_buffer: 32 * 1024,
+    # 2 hours
+    keepalive_idle: 7200,
+    # 75 seconds
+    keepalive_interval: 75,
     keepalive_count: 9
   ]
 
@@ -77,10 +82,11 @@ defmodule Phoenix.SocketClient.Transports.OptimizedWebsocket do
     tcp_opts = build_tcp_options(transport_opts)
 
     # Enhanced transport options with TCP settings
-    enhanced_opts = transport_opts
-    |> Keyword.put(:extra_headers, headers)
-    |> Keyword.put(:socket_opts, tcp_opts)
-    |> Keyword.put(:timeout, Keyword.get(transport_opts, :connect_timeout, 10_000))
+    enhanced_opts =
+      transport_opts
+      |> Keyword.put(:extra_headers, headers)
+      |> Keyword.put(:socket_opts, tcp_opts)
+      |> Keyword.put(:timeout, Keyword.get(transport_opts, :connect_timeout, 10_000))
 
     Phoenix.SocketClient.Telemetry.connection_start(%{
       url: url,
@@ -89,11 +95,11 @@ defmodule Phoenix.SocketClient.Transports.OptimizedWebsocket do
     })
 
     case :websocket_client.start_link(
-      String.to_charlist(url),
-      __MODULE__,
-      enhanced_opts,
-      extra_headers: headers
-    ) do
+           String.to_charlist(url),
+           __MODULE__,
+           enhanced_opts,
+           extra_headers: headers
+         ) do
       {:ok, pid} ->
         Phoenix.SocketClient.Telemetry.connection_stop(%{
           url: url,
@@ -101,6 +107,7 @@ defmodule Phoenix.SocketClient.Transports.OptimizedWebsocket do
           transport_pid: pid,
           status: :connected
         })
+
         {:ok, pid}
 
       {:error, reason} ->
@@ -109,6 +116,7 @@ defmodule Phoenix.SocketClient.Transports.OptimizedWebsocket do
           transport: :optimized_websocket,
           error: reason
         })
+
         {:error, reason}
     end
   end
@@ -124,6 +132,7 @@ defmodule Phoenix.SocketClient.Transports.OptimizedWebsocket do
       %{system_time: System.system_time()},
       %{transport: :optimized_websocket, socket: socket}
     )
+
     send(socket, :close)
   end
 
@@ -203,6 +212,7 @@ defmodule Phoenix.SocketClient.Transports.OptimizedWebsocket do
 
     # Report final metrics
     final_metrics = state.metrics
+
     Phoenix.SocketClient.Telemetry.emit_event(
       [:phoenix, :socket_client, :transport, :session_stats],
       %{
@@ -228,10 +238,11 @@ defmodule Phoenix.SocketClient.Transports.OptimizedWebsocket do
     message_size = byte_size(msg)
 
     # Update metrics
-    new_metrics = %{state.metrics |
-      messages_received: state.metrics.messages_received + 1,
-      bytes_received: state.metrics.bytes_received + message_size,
-      last_activity: System.monotonic_time(:millisecond)
+    new_metrics = %{
+      state.metrics
+      | messages_received: state.metrics.messages_received + 1,
+        bytes_received: state.metrics.bytes_received + message_size,
+        last_activity: System.monotonic_time(:millisecond)
     }
 
     # Forward message to sender
@@ -249,10 +260,11 @@ defmodule Phoenix.SocketClient.Transports.OptimizedWebsocket do
     # Handle binary messages (could be compressed data)
     message_size = byte_size(data)
 
-    new_metrics = %{state.metrics |
-      messages_received: state.metrics.messages_received + 1,
-      bytes_received: state.metrics.bytes_received + message_size,
-      last_activity: System.monotonic_time(:millisecond)
+    new_metrics = %{
+      state.metrics
+      | messages_received: state.metrics.messages_received + 1,
+        bytes_received: state.metrics.bytes_received + message_size,
+        last_activity: System.monotonic_time(:millisecond)
     }
 
     # Forward binary data to sender
@@ -267,6 +279,7 @@ defmodule Phoenix.SocketClient.Transports.OptimizedWebsocket do
       event: :unknown_message,
       message: other_msg
     })
+
     {:ok, state}
   end
 
@@ -279,17 +292,19 @@ defmodule Phoenix.SocketClient.Transports.OptimizedWebsocket do
     message_size = byte_size(msg)
 
     # Apply compression if enabled
-    final_msg = if state.compression_enabled and message_size > 1024 do
-      compress_message(msg)
-    else
-      msg
-    end
+    final_msg =
+      if state.compression_enabled and message_size > 1024 do
+        compress_message(msg)
+      else
+        msg
+      end
 
     # Update metrics
-    new_metrics = %{state.metrics |
-      messages_sent: state.metrics.messages_sent + 1,
-      bytes_sent: state.metrics.bytes_sent + byte_size(final_msg),
-      last_activity: System.monotonic_time(:millisecond)
+    new_metrics = %{
+      state.metrics
+      | messages_sent: state.metrics.messages_sent + 1,
+        bytes_sent: state.metrics.bytes_sent + byte_size(final_msg),
+        last_activity: System.monotonic_time(:millisecond)
     }
 
     {:reply, {:text, final_msg}, %{state | metrics: new_metrics}}
@@ -316,6 +331,7 @@ defmodule Phoenix.SocketClient.Transports.OptimizedWebsocket do
       %{system_time: System.system_time()},
       %{transport: :optimized_websocket}
     )
+
     :ok
   end
 
@@ -326,6 +342,7 @@ defmodule Phoenix.SocketClient.Transports.OptimizedWebsocket do
   """
   def get_stats(socket_pid) when is_pid(socket_pid) do
     send(socket_pid, :get_stats)
+
     receive do
       {:stats, metrics} -> {:ok, metrics}
     after
@@ -367,10 +384,14 @@ defmodule Phoenix.SocketClient.Transports.OptimizedWebsocket do
     if Keyword.get(tcp_opts, :keepalive, false) do
       keepalive_opts = [
         {:keepalive, true},
-        {:raw, 6, 1, <<Keyword.get(tcp_opts, :keepalive_idle, 7200)::32>>},  # TCP_KEEPIDLE
-        {:raw, 6, 2, <<Keyword.get(tcp_opts, :keepalive_interval, 75)::32>>},  # TCP_KEEPINTVL
-        {:raw, 6, 3, <<Keyword.get(tcp_opts, :keepalive_count, 9)::32>>}     # TCP_KEEPCNT
+        # TCP_KEEPIDLE
+        {:raw, 6, 1, <<Keyword.get(tcp_opts, :keepalive_idle, 7200)::32>>},
+        # TCP_KEEPINTVL
+        {:raw, 6, 2, <<Keyword.get(tcp_opts, :keepalive_interval, 75)::32>>},
+        # TCP_KEEPCNT
+        {:raw, 6, 3, <<Keyword.get(tcp_opts, :keepalive_count, 9)::32>>}
       ]
+
       keepalive_opts ++ opts
     else
       opts
@@ -387,23 +408,25 @@ defmodule Phoenix.SocketClient.Transports.OptimizedWebsocket do
           case Keyword.get(dict, :socket) do
             socket when is_port(socket) ->
               apply_socket_options(socket, tcp_opts)
+
             _ ->
               Phoenix.SocketClient.Telemetry.debug(%{
-                  transport: :optimized_websocket,
-                  event: :socket_not_accessible,
-                  message: "socket not accessible for optimization"
-                })
+                transport: :optimized_websocket,
+                event: :socket_not_accessible,
+                message: "socket not accessible for optimization"
+              })
           end
+
         _ ->
           Phoenix.SocketClient.Telemetry.debug(%{
-                transport: :optimized_websocket,
-                event: :socket_access_failed,
-                message: "cannot access socket for optimization"
-              })
+            transport: :optimized_websocket,
+            event: :socket_access_failed,
+            message: "cannot access socket for optimization"
+          })
       end
     catch
       _, error ->
-      Phoenix.SocketClient.Telemetry.debug(%{
+        Phoenix.SocketClient.Telemetry.debug(%{
           transport: :optimized_websocket,
           event: :socket_optimization_failed,
           error: inspect(error)
@@ -415,13 +438,16 @@ defmodule Phoenix.SocketClient.Transports.OptimizedWebsocket do
 
   defp apply_socket_options(socket, [opt | rest]) do
     case :inet.setopts(socket, [opt]) do
-      :ok -> apply_socket_options(socket, rest)
-      {:error, reason} -> Phoenix.SocketClient.Telemetry.debug(%{
-                         transport: :optimized_websocket,
-                         event: :socket_option_failed,
-                         option: inspect(opt),
-                         reason: inspect(reason)
-                       })
+      :ok ->
+        apply_socket_options(socket, rest)
+
+      {:error, reason} ->
+        Phoenix.SocketClient.Telemetry.debug(%{
+          transport: :optimized_websocket,
+          event: :socket_option_failed,
+          option: inspect(opt),
+          reason: inspect(reason)
+        })
     end
   end
 
@@ -430,7 +456,8 @@ defmodule Phoenix.SocketClient.Transports.OptimizedWebsocket do
     try do
       :zlib.compress(msg)
     catch
-      _, _ -> msg  # Fallback to uncompressed message
+      # Fallback to uncompressed message
+      _, _ -> msg
     end
   end
 

@@ -73,7 +73,6 @@ defmodule Phoenix.SocketClient do
     end
   end
 
-  
   # Fallback to the old discovery method (only used during transition)
   defp fallback_process_discovery(sup_pid, name) do
     sup_pid
@@ -81,6 +80,7 @@ defmodule Phoenix.SocketClient do
     |> Enum.find_value(fn
       {process_name, process_pid, _, _} when is_pid(process_pid) and process_name == name ->
         process_pid
+
       _ ->
         nil
     end)

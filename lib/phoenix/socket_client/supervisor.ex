@@ -80,8 +80,12 @@ defmodule Phoenix.SocketClient.Supervisor do
 
          # Register socket process with hibernation manager
          socket_pid = Phoenix.SocketClient.get_process_pid(sup_pid, :socket)
+
          if socket_pid do
-           Phoenix.SocketClient.HibernationManager.register_process(socket_pid, {registry_name, :socket})
+           Phoenix.SocketClient.HibernationManager.register_process(
+             socket_pid,
+             {registry_name, :socket}
+           )
          end
 
          if get_state(sup_pid, :auto_connect) do

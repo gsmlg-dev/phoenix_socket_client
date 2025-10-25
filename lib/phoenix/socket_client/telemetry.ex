@@ -116,19 +116,23 @@ defmodule Phoenix.SocketClient.Telemetry do
   @type measurements :: map()
   @type metadata :: map()
   @type span_result :: {:ok, metadata()} | {:error, metadata()}
-  @type duration_token :: %{
-    component: atom(),
-    operation: atom(),
-    start_time: integer(),
-    start_system_time: integer(),
-    metadata: metadata()
-  } | :disabled
-  @type duration_context :: %{
-    component: atom(),
-    start_time: integer(),
-    operations: %{atom() => integer()},
-    metadata: metadata()
-  } | :disabled
+  @type duration_token ::
+          %{
+            component: atom(),
+            operation: atom(),
+            start_time: integer(),
+            start_system_time: integer(),
+            metadata: metadata()
+          }
+          | :disabled
+  @type duration_context ::
+          %{
+            component: atom(),
+            start_time: integer(),
+            operations: %{atom() => integer()},
+            metadata: metadata()
+          }
+          | :disabled
 
   # Configuration
   @default_config %{
@@ -155,7 +159,8 @@ defmodule Phoenix.SocketClient.Telemetry do
       exclude_heartbeats: false,
       exclude_message_sends: false,
       exclude_system_metrics: false,
-      min_duration_threshold: 0  # in milliseconds
+      # in milliseconds
+      min_duration_threshold: 0
     }
   }
 
@@ -242,6 +247,7 @@ defmodule Phoenix.SocketClient.Telemetry do
   @spec should_sample?() :: boolean()
   def should_sample? do
     rate = sampler_rate()
+
     cond do
       rate >= 1.0 -> true
       rate <= 0.0 -> false
@@ -258,7 +264,9 @@ defmodule Phoenix.SocketClient.Telemetry do
 
     # Check minimum duration threshold first
     if measurements[:duration] do
-      duration_ms = measurements[:duration] / 1_000_000  # Convert from nanoseconds to milliseconds
+      # Convert from nanoseconds to milliseconds
+      duration_ms = measurements[:duration] / 1_000_000
+
       if duration_ms < filters.min_duration_threshold do
         false
       else
@@ -307,7 +315,8 @@ defmodule Phoenix.SocketClient.Telemetry do
       )
   """
   @spec span(event_name(), metadata(), (-> span_result())) :: span_result()
-  def span(event_name, metadata, fun) when is_list(event_name) and is_map(metadata) and is_function(fun, 0) do
+  def span(event_name, metadata, fun)
+      when is_list(event_name) and is_map(metadata) and is_function(fun, 0) do
     if enabled?() and track_durations?() and should_sample?() and passes_filters?(event_name) do
       # We need to return the function result, not just :ok like :telemetry.span does
       start_time = System.monotonic_time()
@@ -434,7 +443,8 @@ defmodule Phoenix.SocketClient.Telemetry do
   @spec measure_duration(atom(), atom(), metadata(), (-> result)) :: result
         when result: any()
   def measure_duration(component, operation, metadata \\ %{}, function)
-      when is_atom(component) and is_atom(operation) and is_map(metadata) and is_function(function, 0) do
+      when is_atom(component) and is_atom(operation) and is_map(metadata) and
+             is_function(function, 0) do
     token = start_duration(component, operation, metadata)
 
     try do
@@ -458,7 +468,8 @@ defmodule Phoenix.SocketClient.Telemetry do
   Returns a context that can be used to measure multiple sub-operations.
   """
   @spec create_duration_context(atom(), metadata()) :: duration_context()
-  def create_duration_context(component, metadata \\ %{}) when is_atom(component) and is_map(metadata) do
+  def create_duration_context(component, metadata \\ %{})
+      when is_atom(component) and is_map(metadata) do
     if enabled?() and config().track_durations do
       %{
         component: component,
@@ -476,12 +487,13 @@ defmodule Phoenix.SocketClient.Telemetry do
   """
   @spec measure_sub_operation(duration_context(), atom(), (-> result)) :: result
         when result: any() do
-  measure_sub_operation(context, nil, function)
+    measure_sub_operation(context, nil, function)
   end
 
   def measure_sub_operation(:disabled, _operation, function), do: function.()
 
-  def measure_sub_operation(context, operation, function) when is_map(context) and is_atom(operation) do
+  def measure_sub_operation(context, operation, function)
+      when is_map(context) and is_atom(operation) do
     start_time = System.monotonic_time()
 
     try do
@@ -548,9 +560,10 @@ defmodule Phoenix.SocketClient.Telemetry do
       }
 
       # Add operation-specific measurements
-      operation_measurements = Enum.reduce(context.operations, measurements, fn {op, duration}, acc ->
-        Map.put(acc, "#{op}_duration", duration)
-      end)
+      operation_measurements =
+        Enum.reduce(context.operations, measurements, fn {op, duration}, acc ->
+          Map.put(acc, "#{op}_duration", duration)
+        end)
 
       metadata = Map.merge(context.metadata, additional_metadata)
 
@@ -1086,13 +1099,15 @@ defmodule Phoenix.SocketClient.Telemetry do
   """
   @spec channel_joined(pid(), String.t(), pid(), map(), metadata()) :: :ok
   def channel_joined(pid, topic, channel_pid, response, metadata \\ %{}) do
-    channel_join_stop(Map.merge(metadata, %{
-      pid: pid,
-      topic: topic,
-      channel_pid: channel_pid,
-      response: response,
-      status: :ok
-    }))
+    channel_join_stop(
+      Map.merge(metadata, %{
+        pid: pid,
+        topic: topic,
+        channel_pid: channel_pid,
+        response: response,
+        status: :ok
+      })
+    )
   end
 
   @doc """
@@ -1100,7 +1115,9 @@ defmodule Phoenix.SocketClient.Telemetry do
   """
   @spec channel_join_error(pid(), String.t(), any(), metadata()) :: :ok
   def channel_join_error(pid, topic, error, metadata \\ %{}) do
-    channel_join_error(Map.merge(metadata, %{pid: pid, topic: topic, error: error, status: :error}))
+    channel_join_error(
+      Map.merge(metadata, %{pid: pid, topic: topic, error: error, status: :error})
+    )
   end
 
   @doc """
@@ -1116,12 +1133,14 @@ defmodule Phoenix.SocketClient.Telemetry do
   """
   @spec message_sent(pid(), String.t(), String.t(), map(), metadata()) :: :ok
   def message_sent(pid, topic, event, payload, metadata \\ %{}) do
-    message_sent(Map.merge(metadata, %{
-      pid: pid,
-      topic: topic,
-      event: event,
-      payload: payload
-    }))
+    message_sent(
+      Map.merge(metadata, %{
+        pid: pid,
+        topic: topic,
+        event: event,
+        payload: payload
+      })
+    )
   end
 
   @doc """
@@ -1129,12 +1148,14 @@ defmodule Phoenix.SocketClient.Telemetry do
   """
   @spec message_received(pid(), String.t(), String.t(), map(), metadata()) :: :ok
   def message_received(pid, topic, event, payload, metadata \\ %{}) do
-    message_received(Map.merge(metadata, %{
-      pid: pid,
-      topic: topic,
-      event: event,
-      payload: payload
-    }))
+    message_received(
+      Map.merge(metadata, %{
+        pid: pid,
+        topic: topic,
+        event: event,
+        payload: payload
+      })
+    )
   end
 
   @doc """
@@ -1288,7 +1309,9 @@ defmodule Phoenix.SocketClient.Telemetry do
   defp default_handler(event_name, measurements, metadata, %{log_levels: log_levels}) do
     case get_log_level(event_name, log_levels) do
       nil ->
-        :ok  # No logging configured for this event
+        # No logging configured for this event
+        :ok
+
       level ->
         message = format_event_message(event_name, measurements, metadata)
         Logger.log(level, message)
@@ -1303,22 +1326,31 @@ defmodule Phoenix.SocketClient.Telemetry do
     case event_name do
       [:phoenix, :socket_client, :connection, :established, _action] ->
         log_levels[:connection_established] || log_levels[:connection]
+
       [:phoenix, :socket_client, :connection, _action] ->
         log_levels[:connection]
+
       [:phoenix, :socket_client, :channel, :active, _action] ->
         log_levels[:channel_active] || log_levels[:channel]
+
       [:phoenix, :socket_client, :channel, _action] ->
         log_levels[:channel]
+
       [:phoenix, :socket_client, :message, _action] ->
         log_levels[:message]
+
       [:phoenix, :socket_client, :heartbeat, _action] ->
         log_levels[:heartbeat]
+
       [:phoenix, :socket_client, :error] ->
         log_levels[:error]
+
       [:phoenix, :socket_client, :optimization, _type] ->
         log_levels[:optimization]
+
       _ ->
-        log_levels[:connection]  # Default fallback
+        # Default fallback
+        log_levels[:connection]
     end
   end
 
@@ -1329,22 +1361,25 @@ defmodule Phoenix.SocketClient.Telemetry do
     base_message = "Phoenix.SocketClient #{component} #{action}"
 
     # Add duration if available
-    message = case measurements do
-      %{duration: duration} ->
-        duration_ms = System.convert_time_unit(duration, :native, :millisecond)
-        "#{base_message} duration=#{duration_ms}ms"
-      _ ->
-        base_message
-    end
+    message =
+      case measurements do
+        %{duration: duration} ->
+          duration_ms = System.convert_time_unit(duration, :native, :millisecond)
+          "#{base_message} duration=#{duration_ms}ms"
+
+        _ ->
+          base_message
+      end
 
     # Add key metadata
-    metadata_parts = []
-    |> maybe_add_metadata_part(metadata, :socket_ref)
-    |> maybe_add_metadata_part(metadata, :topic)
-    |> maybe_add_metadata_part(metadata, :url)
-    |> maybe_add_metadata_part(metadata, :status)
-    |> maybe_add_metadata_part(metadata, :reason)
-    |> maybe_add_metadata_part(metadata, :error)
+    metadata_parts =
+      []
+      |> maybe_add_metadata_part(metadata, :socket_ref)
+      |> maybe_add_metadata_part(metadata, :topic)
+      |> maybe_add_metadata_part(metadata, :url)
+      |> maybe_add_metadata_part(metadata, :status)
+      |> maybe_add_metadata_part(metadata, :reason)
+      |> maybe_add_metadata_part(metadata, :error)
 
     if length(metadata_parts) > 0 do
       "#{message} #{Enum.join(metadata_parts, " ")}"

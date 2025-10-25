@@ -31,47 +31,49 @@ defmodule Phoenix.SocketClient.RouteCache do
   require Logger
 
   @default_cache_size 1000
-  @default_ttl 300_000  # 5 minutes
-  @default_cleanup_interval 60_000  # 1 minute
+  # 5 minutes
+  @default_ttl 300_000
+  # 1 minute
+  @default_cleanup_interval 60_000
 
   @typedoc """
   Cache configuration options
   """
   @type opts :: [
-    cache_size: non_neg_integer(),
-    ttl: non_neg_integer(),
-    cleanup_interval: non_neg_integer(),
-    registry_name: atom()
-  ]
+          cache_size: non_neg_integer(),
+          ttl: non_neg_integer(),
+          cleanup_interval: non_neg_integer(),
+          registry_name: atom()
+        ]
 
   @typedoc """
   Cache entry with metadata
   """
   @type cache_entry :: %{
-    pid: pid(),
-    timestamp: integer(),
-    access_count: non_neg_integer(),
-    last_access: integer()
-  }
+          pid: pid(),
+          timestamp: integer(),
+          access_count: non_neg_integer(),
+          last_access: integer()
+        }
 
   @typedoc """
   Route cache state
   """
   @type t :: %__MODULE__{
-    cache_table: :ets.tid(),
-    cache_size: non_neg_integer(),
-    ttl: non_neg_integer(),
-    cleanup_interval: non_neg_integer(),
-    registry_name: atom() | nil,
-    cleanup_timer: reference() | nil,
-    stats: %{
-      hits: non_neg_integer(),
-      misses: non_neg_integer(),
-      evictions: non_neg_integer(),
-      insertions: non_neg_integer(),
-      current_size: non_neg_integer()
-    }
-  }
+          cache_table: :ets.tid(),
+          cache_size: non_neg_integer(),
+          ttl: non_neg_integer(),
+          cleanup_interval: non_neg_integer(),
+          registry_name: atom() | nil,
+          cleanup_timer: reference() | nil,
+          stats: %{
+            hits: non_neg_integer(),
+            misses: non_neg_integer(),
+            evictions: non_neg_integer(),
+            insertions: non_neg_integer(),
+            current_size: non_neg_integer()
+          }
+        }
 
   defstruct [
     :cache_table,
@@ -123,7 +125,8 @@ defmodule Phoenix.SocketClient.RouteCache do
   Associates a topic with a channel PID.
   """
   @spec put(pid(), String.t(), pid()) :: :ok
-  def put(cache_pid, topic, channel_pid) when is_pid(cache_pid) and is_binary(topic) and is_pid(channel_pid) do
+  def put(cache_pid, topic, channel_pid)
+      when is_pid(cache_pid) and is_binary(topic) and is_pid(channel_pid) do
     GenServer.cast(cache_pid, {:put, topic, channel_pid})
   end
 
@@ -188,13 +191,15 @@ defmodule Phoenix.SocketClient.RouteCache do
 
     # Create ETS table for caching with unique name
     table_name = :"phoenix_route_cache_#{System.unique_integer([:positive])}"
-    cache_table = :ets.new(table_name, [
-      :set,
-      :public,
-      :named_table,
-      {:read_concurrency, true},
-      {:write_concurrency, true}
-    ])
+
+    cache_table =
+      :ets.new(table_name, [
+        :set,
+        :public,
+        :named_table,
+        {:read_concurrency, true},
+        {:write_concurrency, true}
+      ])
 
     # Start cleanup timer
     {:ok, timer} = :timer.send_interval(cleanup_interval, :cleanup)
@@ -225,9 +230,10 @@ defmodule Phoenix.SocketClient.RouteCache do
         # Check if entry is still valid
         if current_time - entry.timestamp <= state.ttl and Process.alive?(entry.pid) do
           # Update access statistics
-          updated_entry = %{entry |
-            access_count: entry.access_count + 1,
-            last_access: current_time
+          updated_entry = %{
+            entry
+            | access_count: entry.access_count + 1,
+              last_access: current_time
           }
 
           :ets.insert(state.cache_table, {topic, updated_entry})
@@ -241,10 +247,7 @@ defmodule Phoenix.SocketClient.RouteCache do
           :ets.delete(state.cache_table, topic)
           current_size = :ets.info(state.cache_table, :size)
 
-          new_stats = %{state.stats |
-            misses: state.stats.misses + 1,
-            current_size: current_size
-          }
+          new_stats = %{state.stats | misses: state.stats.misses + 1, current_size: current_size}
           new_state = %{state | stats: new_stats}
 
           {:reply, :error, new_state}
@@ -264,16 +267,18 @@ defmodule Phoenix.SocketClient.RouteCache do
     current_size = :ets.info(state.cache_table, :size)
     memory = :ets.info(state.cache_table, :memory)
 
-    stats = Map.merge(state.stats, %{
-      current_size: current_size,
-      memory_bytes: memory * 8,  # ETS memory is in words
-      cache_table_info: %{
-        size: current_size,
-        memory: memory,
-        owner: :ets.info(state.cache_table, :owner),
-        protection: :ets.info(state.cache_table, :protection)
-      }
-    })
+    stats =
+      Map.merge(state.stats, %{
+        current_size: current_size,
+        # ETS memory is in words
+        memory_bytes: memory * 8,
+        cache_table_info: %{
+          size: current_size,
+          memory: memory,
+          owner: :ets.info(state.cache_table, :owner),
+          protection: :ets.info(state.cache_table, :protection)
+        }
+      })
 
     {:reply, stats, state}
   end
@@ -301,9 +306,11 @@ defmodule Phoenix.SocketClient.RouteCache do
       end)
 
     current_size = :ets.info(state.cache_table, :size)
-    new_stats = %{state.stats |
-      insertions: state.stats.insertions + inserted_count,
-      current_size: current_size
+
+    new_stats = %{
+      state.stats
+      | insertions: state.stats.insertions + inserted_count,
+        current_size: current_size
     }
 
     final_state = %{new_state | stats: new_stats}
@@ -311,15 +318,17 @@ defmodule Phoenix.SocketClient.RouteCache do
     Phoenix.SocketClient.Telemetry.optimization(:route_cache_warmup, %{
       routes_inserted: inserted_count
     })
+
     {:reply, :ok, final_state}
   end
 
   @impl true
   def handle_call({:cached?, topic}, _from, state) do
-    cached = case :ets.lookup(state.cache_table, topic) do
-      [{^topic, _entry}] -> true
-      [] -> false
-    end
+    cached =
+      case :ets.lookup(state.cache_table, topic) do
+        [{^topic, _entry}] -> true
+        [] -> false
+      end
 
     {:reply, cached, state}
   end
@@ -330,11 +339,12 @@ defmodule Phoenix.SocketClient.RouteCache do
     current_size = :ets.info(state.cache_table, :size)
 
     # Check if we need to evict entries
-    new_state = if current_size >= state.cache_size do
-      evict_lru_entries(state)
-    else
-      state
-    end
+    new_state =
+      if current_size >= state.cache_size do
+        evict_lru_entries(state)
+      else
+        state
+      end
 
     entry = %{
       pid: channel_pid,
@@ -346,9 +356,11 @@ defmodule Phoenix.SocketClient.RouteCache do
     :ets.insert(new_state.cache_table, {topic, entry})
 
     final_size = :ets.info(new_state.cache_table, :size)
-    new_stats = %{new_state.stats |
-      insertions: new_state.stats.insertions + 1,
-      current_size: final_size
+
+    new_stats = %{
+      new_state.stats
+      | insertions: new_state.stats.insertions + 1,
+        current_size: final_size
     }
 
     final_state = %{new_state | stats: new_stats}
@@ -408,16 +420,17 @@ defmodule Phoenix.SocketClient.RouteCache do
 
     if total_removed > 0 do
       Phoenix.SocketClient.Telemetry.optimization(:route_cache_cleanup, %{
-      total_removed: total_removed,
-      expired_removed: removed_count,
-      dead_removed: evicted_count,
-      cache_size: :ets.info(state.cache_table, :size)
-    })
+        total_removed: total_removed,
+        expired_removed: removed_count,
+        dead_removed: evicted_count,
+        cache_size: :ets.info(state.cache_table, :size)
+      })
     end
 
-    new_stats = %{state.stats |
-      evictions: state.stats.evictions + evicted_count,
-      current_size: current_size
+    new_stats = %{
+      state.stats
+      | evictions: state.stats.evictions + evicted_count,
+        current_size: current_size
     }
 
     new_state = %{state | stats: new_stats}
@@ -431,9 +444,11 @@ defmodule Phoenix.SocketClient.RouteCache do
     end
 
     :ets.delete(state.cache_table)
+
     Phoenix.SocketClient.Telemetry.optimization(:route_cache_terminating, %{
       entries_cleared: :ets.info(state.cache_table, :size)
     })
+
     :ok
   end
 
@@ -441,17 +456,20 @@ defmodule Phoenix.SocketClient.RouteCache do
 
   defp evict_lru_entries(state) do
     # Evict least recently used entries
-    target_size = div(state.cache_size, 2)  # Evict to 50% capacity
+    # Evict to 50% capacity
+    target_size = div(state.cache_size, 2)
 
-    entries = :ets.tab2list(state.cache_table)
-    |> Enum.sort_by(fn {_topic, entry} -> entry.last_access end)
+    entries =
+      :ets.tab2list(state.cache_table)
+      |> Enum.sort_by(fn {_topic, entry} -> entry.last_access end)
 
     {to_evict, _to_keep} = Enum.split(entries, length(entries) - target_size)
 
-    evicted_count = Enum.reduce(to_evict, 0, fn {topic, _entry}, count ->
-      :ets.delete(state.cache_table, topic)
-      count + 1
-    end)
+    evicted_count =
+      Enum.reduce(to_evict, 0, fn {topic, _entry}, count ->
+        :ets.delete(state.cache_table, topic)
+        count + 1
+      end)
 
     Phoenix.SocketClient.Telemetry.optimization(:route_cache_lr_eviction, %{
       evicted_count: evicted_count,

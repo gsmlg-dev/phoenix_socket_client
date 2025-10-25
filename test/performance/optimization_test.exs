@@ -17,21 +17,22 @@ defmodule Phoenix.SocketClient.Performance.OptimizationTest do
   describe "Optimization Integration" do
     test "all optimizations start correctly" do
       # Start a socket with optimizations enabled
-      {:ok, socket_pid} = Phoenix.SocketClient.start_link([
-        url: "ws://localhost:4000/socket/websocket",
-        auto_connect: false,
-        registry_name: :"TestRegistry#{System.unique_integer()}",
-        binary_pool_size: 100,
-        route_cache_size: 100,
-        hibernation_enabled: true,
-        transport_opts: [
-          tcp_opts: [
-            nodelay: true,
-            keepalive: true,
-            buffer: 64 * 1024
+      {:ok, socket_pid} =
+        Phoenix.SocketClient.start_link(
+          url: "ws://localhost:4000/socket/websocket",
+          auto_connect: false,
+          registry_name: :"TestRegistry#{System.unique_integer()}",
+          binary_pool_size: 100,
+          route_cache_size: 100,
+          hibernation_enabled: true,
+          transport_opts: [
+            tcp_opts: [
+              nodelay: true,
+              keepalive: true,
+              buffer: 64 * 1024
+            ]
           ]
-        ]
-      ])
+        )
 
       # Verify all optimization components are running
       assert Process.alive?(socket_pid)
@@ -68,10 +69,11 @@ defmodule Phoenix.SocketClient.Performance.OptimizationTest do
       RouteCache.put(route_cache_pid, topic, channel_pid)
 
       # Test cache hit
-      assert {:ok, ^channel_pid} = Router.route_message(topic, [
-        cache_pid: route_cache_pid,
-        registry_name: registry_name
-      ])
+      assert {:ok, ^channel_pid} =
+               Router.route_message(topic,
+                 cache_pid: route_cache_pid,
+                 registry_name: registry_name
+               )
 
       # Test cache statistics
       stats = RouteCache.stats(route_cache_pid)
@@ -115,25 +117,28 @@ defmodule Phoenix.SocketClient.Performance.OptimizationTest do
       Registry.register(registry_name, topic, nil)
 
       # Route without cache (should use registry)
-      assert {:ok, ^channel_pid} = Router.route_message(topic, [
-        registry_name: registry_name,
-        use_cache: false
-      ])
+      assert {:ok, ^channel_pid} =
+               Router.route_message(topic,
+                 registry_name: registry_name,
+                 use_cache: false
+               )
 
       # Route with cache (should populate cache)
-      assert {:ok, ^channel_pid} = Router.route_message(topic, [
-        cache_pid: route_cache_pid,
-        registry_name: registry_name,
-        use_cache: true,
-        cache_on_hit: true
-      ])
+      assert {:ok, ^channel_pid} =
+               Router.route_message(topic,
+                 cache_pid: route_cache_pid,
+                 registry_name: registry_name,
+                 use_cache: true,
+                 cache_on_hit: true
+               )
 
       # Route again (should use cache)
-      assert {:ok, ^channel_pid} = Router.route_message(topic, [
-        cache_pid: route_cache_pid,
-        registry_name: registry_name,
-        use_cache: true
-      ])
+      assert {:ok, ^channel_pid} =
+               Router.route_message(topic,
+                 cache_pid: route_cache_pid,
+                 registry_name: registry_name,
+                 use_cache: true
+               )
 
       # Verify route is cached
       assert Router.route_cached?(topic, route_cache_pid)
@@ -150,9 +155,11 @@ defmodule Phoenix.SocketClient.Performance.OptimizationTest do
 
       # Create many similar binaries
       base_pattern = <<"{\"pattern\": \"memory_test\", \"data\": \"">>
-      binaries = for i <- 1..100 do
-        base_pattern <> Integer.to_string(i) <> "\"}"
-      end
+
+      binaries =
+        for i <- 1..100 do
+          base_pattern <> Integer.to_string(i) <> "\"}"
+        end
 
       # Pool all binaries
       Enum.each(binaries, fn binary ->
@@ -161,11 +168,13 @@ defmodule Phoenix.SocketClient.Performance.OptimizationTest do
 
       # Check pool stats
       stats = BinaryPool.stats(pool_pid)
-      assert stats.pool_size <= 50  # Should be limited
+      # Should be limited
+      assert stats.pool_size <= 50
       assert stats.total_count > 0
 
       # Memory should be reasonable
-      assert stats.total_memory_bytes < 1_000_000  # Less than 1MB
+      # Less than 1MB
+      assert stats.total_memory_bytes < 1_000_000
 
       GenServer.stop(pool_pid)
     end
@@ -182,7 +191,8 @@ defmodule Phoenix.SocketClient.Performance.OptimizationTest do
       # Check memory usage
       stats = RouteCache.stats(cache_pid)
       assert stats.current_size <= 100
-      assert stats.memory_bytes < 1_000_000  # Less than 1MB
+      # Less than 1MB
+      assert stats.memory_bytes < 1_000_000
 
       RouteCache.clear(cache_pid)
     end
@@ -200,31 +210,33 @@ defmodule Phoenix.SocketClient.Performance.OptimizationTest do
       Registry.register(registry_name, topic, nil)
 
       # Warm up cache
-      Router.route_message(topic, [
+      Router.route_message(topic,
         cache_pid: route_cache_pid,
         registry_name: registry_name,
         cache_on_hit: true
-      ])
+      )
 
       # Benchmark cache lookups
-      cache_time = :timer.tc(fn ->
-        for _i <- 1..1000 do
-          Router.route_message(topic, [
-            cache_pid: route_cache_pid,
-            registry_name: registry_name
-          ])
-        end
-      end)
+      cache_time =
+        :timer.tc(fn ->
+          for _i <- 1..1000 do
+            Router.route_message(topic,
+              cache_pid: route_cache_pid,
+              registry_name: registry_name
+            )
+          end
+        end)
 
       # Benchmark registry lookups
-      registry_time = :timer.tc(fn ->
-        for _i <- 1..1000 do
-          Router.route_message(topic, [
-            registry_name: registry_name,
-            use_cache: false
-          ])
-        end
-      end)
+      registry_time =
+        :timer.tc(fn ->
+          for _i <- 1..1000 do
+            Router.route_message(topic,
+              registry_name: registry_name,
+              use_cache: false
+            )
+          end
+        end)
 
       {cache_microseconds, _cache_result} = cache_time
       {registry_microseconds, _registry_result} = registry_time
@@ -232,7 +244,10 @@ defmodule Phoenix.SocketClient.Performance.OptimizationTest do
       # Cache should be faster (this is a loose assertion since timing can vary)
       IO.puts("Cache lookup time: #{cache_microseconds}μs")
       IO.puts("Registry lookup time: #{registry_microseconds}μs")
-      IO.puts("Performance improvement: #{Float.round(registry_microseconds / cache_microseconds, 2)}x")
+
+      IO.puts(
+        "Performance improvement: #{Float.round(registry_microseconds / cache_microseconds, 2)}x"
+      )
 
       # Clean up
       Registry.unregister(registry_name, topic)

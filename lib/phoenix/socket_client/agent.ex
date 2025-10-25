@@ -39,8 +39,11 @@ defmodule Phoenix.SocketClient.Agent do
     case registry_name do
       nil ->
         Agent.start_link(fn -> init_state(opts) end)
+
       _ ->
-        Agent.start_link(fn -> init_state(opts) end, name: {:via, Registry, {registry_name, :socket_state}})
+        Agent.start_link(fn -> init_state(opts) end,
+          name: {:via, Registry, {registry_name, :socket_state}}
+        )
     end
   end
 
@@ -214,7 +217,7 @@ defmodule Phoenix.SocketClient.Agent do
       config.transport_opts
       |> Keyword.put_new(:extra_headers, config.headers)
       |> Keyword.put_new(:keepalive, config.heartbeat_interval)
-      |> Keyword.put_new(:tcp_opts, [
+      |> Keyword.put_new(:tcp_opts,
         nodelay: true,
         keepalive: true,
         buffer: 64 * 1024,
@@ -223,9 +226,10 @@ defmodule Phoenix.SocketClient.Agent do
         keepalive_idle: 7200,
         keepalive_interval: 75,
         keepalive_count: 9
-      ])
+      )
       |> Keyword.put_new(:connect_timeout, 10_000)
-      |> Keyword.put_new(:compression, false)  # Can be enabled by user
+      # Can be enabled by user
+      |> Keyword.put_new(:compression, false)
 
     %State{
       url: base_url,

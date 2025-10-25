@@ -58,6 +58,7 @@ defmodule Phoenix.SocketClient.Transports.Websocket do
       event: :unknown_message,
       message: other_msg
     })
+
     {:ok, state}
   end
 

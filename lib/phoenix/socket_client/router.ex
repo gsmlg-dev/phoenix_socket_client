@@ -33,11 +33,11 @@ defmodule Phoenix.SocketClient.Router do
   Routing options
   """
   @type opts :: [
-    cache_pid: pid(),
-    registry_name: atom(),
-    use_cache: boolean(),
-    cache_on_hit: boolean()
-  ]
+          cache_pid: pid(),
+          registry_name: atom(),
+          use_cache: boolean(),
+          cache_on_hit: boolean()
+        ]
 
   @doc """
   Routes a message to the appropriate channel process.
@@ -135,7 +135,8 @@ defmodule Phoenix.SocketClient.Router do
   def invalidate_route(topic, cache_pid) when is_binary(topic) and is_pid(cache_pid) do
     RouteCache.delete(cache_pid, topic)
   catch
-    :exit, _ -> :ok  # Cache might be unavailable
+    # Cache might be unavailable
+    :exit, _ -> :ok
   end
 
   @doc """
@@ -208,6 +209,7 @@ defmodule Phoenix.SocketClient.Router do
             if cache_on_hit do
               RouteCache.put(cache_pid, topic, pid)
             end
+
             {:ok, pid}
 
           _ ->
@@ -228,6 +230,7 @@ defmodule Phoenix.SocketClient.Router do
         if cache_on_hit && cache_pid do
           RouteCache.put(cache_pid, topic, pid)
         end
+
         {:ok, pid}
 
       _ ->
@@ -235,6 +238,7 @@ defmodule Phoenix.SocketClient.Router do
         :error
     end
   rescue
-    ArgumentError -> :error  # Registry might not exist
+    # Registry might not exist
+    ArgumentError -> :error
   end
 end

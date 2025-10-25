@@ -107,20 +107,24 @@ defmodule Phoenix.SocketClient.MessageProcessor do
     concurrency = Keyword.get(opts, :concurrency, @default_concurrency)
 
     # Start binary pool for JSON optimization
-    {:ok, binary_pool_pid} = Phoenix.SocketClient.BinaryPool.start_link([
-      pool_size: Keyword.get(opts, :binary_pool_size, 1000),
-      cleanup_interval: Keyword.get(opts, :binary_cleanup_interval, 30_000),
-      max_age: Keyword.get(opts, :binary_max_age, 300_000),
-      registry_name: nil  # No registry for binary pool
-    ])
+    {:ok, binary_pool_pid} =
+      Phoenix.SocketClient.BinaryPool.start_link(
+        pool_size: Keyword.get(opts, :binary_pool_size, 1000),
+        cleanup_interval: Keyword.get(opts, :binary_cleanup_interval, 30_000),
+        max_age: Keyword.get(opts, :binary_max_age, 300_000),
+        # No registry for binary pool
+        registry_name: nil
+      )
 
     # Start route cache for message routing
-    {:ok, route_cache_pid} = Phoenix.SocketClient.RouteCache.start_link([
-      cache_size: Keyword.get(opts, :route_cache_size, 1000),
-      ttl: Keyword.get(opts, :route_cache_ttl, 300_000),
-      cleanup_interval: Keyword.get(opts, :route_cleanup_interval, 60_000),
-      registry_name: nil  # No registry for route cache
-    ])
+    {:ok, route_cache_pid} =
+      Phoenix.SocketClient.RouteCache.start_link(
+        cache_size: Keyword.get(opts, :route_cache_size, 1000),
+        ttl: Keyword.get(opts, :route_cache_ttl, 300_000),
+        cleanup_interval: Keyword.get(opts, :route_cleanup_interval, 60_000),
+        # No registry for route cache
+        registry_name: nil
+      )
 
     state = %__MODULE__{
       serializer: serializer,
@@ -134,11 +138,14 @@ defmodule Phoenix.SocketClient.MessageProcessor do
     }
 
     # Start worker supervisor
-    {:ok, worker_sup} = start_worker_supervisor(concurrency, serializer, json_library, binary_pool_pid)
+    {:ok, worker_sup} =
+      start_worker_supervisor(concurrency, serializer, json_library, binary_pool_pid)
 
     state = %{state | worker_sup: worker_sup}
 
-    Telemetry.execute([:phoenix_socket_client, :message_processor, :started], %{}, %{registry_name: registry_name})
+    Telemetry.execute([:phoenix_socket_client, :message_processor, :started], %{}, %{
+      registry_name: registry_name
+    })
 
     {:ok, state}
   end
@@ -148,20 +155,26 @@ defmodule Phoenix.SocketClient.MessageProcessor do
     queue_size = :queue.len(state.encode_queue) + :queue.len(state.decode_queue)
 
     if queue_size >= state.max_queue_size do
-      Telemetry.execute([:phoenix_socket_client, :message_processor, :backpressure], %{queue_size: queue_size}, %{
-        operation: operation
-      })
+      Telemetry.execute(
+        [:phoenix_socket_client, :message_processor, :backpressure],
+        %{queue_size: queue_size},
+        %{
+          operation: operation
+        }
+      )
 
       {:reply, {:error, :queue_full}, state}
     else
       item = {operation, data, caller, ref}
 
-      new_state = case operation do
-        :encode ->
-          %{state | encode_queue: :queue.in(item, state.encode_queue)}
-        :decode ->
-          %{state | decode_queue: :queue.in(item, state.decode_queue)}
-      end
+      new_state =
+        case operation do
+          :encode ->
+            %{state | encode_queue: :queue.in(item, state.encode_queue)}
+
+          :decode ->
+            %{state | decode_queue: :queue.in(item, state.decode_queue)}
+        end
 
       # Start batch timer if not already running
       new_state = maybe_start_batch_timer(new_state, operation)
@@ -170,12 +183,19 @@ defmodule Phoenix.SocketClient.MessageProcessor do
       new_state = maybe_process_batch(new_state, operation)
 
       # Store pending reply tracking
-      new_state = %{new_state | pending_replies: Map.put(new_state.pending_replies, ref, {caller, operation})}
+      new_state = %{
+        new_state
+        | pending_replies: Map.put(new_state.pending_replies, ref, {caller, operation})
+      }
 
-      Telemetry.execute([:phoenix_socket_client, :message_processor, :queued], %{
-        queue_size: :queue.len(new_state.encode_queue) + :queue.len(new_state.decode_queue),
-        operation: operation
-      }, %{})
+      Telemetry.execute(
+        [:phoenix_socket_client, :message_processor, :queued],
+        %{
+          queue_size: :queue.len(new_state.encode_queue) + :queue.len(new_state.decode_queue),
+          operation: operation
+        },
+        %{}
+      )
 
       {:reply, :ok, new_state}
     end
@@ -226,6 +246,7 @@ defmodule Phoenix.SocketClient.MessageProcessor do
             :encode -> send(caller, {:encode_result, ref, result})
             :decode -> send(caller, {:decode_result, ref, result})
           end
+
         _ ->
           # Caller may have died or operation mismatch, clean up
           :ok
@@ -238,10 +259,14 @@ defmodule Phoenix.SocketClient.MessageProcessor do
 
     new_state = %{state | pending_replies: new_pending_replies}
 
-    Telemetry.execute([:phoenix_socket_client, :message_processor, :batch_completed], %{
-      operation: operation,
-      batch_size: length(results)
-    }, %{})
+    Telemetry.execute(
+      [:phoenix_socket_client, :message_processor, :batch_completed],
+      %{
+        operation: operation,
+        batch_size: length(results)
+      },
+      %{}
+    )
 
     {:noreply, new_state}
   end
@@ -254,9 +279,13 @@ defmodule Phoenix.SocketClient.MessageProcessor do
   defp message_name(registry_name), do: {:via, Registry, {registry_name, :message_processor}}
 
   defp start_worker_supervisor(concurrency, serializer, json_library, binary_pool_pid) do
-    children = for i <- 1..concurrency do
-      Supervisor.child_spec({Task, fn -> worker_loop(i, serializer, json_library, binary_pool_pid) end}, id: i)
-    end
+    children =
+      for i <- 1..concurrency do
+        Supervisor.child_spec(
+          {Task, fn -> worker_loop(i, serializer, json_library, binary_pool_pid) end},
+          id: i
+        )
+      end
 
     Supervisor.start_link(children, strategy: :one_for_one, max_restarts: 10, max_seconds: 60)
   end
@@ -307,17 +336,20 @@ defmodule Phoenix.SocketClient.MessageProcessor do
   defp process_batch_async(operation, batch, state) do
     # Find available worker
     children = Supervisor.which_children(state.worker_sup)
+
     case Enum.find(children, fn {_id, pid, _worker, _modules} ->
-      is_pid(pid) and Process.alive?(pid)
-    end) do
+           is_pid(pid) and Process.alive?(pid)
+         end) do
       {_, pid, _worker, _modules} ->
         send(pid, {:"#{operation}_batch", batch, self()})
         state
+
       nil ->
         # No available workers, re-queue
         case operation do
           :encode ->
             %{state | encode_queue: :queue.join(batch, state.encode_queue)}
+
           :decode ->
             %{state | decode_queue: :queue.join(batch, state.decode_queue)}
         end
@@ -329,16 +361,19 @@ defmodule Phoenix.SocketClient.MessageProcessor do
       {{:value, item}, remaining_queue} ->
         {batch, final_queue} = take_batch_helper([item], remaining_queue, max_size - 1)
         {:queue.from_list(batch), final_queue}
+
       {:empty} ->
         {:queue.new(), queue}
     end
   end
 
   defp take_batch_helper(batch, queue, 0), do: {batch, queue}
+
   defp take_batch_helper(batch, queue, remaining) do
     case :queue.out(queue) do
       {{:value, item}, remaining_queue} ->
         take_batch_helper([item | batch], remaining_queue, remaining - 1)
+
       {:empty} ->
         {batch, queue}
     end
@@ -353,6 +388,7 @@ defmodule Phoenix.SocketClient.MessageProcessor do
         else
           state
         end
+
       :decode ->
         if state.decode_timer == nil and :queue.len(state.decode_queue) > 0 do
           timer = Process.send_after(self(), :process_decode_batch, state.batch_interval)
@@ -373,6 +409,7 @@ defmodule Phoenix.SocketClient.MessageProcessor do
         else
           state
         end
+
       :decode ->
         if :queue.len(state.decode_queue) >= state.batch_size do
           {batch, new_decode_queue} = take_batch(state.decode_queue, state.batch_size)

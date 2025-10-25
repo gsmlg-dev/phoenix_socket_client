@@ -29,32 +29,33 @@ defmodule Phoenix.SocketClient.BinaryPool do
 
   @default_pool_size 1000
   @cleanup_interval 30_000
-  @max_age 300_000  # 5 minutes
+  # 5 minutes
+  @max_age 300_000
 
   @typedoc """
   Pool configuration options
   """
   @type opts :: [
-    pool_size: non_neg_integer(),
-    cleanup_interval: non_neg_integer(),
-    max_age: non_neg_integer(),
-    registry_name: atom()
-  ]
+          pool_size: non_neg_integer(),
+          cleanup_interval: non_neg_integer(),
+          max_age: non_neg_integer(),
+          registry_name: atom()
+        ]
 
   @typedoc """
   Pool state structure
   """
   @type t :: %__MODULE__{
-    pool_size: non_neg_integer(),
-    cleanup_interval: non_neg_integer(),
-    max_age: non_neg_integer(),
-    registry_name: atom() | nil,
-    patterns: %{
-      binary() => %{count: non_neg_integer(), last_used: integer(), size: non_neg_integer()}
-    },
-    total_count: non_neg_integer(),
-    total_memory: non_neg_integer()
-  }
+          pool_size: non_neg_integer(),
+          cleanup_interval: non_neg_integer(),
+          max_age: non_neg_integer(),
+          registry_name: atom() | nil,
+          patterns: %{
+            binary() => %{count: non_neg_integer(), last_used: integer(), size: non_neg_integer()}
+          },
+          total_count: non_neg_integer(),
+          total_memory: non_neg_integer()
+        }
 
   defstruct [
     :pool_size,
@@ -157,7 +158,6 @@ defmodule Phoenix.SocketClient.BinaryPool do
         "payload" => %{},
         "ref" => "3"
       }),
-
       json_lib.encode!(%{
         "topic" => "rooms:lobby",
         "event" => "shout",
@@ -198,7 +198,8 @@ defmodule Phoenix.SocketClient.BinaryPool do
 
     # Warm up with common patterns
     Task.start(fn ->
-      :timer.sleep(1000)  # Give time for system to stabilize
+      # Give time for system to stabilize
+      :timer.sleep(1000)
       warm_up_common_patterns(state)
     end)
 
@@ -220,10 +221,12 @@ defmodule Phoenix.SocketClient.BinaryPool do
           }
 
           new_patterns = Map.put(state.patterns, binary, pattern_info)
-          new_state = %{state |
-            patterns: new_patterns,
-            total_count: state.total_count + 1,
-            total_memory: state.total_memory + binary_size
+
+          new_state = %{
+            state
+            | patterns: new_patterns,
+              total_count: state.total_count + 1,
+              total_memory: state.total_memory + binary_size
           }
 
           {:reply, binary, new_state}
@@ -234,9 +237,10 @@ defmodule Phoenix.SocketClient.BinaryPool do
 
       pattern_info ->
         # Existing pattern, update usage stats
-        updated_info = %{pattern_info |
-          count: pattern_info.count + 1,
-          last_used: System.monotonic_time(:millisecond)
+        updated_info = %{
+          pattern_info
+          | count: pattern_info.count + 1,
+            last_used: System.monotonic_time(:millisecond)
         }
 
         new_patterns = Map.put(state.patterns, binary, updated_info)
@@ -256,25 +260,27 @@ defmodule Phoenix.SocketClient.BinaryPool do
 
   @impl true
   def handle_call({:warm_up, patterns}, _from, state) do
-    new_state = Enum.reduce(patterns, state, fn binary, acc_state ->
-      binary_size = byte_size(binary)
+    new_state =
+      Enum.reduce(patterns, state, fn binary, acc_state ->
+        binary_size = byte_size(binary)
 
-      if map_size(acc_state.patterns) < acc_state.pool_size do
-        pattern_info = %{
-          count: 1,
-          last_used: System.monotonic_time(:millisecond),
-          size: binary_size
-        }
+        if map_size(acc_state.patterns) < acc_state.pool_size do
+          pattern_info = %{
+            count: 1,
+            last_used: System.monotonic_time(:millisecond),
+            size: binary_size
+          }
 
-        %{acc_state |
-          patterns: Map.put(acc_state.patterns, binary, pattern_info),
-          total_count: acc_state.total_count + 1,
-          total_memory: acc_state.total_memory + binary_size
-        }
-      else
-        acc_state
-      end
-    end)
+          %{
+            acc_state
+            | patterns: Map.put(acc_state.patterns, binary, pattern_info),
+              total_count: acc_state.total_count + 1,
+              total_memory: acc_state.total_memory + binary_size
+          }
+        else
+          acc_state
+        end
+      end)
 
     {:reply, :ok, new_state}
   end
@@ -287,7 +293,8 @@ defmodule Phoenix.SocketClient.BinaryPool do
       total_count: state.total_count,
       total_memory_bytes: state.total_memory,
       total_memory_mb: state.total_memory / (1024 * 1024),
-      average_pattern_size: if(state.total_count > 0, do: state.total_memory / state.total_count, else: 0),
+      average_pattern_size:
+        if(state.total_count > 0, do: state.total_memory / state.total_count, else: 0),
       oldest_pattern_age: find_oldest_pattern_age(state.patterns),
       newest_pattern_age: find_newest_pattern_age(state.patterns)
     }
@@ -308,24 +315,26 @@ defmodule Phoenix.SocketClient.BinaryPool do
       end)
 
     # Calculate removed memory
-    removed_memory = Enum.reduce(removed_patterns, 0, fn {_binary, pattern_info}, acc ->
-      acc + pattern_info.size
-    end)
+    removed_memory =
+      Enum.reduce(removed_patterns, 0, fn {_binary, pattern_info}, acc ->
+        acc + pattern_info.size
+      end)
 
     removed_count = length(removed_patterns)
 
-    new_state = %{state |
-      patterns: Map.new(active_patterns),
-      total_count: state.total_count - removed_count,
-      total_memory: state.total_memory - removed_memory
+    new_state = %{
+      state
+      | patterns: Map.new(active_patterns),
+        total_count: state.total_count - removed_count,
+        total_memory: state.total_memory - removed_memory
     }
 
     if removed_count > 0 do
       Phoenix.SocketClient.Telemetry.optimization(:binary_pool_cleanup, %{
-      patterns_removed: removed_count,
-      memory_freed_bytes: removed_memory,
-      pool_size: map_size(state.patterns)
-    })
+        patterns_removed: removed_count,
+        memory_freed_bytes: removed_memory,
+        pool_size: map_size(state.patterns)
+      })
     end
 
     {:noreply, new_state}
@@ -337,6 +346,7 @@ defmodule Phoenix.SocketClient.BinaryPool do
       patterns_count: map_size(state.patterns),
       total_memory: state.total_memory
     })
+
     :ok
   end
 
@@ -346,23 +356,28 @@ defmodule Phoenix.SocketClient.BinaryPool do
     try do
       patterns = common_patterns()
       GenServer.call(self(), {:warm_up, patterns}, 5000)
+
       Phoenix.SocketClient.Telemetry.optimization(:binary_pool_warmup, %{
-      patterns_count: length(patterns)
-    })
+        patterns_count: length(patterns)
+      })
     catch
       :exit, _ ->
-      Phoenix.SocketClient.Telemetry.optimization(:binary_pool_warmup_failed, %{
-        reason: :server_terminating
-      })
+        Phoenix.SocketClient.Telemetry.optimization(:binary_pool_warmup_failed, %{
+          reason: :server_terminating
+        })
     end
   end
 
   defp find_oldest_pattern_age(patterns) do
     current_time = System.monotonic_time(:millisecond)
 
-    case Enum.min_by(patterns, fn {_binary, pattern_info} ->
-      pattern_info.last_used
-    end, fn -> nil end) do
+    case Enum.min_by(
+           patterns,
+           fn {_binary, pattern_info} ->
+             pattern_info.last_used
+           end,
+           fn -> nil end
+         ) do
       {_binary, pattern_info} -> current_time - pattern_info.last_used
       nil -> 0
     end
@@ -371,9 +386,13 @@ defmodule Phoenix.SocketClient.BinaryPool do
   defp find_newest_pattern_age(patterns) do
     current_time = System.monotonic_time(:millisecond)
 
-    case Enum.max_by(patterns, fn {_binary, pattern_info} ->
-      pattern_info.last_used
-    end, fn -> nil end) do
+    case Enum.max_by(
+           patterns,
+           fn {_binary, pattern_info} ->
+             pattern_info.last_used
+           end,
+           fn -> nil end
+         ) do
       {_binary, pattern_info} -> current_time - pattern_info.last_used
       nil -> 0
     end

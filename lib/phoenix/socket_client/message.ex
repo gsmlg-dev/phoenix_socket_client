@@ -55,7 +55,7 @@ defmodule Phoenix.SocketClient.Message do
   Use V2 protocol ("2.0.0") for new applications.
   """
   @spec serializer(String.t()) :: module()
-  
+
   def serializer("2.0.0"), do: __MODULE__.V2
   def serializer(_), do: __MODULE__.V2
 
