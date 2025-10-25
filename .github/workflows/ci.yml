@@ -127,25 +127,3 @@ jobs:
 
       - name: Run Dialyzer
         run: mix dialyzer --halt-exit-status
-
-  ci-success:
-    name: All CI Checks Passed
-    runs-on: ubuntu-latest
-    if: always()
-    needs: [compile, format, credo, dialyzer]
-
-    steps:
-      - name: Check all jobs succeeded
-        run: |
-          if [[ "${{ needs.compile.result }}" != "success" ]] || \
-             [[ "${{ needs.format.result }}" != "success" ]] || \
-             [[ "${{ needs.credo.result }}" != "success" ]] || \
-             [[ "${{ needs.dialyzer.result }}" != "success" ]]; then
-            echo "One or more CI checks failed:"
-            echo "  - Compile: ${{ needs.compile.result }}"
-            echo "  - Format: ${{ needs.format.result }}"
-            echo "  - Credo: ${{ needs.credo.result }}"
-            echo "  - Dialyzer: ${{ needs.dialyzer.result }}"
-            exit 1
-          fi
-          echo "All CI checks passed successfully!"
