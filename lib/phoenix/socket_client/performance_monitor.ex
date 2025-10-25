@@ -547,7 +547,7 @@ defmodule Phoenix.SocketClient.PerformanceMonitor do
     Recent Alerts:
     ---------------
     #{if length(metrics.alerts) > 0 do
-      Enum.map(metrics.alerts, fn alert -> "#{alert.type}: #{alert.message}" end) |> Enum.join("\n")
+      Enum.map_join(metrics.alerts, "\n", fn alert -> "#{alert.type}: #{alert.message}" end)
     else
       "No recent alerts"
     end}

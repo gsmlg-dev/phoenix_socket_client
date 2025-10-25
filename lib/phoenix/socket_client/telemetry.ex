@@ -1319,7 +1319,12 @@ defmodule Phoenix.SocketClient.Telemetry do
   end
 
   defp debug_handler(event_name, measurements, metadata, _config) do
-    IO.inspect({event_name, measurements, metadata}, label: "[Phoenix.SocketClient] Telemetry")
+    # Debug telemetry events - can be enabled via Logger level
+    require Logger
+
+    Logger.debug(fn ->
+      "[Phoenix.SocketClient] Telemetry: #{inspect(event_name)} - #{inspect(measurements)} - #{inspect(metadata)}"
+    end)
   end
 
   defp get_log_level(event_name, log_levels) do

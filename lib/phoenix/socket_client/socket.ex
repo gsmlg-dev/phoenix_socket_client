@@ -7,8 +7,8 @@ defmodule Phoenix.SocketClient.Socket do
 
   alias Phoenix.SocketClient.ChannelManager
   alias Phoenix.SocketClient.Message
-  alias Phoenix.SocketClient.Telemetry
   alias Phoenix.SocketClient.Router
+  alias Phoenix.SocketClient.Telemetry
 
   import Phoenix.SocketClient, only: [get_state: 2, put_state: 3, get_process_pid: 2]
 
@@ -416,7 +416,7 @@ defmodule Phoenix.SocketClient.Socket do
 
   def handle_info(:hibernate_request, state) do
     # Only hibernate if disconnected and no pending messages
-    if state.status == :disconnected and length(state.to_send_r) == 0 do
+    if state.status == :disconnected and Enum.empty?(state.to_send_r) do
       # Emit hibernation telemetry event
       Phoenix.SocketClient.Telemetry.optimization(:hibernation, %{
         socket_ref: Phoenix.SocketClient.get_state(state.sup_pid, :socket_ref),

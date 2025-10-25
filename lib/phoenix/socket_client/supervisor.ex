@@ -48,8 +48,7 @@ defmodule Phoenix.SocketClient.Supervisor do
       |> to_string()
       |> String.replace_leading("Elixir.", "")
       |> String.split(["_", "."])
-      |> Enum.map(&String.capitalize/1)
-      |> Enum.join()
+      |> Enum.map_join(&String.capitalize/1)
       |> (&(&1 <> "ChannelRegistry")).()
       |> String.to_atom()
 

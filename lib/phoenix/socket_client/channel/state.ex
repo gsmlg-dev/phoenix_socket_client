@@ -1,4 +1,11 @@
 defmodule Phoenix.SocketClient.Channel.State do
+  @moduledoc """
+  State structure for Phoenix Socket Client channel processes.
+
+  Maintains the state of individual channel connections including
+  topic, params, pending pushes, and registered hooks.
+  """
+
   @type t :: %__MODULE__{
           caller: pid() | nil,
           sup_pid: pid(),
