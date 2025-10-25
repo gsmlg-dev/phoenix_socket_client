@@ -157,7 +157,7 @@ defmodule Phoenix.SocketClient.TelemetryTest do
       assert config.track_message_sizes == true
       assert config.sampler_rate == 1.0
       assert config.max_events_per_second == 1000
-      assert config.event_buffer_size == 10000
+      assert config.event_buffer_size == 10_000
 
       assert is_map(config.log_levels)
       assert config.log_levels.connection == :info

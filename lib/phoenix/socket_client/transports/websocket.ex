@@ -1,4 +1,11 @@
 defmodule Phoenix.SocketClient.Transports.Websocket do
+  @moduledoc """
+  WebSocket transport implementation using the websocket_client library.
+
+  Provides WebSocket connectivity for Phoenix Socket Client using the
+  Erlang websocket_client library as the underlying transport mechanism.
+  """
+
   @behaviour Phoenix.SocketClient.Transport
 
   require Logger

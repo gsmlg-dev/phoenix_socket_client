@@ -143,7 +143,7 @@ defmodule Phoenix.SocketClient.Telemetry do
     track_message_sizes: true,
     sampler_rate: 1.0,
     max_events_per_second: 1000,
-    event_buffer_size: 10000,
+    event_buffer_size: 10_000,
     log_levels: %{
       connection: :info,
       connection_established: :debug,

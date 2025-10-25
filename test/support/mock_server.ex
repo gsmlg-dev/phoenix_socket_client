@@ -68,7 +68,7 @@ defmodule Phoenix.SocketClientTest.MockServer do
 
       {:error, _} ->
         # Fallback to a random port in a reasonable range
-        Enum.random(5808..65535)
+        Enum.random(5808..65_535)
     end
   end
 end
