@@ -75,16 +75,21 @@ defmodule Phoenix.SocketClient.Supervisor do
       {Task,
        fn ->
          # Store registry name in agent state for fast access
-         Phoenix.SocketClient.Agent.put(self(), :registry_name, registry_name)
+         case Phoenix.SocketClient.get_process_pid(sup_pid, :socket_state) do
+           nil -> :ok
+           state_pid -> Phoenix.SocketClient.Agent.put(state_pid, :registry_name, registry_name)
+         end
 
          # Register socket process with hibernation manager
-         socket_pid = Phoenix.SocketClient.get_process_pid(sup_pid, :socket)
+         case Phoenix.SocketClient.get_process_pid(sup_pid, :socket) do
+           nil ->
+             :ok
 
-         if socket_pid do
-           Phoenix.SocketClient.HibernationManager.register_process(
-             socket_pid,
-             {registry_name, :socket}
-           )
+           socket_pid ->
+             Phoenix.SocketClient.HibernationManager.register_process(
+               socket_pid,
+               {registry_name, :socket}
+             )
          end
 
          if get_state(sup_pid, :auto_connect) do

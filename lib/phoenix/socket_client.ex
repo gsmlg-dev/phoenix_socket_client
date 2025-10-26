@@ -24,13 +24,11 @@ defmodule Phoenix.SocketClient do
   """
   @spec connect(pid() | atom()) :: :ok | {:error, :no_socket_found}
   def connect(sup_pid) do
-    case get_process_pid(sup_pid, :socket) do
-      nil ->
-        {:error, :no_socket_found}
-
-      socket_pid ->
-        send(socket_pid, :connect)
-        :ok
+    sup_pid
+    |> get_process_pid(:socket)
+    |> case do
+      nil -> {:error, :no_socket_found}
+      socket_pid -> send(socket_pid, :connect) && :ok
     end
   end
 
@@ -89,7 +87,7 @@ defmodule Phoenix.SocketClient do
   @doc """
   Gets a value from the socket state.
   """
-  @spec get_state(pid() | atom(), atom()) :: any()
+  @spec get_state(pid() | atom(), atom()) :: any() | nil
   def get_state(name, key)
 
   def get_state(name, key) when is_atom(name) do
@@ -103,14 +101,16 @@ defmodule Phoenix.SocketClient do
   end
 
   def get_state(pid, key) when is_pid(pid) do
-    state_pid = get_process_pid(pid, :socket_state)
-    Phoenix.SocketClient.Agent.get(state_pid, key)
+    case get_process_pid(pid, :socket_state) do
+      nil -> nil
+      state_pid -> Phoenix.SocketClient.Agent.get(state_pid, key)
+    end
   end
 
   @doc """
   Gets the entire socket state.
   """
-  @spec get_state(pid() | atom()) :: map()
+  @spec get_state(pid() | atom()) :: map() | nil
   def get_state(name)
 
   def get_state(name) when is_atom(name) do
@@ -124,14 +124,16 @@ defmodule Phoenix.SocketClient do
   end
 
   def get_state(pid) when is_pid(pid) do
-    state_pid = get_process_pid(pid, :socket_state)
-    Phoenix.SocketClient.Agent.get_state(state_pid)
+    case get_process_pid(pid, :socket_state) do
+      nil -> nil
+      state_pid -> Phoenix.SocketClient.Agent.get_state(state_pid)
+    end
   end
 
   @doc """
   Puts a value into the socket state.
   """
-  @spec put_state(pid() | atom(), atom(), any()) :: :ok
+  @spec put_state(pid() | atom(), atom(), any()) :: :ok | nil
   def put_state(name, key, value)
 
   def put_state(name, key, value) when is_atom(name) do
@@ -145,8 +147,10 @@ defmodule Phoenix.SocketClient do
   end
 
   def put_state(pid, key, value) when is_pid(pid) do
-    state_pid = get_process_pid(pid, :socket_state)
-    Phoenix.SocketClient.Agent.put(state_pid, key, value)
+    case get_process_pid(pid, :socket_state) do
+      nil -> nil
+      state_pid -> Phoenix.SocketClient.Agent.put(state_pid, key, value)
+    end
   end
 
   @doc """
@@ -154,7 +158,9 @@ defmodule Phoenix.SocketClient do
   """
   @spec connected?(pid | atom) :: boolean
   def connected?(sup_pid) do
-    case get_process_pid(sup_pid, :socket) do
+    sup_pid
+    |> get_process_pid(:socket)
+    |> case do
       nil ->
         false
 
@@ -173,7 +179,9 @@ defmodule Phoenix.SocketClient do
   @spec channel_join(pid, binary, map) ::
           {:ok, pid} | {:error, :channel_manager_not_found | {:already_started, pid}}
   def channel_join(sup_pid, topic, params \\ %{}) do
-    case get_process_pid(sup_pid, :channel_manager) do
+    sup_pid
+    |> get_process_pid(:channel_manager)
+    |> case do
       nil ->
         {:error, :channel_manager_not_found}
 
@@ -185,7 +193,7 @@ defmodule Phoenix.SocketClient do
   @doc """
   Leaves a channel.
   """
-  @spec channel_leave(pid, pid) :: :ok
+  @spec channel_leave(pid, pid) :: :ok | :error
   def channel_leave(sup_pid, channel_pid) do
     case get_process_pid(sup_pid, :channel_manager) do
       nil -> :error
@@ -196,29 +204,35 @@ defmodule Phoenix.SocketClient do
   @doc """
   Updates the status of a channel. For internal use.
   """
-  @spec update_channel_status(pid, pid, String.t(), atom(), map() | nil) :: :ok
+  @spec update_channel_status(pid, pid, String.t(), atom(), map() | nil) :: :ok | nil
   def update_channel_status(sup_pid, channel_pid, topic, status, params \\ nil) do
-    state_pid = get_process_pid(sup_pid, :socket_state)
+    case get_process_pid(sup_pid, :socket_state) do
+      nil ->
+        nil
 
-    Phoenix.SocketClient.Agent.update_channel_status(
-      state_pid,
-      channel_pid,
-      topic,
-      status,
-      params
-    )
+      state_pid ->
+        Phoenix.SocketClient.Agent.update_channel_status(
+          state_pid,
+          channel_pid,
+          topic,
+          status,
+          params
+        )
+    end
   end
 
   @doc """
   Removes a channel from the list of joined channels. For internal use.
   """
-  @spec remove_channel(pid, String.t()) :: :ok
+  @spec remove_channel(pid, String.t()) :: :ok | nil
   def remove_channel(sup_pid, topic) do
     reconnecting = get_state(sup_pid, :reconnecting)
 
     unless reconnecting do
-      state_pid = get_process_pid(sup_pid, :socket_state)
-      Phoenix.SocketClient.Agent.remove_channel(state_pid, topic)
+      case get_process_pid(sup_pid, :socket_state) do
+        nil -> nil
+        state_pid -> Phoenix.SocketClient.Agent.remove_channel(state_pid, topic)
+      end
     end
   end
 

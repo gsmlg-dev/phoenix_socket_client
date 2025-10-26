@@ -362,7 +362,7 @@ defmodule Phoenix.SocketClient.MessageProcessor do
         {batch, final_queue} = take_batch_helper([item], remaining_queue, max_size - 1)
         {:queue.from_list(batch), final_queue}
 
-      {:empty} ->
+      {:empty, _queue} ->
         {:queue.new(), queue}
     end
   end
@@ -374,7 +374,7 @@ defmodule Phoenix.SocketClient.MessageProcessor do
       {{:value, item}, remaining_queue} ->
         take_batch_helper([item | batch], remaining_queue, remaining - 1)
 
-      {:empty} ->
+      {:empty, _queue} ->
         {batch, queue}
     end
   end

@@ -13,11 +13,16 @@ defmodule Phoenix.SocketClient.Socket do
   import Phoenix.SocketClient, only: [get_state: 2, put_state: 3, get_process_pid: 2]
 
   @type t :: %__MODULE__{
-          sup_pid: pid(),
+          sup_pid: pid() | atom(),
           status: :disconnected | :connecting | :connected,
           transport_ref: reference() | nil,
           transport_pid: pid() | nil,
-          to_send_r: list()
+          to_send_r: list(),
+          connect_start_time: integer() | nil,
+          message_processor: pid() | nil,
+          max_pending_messages: pos_integer(),
+          last_activity: integer() | nil,
+          hibernation_enabled: boolean()
         }
 
   defstruct sup_pid: nil,
@@ -186,7 +191,11 @@ defmodule Phoenix.SocketClient.Socket do
     rejoin_channels(sup_pid)
     new_state = %__MODULE__{state | status: :connected, transport_pid: transport_pid}
     update_socket_state_status(sup_pid, :connected)
-    Phoenix.SocketClient.Agent.update_connect_time(sup_pid)
+
+    case get_process_pid(sup_pid, :socket_state) do
+      nil -> :ok
+      state_pid -> Phoenix.SocketClient.Agent.update_connect_time(state_pid)
+    end
 
     # Start tracking connection duration from establishment
     Phoenix.SocketClient.Telemetry.connection_established_start(%{
@@ -213,8 +222,11 @@ defmodule Phoenix.SocketClient.Socket do
       status: :disconnected
     })
 
-    cm_pid = get_process_pid(sup_pid, :channel_manager)
-    ChannelManager.terminate(cm_pid)
+    case get_process_pid(sup_pid, :channel_manager) do
+      nil -> :ok
+      cm_pid -> ChannelManager.terminate(cm_pid)
+    end
+
     {:noreply, close(reason, state)}
   end
 
