@@ -1,15 +1,17 @@
 name: Test
 
-# Temporarily disabled due to hanging tests
-# See: https://github.com/gsmlg-dev/phoenix_socket_client/issues/XXX
 on:
-  workflow_dispatch:  # Only run manually
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:  # Also allow manual trigger
 
 jobs:
   test:
     name: Test
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15  # Tests can take 4+ minutes to run
 
     steps:
       - name: Checkout code
