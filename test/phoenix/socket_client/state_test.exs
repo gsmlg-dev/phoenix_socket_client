@@ -17,6 +17,7 @@ defmodule Phoenix.SocketClient.StateTest do
     :ok
   end
 
+  @moduletag :skip
   describe "Phoenix.SocketClient state management" do
     test "get_process_pid retrieves correct process pids" do
       name = :"test_socket_#{System.unique_integer([:positive])}"

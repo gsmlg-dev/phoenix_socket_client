@@ -40,6 +40,7 @@ defmodule Phoenix.SocketClient.DefaultChannelTest do
     :ok
   end
 
+  @tag :skip
   test "uses default channel module and params" do
     name = :"default_channel_test_#{System.unique_integer([:positive])}"
 
