@@ -46,8 +46,8 @@ defmodule Phoenix.SocketClient.ChannelStatusTest do
     end
   end
 
-  @moduletag :skip
   describe "channel status" do
+    @tag :skip
     test "transitions through joining and joined states" do
       name = :"channel_status_join_#{System.unique_integer([:positive])}"
       config = get_socket_config() |> Keyword.put(:name, name)
@@ -94,6 +94,7 @@ defmodule Phoenix.SocketClient.ChannelStatusTest do
       assert is_pid(channel_data.pid)
     end
 
+    @tag :skip
     test "transitions through leaving and then is removed" do
       name = :"channel_status_leave_#{System.unique_integer([:positive])}"
       config = get_socket_config() |> Keyword.put(:name, name)
@@ -118,6 +119,7 @@ defmodule Phoenix.SocketClient.ChannelStatusTest do
                get_in(Phoenix.SocketClient.get_state(sup_pid, :joined_channels), ["topic:status"])
     end
 
+    @tag :skip
     test "transitions to errored state on crash" do
       name = :"channel_status_crash_#{System.unique_integer([:positive])}"
       config = get_socket_config() |> Keyword.put(:name, name)

@@ -13,19 +13,12 @@ defmodule Phoenix.SocketClientTest.MockServer do
 
     Task.Supervisor.start_link(name: Phoenix.SocketClientTest.TaskSupervisor)
 
-    # Start PubSub
-    {:ok, _} =
-      Supervisor.start_link(
-        [{Phoenix.PubSub, [name: Phoenix.SocketClientTest.PubSub, adapter: Phoenix.PubSub.PG2]}],
-        strategy: :one_for_one
-      )
-
-    # Configure endpoint - Phoenix will handle PubSub internally
+    # Configure endpoint - will start PubSub via supervisor
     Application.put_env(
       :phoenix_socket_client_test,
       Phoenix.SocketClientTest.Endpoint,
       https: false,
-      http: [port: port],
+      http: [ip: {127, 0, 0, 1}, port: port],
       secret_key_base: String.duplicate("abcdefgh", 8),
       debug_errors: false,
       code_reloader: false,
@@ -35,12 +28,18 @@ defmodule Phoenix.SocketClientTest.MockServer do
       render_errors: [formats: [json: Phoenix.SocketClientTest.ErrorView], accepts: ~w(json)]
     )
 
-    Phoenix.PubSub.Supervisor.start_link(name: Phoenix.SocketClientTest.PubSub)
-    # Start the endpoint - it will start PubSub automatically
-    {:ok, _pid} = Phoenix.SocketClientTest.Endpoint.start_link()
+    # Start PubSub and endpoint in a single supervisor
+    {:ok, _} =
+      Supervisor.start_link(
+        [
+          {Phoenix.PubSub, name: Phoenix.SocketClientTest.PubSub},
+          Phoenix.SocketClientTest.Endpoint
+        ],
+        strategy: :one_for_one
+      )
 
-    # Give it a moment to start
-    Process.sleep(100)
+    # Wait for server to be ready
+    wait_for_server_ready(port)
 
     IO.puts("Mock server started on port #{port}")
     port
@@ -69,6 +68,22 @@ defmodule Phoenix.SocketClientTest.MockServer do
       {:error, _} ->
         # Fallback to a random port in a reasonable range
         Enum.random(5808..65_535)
+    end
+  end
+
+  defp wait_for_server_ready(port, retries \\ 50) do
+    if retries == 0 do
+      raise "Server failed to start on port #{port}"
+    end
+
+    case :gen_tcp.connect(~c"127.0.0.1", port, [:binary, active: false], 100) do
+      {:ok, socket} ->
+        :gen_tcp.close(socket)
+        :ok
+
+      {:error, _} ->
+        Process.sleep(50)
+        wait_for_server_ready(port, retries - 1)
     end
   end
 end
