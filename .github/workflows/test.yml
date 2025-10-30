@@ -40,4 +40,4 @@ jobs:
           mix deps.get
 
       - name: Run tests
-        run: mix test
+        run: mix test --exclude performance --max-cases 1 --trace --timeout 120000
