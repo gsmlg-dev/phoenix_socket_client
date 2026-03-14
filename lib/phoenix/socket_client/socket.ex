@@ -22,7 +22,8 @@ defmodule Phoenix.SocketClient.Socket do
           message_processor: pid() | nil,
           max_pending_messages: pos_integer(),
           last_activity: integer() | nil,
-          hibernation_enabled: boolean()
+          hibernation_enabled: boolean(),
+          heartbeat_timer: reference() | nil
         }
 
   defstruct sup_pid: nil,
@@ -34,7 +35,8 @@ defmodule Phoenix.SocketClient.Socket do
             message_processor: nil,
             max_pending_messages: 500,
             last_activity: nil,
-            hibernation_enabled: true
+            hibernation_enabled: true,
+            heartbeat_timer: nil
 
   @doc false
   @spec start_link(keyword()) :: GenServer.on_start()
@@ -189,7 +191,18 @@ defmodule Phoenix.SocketClient.Socket do
     put_state(sup_pid, :reconnecting, false)
     join_initial_channels(sup_pid)
     rejoin_channels(sup_pid)
-    new_state = %__MODULE__{state | status: :connected, transport_pid: transport_pid}
+
+    # Start heartbeat timer
+    heartbeat_interval = get_state(sup_pid, :heartbeat_interval) || 30_000
+    heartbeat_timer = Process.send_after(self(), :heartbeat, heartbeat_interval)
+
+    new_state = %__MODULE__{
+      state
+      | status: :connected,
+        transport_pid: transport_pid,
+        heartbeat_timer: heartbeat_timer
+    }
+
     update_socket_state_status(sup_pid, :connected)
 
     case get_process_pid(sup_pid, :socket_state) do
@@ -243,6 +256,29 @@ defmodule Phoenix.SocketClient.Socket do
     to_send = state.to_send_r || []
     Enum.each(to_send, &transport_send(&1, state))
     {:noreply, %__MODULE__{state | to_send_r: []}}
+  end
+
+  @spec handle_info(:heartbeat, t()) :: {:noreply, t()}
+  def handle_info(:heartbeat, %{sup_pid: sup_pid, status: :connected} = state) do
+    heartbeat_msg = %Message{
+      topic: "phoenix",
+      event: "heartbeat",
+      payload: %{},
+      ref: Message.generate_ref()
+    }
+
+    transport_send(heartbeat_msg, state)
+
+    # Schedule next heartbeat
+    heartbeat_interval = get_state(sup_pid, :heartbeat_interval) || 30_000
+    heartbeat_timer = Process.send_after(self(), :heartbeat, heartbeat_interval)
+
+    {:noreply, %{state | heartbeat_timer: heartbeat_timer}}
+  end
+
+  def handle_info(:heartbeat, state) do
+    # Not connected, ignore heartbeat
+    {:noreply, %{state | heartbeat_timer: nil}}
   end
 
   @spec handle_info(Message.t(), t()) :: {:noreply, t()}
@@ -596,6 +632,11 @@ defmodule Phoenix.SocketClient.Socket do
   end
 
   defp close(reason, %{sup_pid: sup_pid} = state) do
+    # Cancel heartbeat timer if active
+    if state.heartbeat_timer do
+      Process.cancel_timer(state.heartbeat_timer)
+    end
+
     socket_state = Phoenix.SocketClient.get_state(sup_pid)
     socket_ref = Phoenix.SocketClient.get_state(sup_pid, :socket_ref)
 
@@ -616,7 +657,7 @@ defmodule Phoenix.SocketClient.Socket do
       Process.send_after(self(), :connect, socket_state.reconnect_interval)
     end
 
-    %__MODULE__{state | status: :disconnected}
+    %__MODULE__{state | status: :disconnected, heartbeat_timer: nil}
   end
 
   defp update_socket_state_status(sup_pid, new_status) do

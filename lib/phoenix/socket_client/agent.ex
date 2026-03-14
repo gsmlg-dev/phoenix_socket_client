@@ -253,7 +253,8 @@ defmodule Phoenix.SocketClient.Agent do
       registry_name: config.registry_name,
       join_channels: config.join_channels,
       default_channel_module: config.default_channel_module,
-      default_channel_params: config.default_channel_params
+      default_channel_params: config.default_channel_params,
+      heartbeat_interval: config.heartbeat_interval
     }
   end
 end
