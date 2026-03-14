@@ -81,12 +81,17 @@ defmodule Phoenix.SocketClient.Supervisor do
          end
 
          # Register socket process with hibernation manager
-         case Phoenix.SocketClient.get_process_pid(sup_pid, :socket) do
-           nil ->
+         case {Phoenix.SocketClient.get_process_pid(sup_pid, :hibernation_manager),
+               Phoenix.SocketClient.get_process_pid(sup_pid, :socket)} do
+           {nil, _} ->
              :ok
 
-           socket_pid ->
+           {_, nil} ->
+             :ok
+
+           {hm_pid, socket_pid} ->
              Phoenix.SocketClient.HibernationManager.register_process(
+               hm_pid,
                socket_pid,
                {registry_name, :socket}
              )
