@@ -9,9 +9,17 @@ on:
 
 jobs:
   test:
-    name: Test
+    name: Test (Elixir ${{ matrix.elixir }}, OTP ${{ matrix.otp }})
     runs-on: ubuntu-latest
     timeout-minutes: 15  # Tests can take 4+ minutes to run
+
+    strategy:
+      matrix:
+        include:
+          - elixir: '1.17'
+            otp: '26'
+          - elixir: '1.18'
+            otp: '28'
 
     steps:
       - name: Checkout code
@@ -20,8 +28,8 @@ jobs:
       - name: Set up Elixir
         uses: erlef/setup-beam@v1
         with:
-          elixir-version: '1.18'
-          otp-version: '28'
+          elixir-version: ${{ matrix.elixir }}
+          otp-version: ${{ matrix.otp }}
 
       - name: Cache dependencies
         uses: actions/cache@v4
@@ -29,9 +37,9 @@ jobs:
           path: |
             deps
             _build
-          key: ${{ runner.os }}-mix-${{ hashFiles('**/mix.lock') }}
+          key: ${{ runner.os }}-mix-${{ matrix.elixir }}-${{ matrix.otp }}-${{ hashFiles('**/mix.lock') }}
           restore-keys: |
-            ${{ runner.os }}-mix-
+            ${{ runner.os }}-mix-${{ matrix.elixir }}-${{ matrix.otp }}-
 
       - name: Install dependencies
         run: |
