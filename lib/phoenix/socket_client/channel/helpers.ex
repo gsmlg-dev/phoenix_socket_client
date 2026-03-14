@@ -120,7 +120,7 @@ defmodule Phoenix.SocketClient.Channel.Helpers do
         {[{from_ref, _push}], pushes} ->
           %{"status" => status, "response" => response} = msg.payload
           handle_reply_status(status, ref, join_ref, topic, msg, s, params)
-          GenServer.reply(from_ref, {String.to_atom(status), response})
+          GenServer.reply(from_ref, {status_to_atom(status), response})
           pushes
 
         {[], pushes} ->
@@ -166,6 +166,15 @@ defmodule Phoenix.SocketClient.Channel.Helpers do
   end
 
   defp handle_reply_status(_, _, _, _, _, _, _), do: :noop
+
+  defp status_to_atom("ok"), do: :ok
+  defp status_to_atom("error"), do: :error
+
+  defp status_to_atom(other) do
+    String.to_existing_atom(other)
+  rescue
+    ArgumentError -> other
+  end
 
   defp maybe_emit_join_duration(%{join_start_time: nil}), do: :ok
 
