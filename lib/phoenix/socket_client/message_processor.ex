@@ -37,7 +37,6 @@ defmodule Phoenix.SocketClient.MessageProcessor do
     :json_library,
     :registry_name,
     :binary_pool_pid,
-    :route_cache_pid,
     encode_queue: :queue.new(),
     decode_queue: :queue.new(),
     encode_timer: nil,
@@ -116,22 +115,11 @@ defmodule Phoenix.SocketClient.MessageProcessor do
         registry_name: nil
       )
 
-    # Start route cache for message routing
-    {:ok, route_cache_pid} =
-      Phoenix.SocketClient.RouteCache.start_link(
-        cache_size: Keyword.get(opts, :route_cache_size, 1000),
-        ttl: Keyword.get(opts, :route_cache_ttl, 300_000),
-        cleanup_interval: Keyword.get(opts, :route_cleanup_interval, 60_000),
-        # No registry for route cache
-        registry_name: nil
-      )
-
     state = %__MODULE__{
       serializer: serializer,
       json_library: json_library,
       registry_name: registry_name,
       binary_pool_pid: binary_pool_pid,
-      route_cache_pid: route_cache_pid,
       batch_size: Keyword.get(opts, :batch_size, @default_batch_size),
       batch_interval: Keyword.get(opts, :batch_interval, @default_batch_interval),
       max_queue_size: Keyword.get(opts, :max_queue_size, @default_max_queue_size)
