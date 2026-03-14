@@ -72,10 +72,14 @@ defmodule Phoenix.SocketClient.ChannelManager do
               |> Enum.find_value(fn
                 {_id, process_pid, _, _} ->
                   # id - it is always :undefined for dynamic supervisors
-                  if GenServer.call(process_pid, :get_topic) == topic do
-                    process_pid
-                  else
-                    nil
+                  try do
+                    if GenServer.call(process_pid, :get_topic, 1_000) == topic do
+                      process_pid
+                    else
+                      nil
+                    end
+                  catch
+                    :exit, _ -> nil
                   end
 
                 _ ->
