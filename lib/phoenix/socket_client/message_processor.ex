@@ -278,6 +278,20 @@ defmodule Phoenix.SocketClient.MessageProcessor do
   defp message_name(nil), do: __MODULE__
   defp message_name(registry_name), do: {:via, Registry, {registry_name, :message_processor}}
 
+  # TODO: Refactor Task workers to GenServer workers (see GitHub issue #33).
+  #
+  # These Task workers run infinite receive loops, which is not idiomatic usage.
+  # Tasks are designed for one-shot, finite work. Using them for long-running
+  # message loops has the following limitations:
+  #
+  #   - If a worker crashes, any in-flight messages in its mailbox are lost.
+  #   - Task.Supervisor features (async_nolink, yield, etc.) are not leveraged.
+  #   - The restart strategy restarts the Task with a fresh loop, but pending
+  #     messages sent to the old process PID are discarded.
+  #
+  # The correct approach would be to use GenServer workers under the supervisor,
+  # each handling {:encode_batch, ...} and {:decode_batch, ...} via handle_info/2.
+  # This is a larger refactor and is deferred for now.
   defp start_worker_supervisor(concurrency, serializer, json_library, binary_pool_pid) do
     children =
       for i <- 1..concurrency do
