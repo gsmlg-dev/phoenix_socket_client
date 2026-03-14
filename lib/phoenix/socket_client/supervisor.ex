@@ -2,8 +2,6 @@ defmodule Phoenix.SocketClient.Supervisor do
   @moduledoc """
   The main supervisor for the Phoenix Socket Client.
   """
-  import Phoenix.SocketClient, only: [connect: 1, get_state: 2]
-
   use Supervisor
 
   @doc """
@@ -90,11 +88,6 @@ defmodule Phoenix.SocketClient.Supervisor do
                socket_pid,
                {registry_name, :socket}
              )
-         end
-
-         if get_state(sup_pid, :auto_connect) do
-           Process.sleep(1_000)
-           connect(sup_pid)
          end
        end}
       |> Supervisor.child_spec(id: :post_start)
