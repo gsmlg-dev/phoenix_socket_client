@@ -157,7 +157,6 @@ defmodule Phoenix.SocketClient.Channel do
 
       :exit, {:noproc, _} ->
         Phoenix.SocketClient.update_channel_status(sup_pid, pid, topic, :errored, params)
-        GenServer.stop(pid, :normal)
         {:error, :noproc}
 
       :exit, reason ->
