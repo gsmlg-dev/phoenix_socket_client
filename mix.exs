@@ -13,6 +13,7 @@ defmodule Phoenix.SocketClient.Mixfile do
       description: description(),
       elixirc_paths: elixirc_paths(Mix.env()),
       package: package(),
+      source_url: "https://github.com/gsmlg-dev/phoenix_socket_client",
       docs: [
         main: "readme",
         extras: [
@@ -66,7 +67,10 @@ defmodule Phoenix.SocketClient.Mixfile do
   defp package do
     [
       licenses: ["MIT"],
-      links: %{"GitHub" => "https://github.com/gsmlg-dev/phoenix_socket_client"}
+      links: %{"GitHub" => "https://github.com/gsmlg-dev/phoenix_socket_client"},
+      source_url: "https://github.com/gsmlg-dev/phoenix_socket_client",
+      homepage_url: "https://github.com/gsmlg-dev/phoenix_socket_client",
+      files: ~w(lib .formatter.exs mix.exs README.md LICENSE CHANGELOG.md)
     ]
   end
 
