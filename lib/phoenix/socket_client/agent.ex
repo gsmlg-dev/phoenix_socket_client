@@ -60,7 +60,10 @@ defmodule Phoenix.SocketClient.Agent do
   @spec get(pid(), atom() | String.t()) :: any()
   def get(pid, key) do
     Agent.get(pid, fn state ->
-      Map.get(state, key, Map.get(state.custom, key))
+      case Map.fetch(state, key) do
+        {:ok, value} -> value
+        :error -> Map.get(state.custom, key)
+      end
     end)
   end
 
