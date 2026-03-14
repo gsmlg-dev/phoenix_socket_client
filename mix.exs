@@ -1,4 +1,4 @@
-defmodule Phoenix.SocketClient.Mixfile do
+defmodule Phoenix.SocketClient.MixProject do
   use Mix.Project
 
   @version "0.7.0"
