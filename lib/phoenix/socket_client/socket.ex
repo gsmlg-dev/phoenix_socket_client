@@ -23,7 +23,8 @@ defmodule Phoenix.SocketClient.Socket do
           max_pending_messages: pos_integer(),
           last_activity: integer() | nil,
           hibernation_enabled: boolean(),
-          heartbeat_timer: reference() | nil
+          heartbeat_timer: reference() | nil,
+          pending_decodes: %{reference() => {pid() | atom(), String.t()}}
         }
 
   defstruct sup_pid: nil,
@@ -36,7 +37,8 @@ defmodule Phoenix.SocketClient.Socket do
             max_pending_messages: 500,
             last_activity: nil,
             hibernation_enabled: true,
-            heartbeat_timer: nil
+            heartbeat_timer: nil,
+            pending_decodes: %{}
 
   @doc false
   @spec start_link(keyword()) :: GenServer.on_start()
@@ -244,8 +246,8 @@ defmodule Phoenix.SocketClient.Socket do
   @impl true
   @spec handle_info({:receive, String.t()}, t()) :: {:noreply, t()}
   def handle_info({:receive, message}, %{sup_pid: _sup_pid} = state) do
-    transport_receive(message, state)
-    {:noreply, state}
+    new_state = transport_receive(message, state)
+    {:noreply, new_state}
   end
 
   @impl true
@@ -343,8 +345,8 @@ defmodule Phoenix.SocketClient.Socket do
   @spec handle_info({:decode_result, reference(), {:ok, Message.t()}}, t()) :: {:noreply, t()}
   def handle_info({:decode_result, ref, {:ok, decoded_message}}, state) do
     # Get the original decode context
-    case Process.get({:pending_decode, ref}) do
-      {sup_pid, _raw_message} ->
+    case Map.fetch(state.pending_decodes, ref) do
+      {:ok, {sup_pid, _raw_message}} ->
         # Route the decoded message
         socket_state = Phoenix.SocketClient.get_state(sup_pid)
 
@@ -353,20 +355,19 @@ defmodule Phoenix.SocketClient.Socket do
           [] -> :noop
         end
 
-        Process.delete({:pending_decode, ref})
+        new_state = %{state | pending_decodes: Map.delete(state.pending_decodes, ref)}
+        {:noreply, new_state}
 
-      nil ->
+      :error ->
         # No pending decode found
-        :ok
+        {:noreply, state}
     end
-
-    {:noreply, state}
   end
 
   def handle_info({:decode_result, ref, {:error, _reason}}, state) do
     # Clean up failed decode
-    Process.delete({:pending_decode, ref})
-    {:noreply, state}
+    new_state = %{state | pending_decodes: Map.delete(state.pending_decodes, ref)}
+    {:noreply, new_state}
   end
 
   @impl true
@@ -376,28 +377,16 @@ defmodule Phoenix.SocketClient.Socket do
     current_time = System.monotonic_time(:millisecond)
     max_age = 30_000
 
-    # Clean up process dictionary entries for pending decodes
-    Process.get()
-    |> Enum.filter(fn {key, _} ->
-      case key do
-        {:pending_decode, _ref} -> true
-        _ -> false
-      end
-    end)
-    |> Enum.each(fn {key, {sup_pid, _raw_message}} ->
-      # Check if it's too old by checking socket connection time
-      case get_state(sup_pid, :connect_time) do
-        nil ->
-          Process.delete(key)
-
-        connect_time ->
-          age = current_time - connect_time
-
-          if age > max_age do
-            Process.delete(key)
-          end
-      end
-    end)
+    # Clean up stale pending decodes from state
+    cleaned_pending_decodes =
+      state.pending_decodes
+      |> Enum.reject(fn {_ref, {sup_pid, _raw_message}} ->
+        case get_state(sup_pid, :connect_time) do
+          nil -> true
+          connect_time -> current_time - connect_time > max_age
+        end
+      end)
+      |> Map.new()
 
     # Clean up old pending messages in to_send_r
     filtered_to_send =
@@ -429,7 +418,7 @@ defmodule Phoenix.SocketClient.Socket do
       )
     end
 
-    new_state = %{state | to_send_r: final_to_send}
+    new_state = %{state | to_send_r: final_to_send, pending_decodes: cleaned_pending_decodes}
 
     {:noreply, new_state}
   end
@@ -546,7 +535,7 @@ defmodule Phoenix.SocketClient.Socket do
     end
   end
 
-  defp transport_receive(message, %{sup_pid: sup_pid} = _state) do
+  defp transport_receive(message, %{sup_pid: sup_pid} = state) do
     # Get message processor for async decoding
     message_processor = get_process_pid(sup_pid, :message_processor)
 
@@ -555,11 +544,12 @@ defmodule Phoenix.SocketClient.Socket do
       ref = make_ref()
       Phoenix.SocketClient.MessageProcessor.decode(message_processor, message, self(), ref)
 
-      # Store the pending decode operation
-      Process.put({:pending_decode, ref}, {sup_pid, message})
+      # Store the pending decode operation in state
+      %{state | pending_decodes: Map.put(state.pending_decodes, ref, {sup_pid, message})}
     else
       # Fallback to synchronous decoding
       fallback_decode_and_route(message, sup_pid)
+      state
     end
   end
 
