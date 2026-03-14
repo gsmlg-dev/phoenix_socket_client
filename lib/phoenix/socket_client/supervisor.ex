@@ -29,9 +29,8 @@ defmodule Phoenix.SocketClient.Supervisor do
   """
   @spec start_link(keyword()) :: Supervisor.on_start()
   def start_link(opts) do
-    opts = Map.new(opts)
-    name = Map.get(opts, :name, Phoenix.SocketClient)
-    opts = Map.put(opts, :name, name)
+    name = Keyword.get(opts, :name, Phoenix.SocketClient)
+    opts = Keyword.put(opts, :name, name)
 
     Supervisor.start_link(__MODULE__, opts, name: name)
   end
@@ -39,9 +38,9 @@ defmodule Phoenix.SocketClient.Supervisor do
   @impl true
   def init(opts) do
     sup_pid = self()
-    opts = opts |> Map.put(:sup_pid, sup_pid)
+    opts = Keyword.put(opts, :sup_pid, sup_pid)
 
-    name = Map.get(opts, :name)
+    name = Keyword.get(opts, :name)
 
     default_registry_name =
       name
@@ -52,11 +51,13 @@ defmodule Phoenix.SocketClient.Supervisor do
       |> (&(&1 <> "ChannelRegistry")).()
       |> String.to_atom()
 
-    registry_name = Map.get(opts, :registry_name, default_registry_name)
+    registry_name = Keyword.get(opts, :registry_name, default_registry_name)
 
     # Get serializer from opts for MessageProcessor
-    serializer = Phoenix.SocketClient.Message.serializer(Map.get(opts, :vsn, "2.0.0"))
-    opts = opts |> Map.put(:registry_name, registry_name) |> Map.put(:serializer, serializer)
+    serializer = Phoenix.SocketClient.Message.serializer(Keyword.get(opts, :vsn, "2.0.0"))
+
+    opts =
+      opts |> Keyword.put(:registry_name, registry_name) |> Keyword.put(:serializer, serializer)
 
     children = [
       {Registry, keys: :unique, name: registry_name},
