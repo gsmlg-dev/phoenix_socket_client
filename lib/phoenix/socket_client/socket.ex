@@ -79,10 +79,8 @@ defmodule Phoenix.SocketClient.Socket do
   @impl true
   @spec handle_continue(:post_start, t()) :: {:noreply, t()}
   def handle_continue(:post_start, %{sup_pid: sup_pid} = state) do
-    Process.sleep(1_000)
-
     if get_state(sup_pid, :auto_connect) do
-      Process.send(self(), :connect, [:noconnect])
+      Process.send_after(self(), :connect, 1_000)
     end
 
     {:noreply, state}
