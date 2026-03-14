@@ -18,6 +18,7 @@ defmodule Phoenix.SocketClient.Socket do
           transport_ref: reference() | nil,
           transport_pid: pid() | nil,
           to_send_r: list(),
+          to_send_count: non_neg_integer(),
           connect_start_time: integer() | nil,
           message_processor: pid() | nil,
           max_pending_messages: pos_integer(),
@@ -30,6 +31,7 @@ defmodule Phoenix.SocketClient.Socket do
             transport_ref: nil,
             transport_pid: nil,
             to_send_r: [],
+            to_send_count: 0,
             connect_start_time: nil,
             message_processor: nil,
             max_pending_messages: 500,
@@ -242,7 +244,7 @@ defmodule Phoenix.SocketClient.Socket do
   def handle_info(:flush, %{sup_pid: _sup_pid} = state) do
     to_send = state.to_send_r || []
     Enum.each(to_send, &transport_send(&1, state))
-    {:noreply, %__MODULE__{state | to_send_r: []}}
+    {:noreply, %__MODULE__{state | to_send_r: [], to_send_count: 0}}
   end
 
   @spec handle_info(Message.t(), t()) :: {:noreply, t()}
@@ -287,7 +289,7 @@ defmodule Phoenix.SocketClient.Socket do
 
         # Remove from pending list
         new_to_send = Enum.reject(state.to_send_r, fn {pending_ref, _} -> pending_ref == ref end)
-        {:noreply, %{state | to_send_r: new_to_send}}
+        {:noreply, %{state | to_send_r: new_to_send, to_send_count: state.to_send_count - 1}}
 
       _ ->
         {:noreply, state}
@@ -297,7 +299,7 @@ defmodule Phoenix.SocketClient.Socket do
   def handle_info({:encode_result, ref, {:error, _reason}}, state) do
     # Remove failed encoding from pending list
     new_to_send = Enum.reject(state.to_send_r, fn {pending_ref, _} -> pending_ref == ref end)
-    {:noreply, %{state | to_send_r: new_to_send}}
+    {:noreply, %{state | to_send_r: new_to_send, to_send_count: state.to_send_count - 1}}
   end
 
   @impl true
@@ -370,27 +372,29 @@ defmodule Phoenix.SocketClient.Socket do
       end)
 
     # Limit queue size by dropping oldest messages if needed
-    final_to_send =
-      if length(filtered_to_send) > state.max_pending_messages do
-        Enum.take(filtered_to_send, state.max_pending_messages)
+    filtered_count = state.to_send_count
+
+    {final_to_send, final_count} =
+      if filtered_count > state.max_pending_messages do
+        {Enum.take(filtered_to_send, state.max_pending_messages), state.max_pending_messages}
       else
-        filtered_to_send
+        {filtered_to_send, filtered_count}
       end
 
-    trimmed_count = length(state.to_send_r) - length(final_to_send)
+    trimmed_count = state.to_send_count - final_count
 
     if trimmed_count > 0 do
       Telemetry.execute(
         [:phoenix_socket_client, :socket, :cleanup],
         %{
           trimmed_messages: trimmed_count,
-          remaining_messages: length(final_to_send)
+          remaining_messages: final_count
         },
         %{}
       )
     end
 
-    new_state = %{state | to_send_r: final_to_send}
+    new_state = %{state | to_send_r: final_to_send, to_send_count: final_count}
 
     {:noreply, new_state}
   end
@@ -433,7 +437,7 @@ defmodule Phoenix.SocketClient.Socket do
       Phoenix.SocketClient.Telemetry.optimization(:hibernation, %{
         socket_ref: Phoenix.SocketClient.get_state(state.sup_pid, :socket_ref),
         status: state.status,
-        pending_messages: length(state.to_send_r),
+        pending_messages: state.to_send_count,
         reason: :idle_hibernation
       })
 
@@ -443,7 +447,7 @@ defmodule Phoenix.SocketClient.Socket do
       Phoenix.SocketClient.Telemetry.optimization(:hibernation_skipped, %{
         socket_ref: Phoenix.SocketClient.get_state(state.sup_pid, :socket_ref),
         status: state.status,
-        pending_messages: length(state.to_send_r),
+        pending_messages: state.to_send_count,
         reason: :not_safe_to_hibernate
       })
 
@@ -476,11 +480,11 @@ defmodule Phoenix.SocketClient.Socket do
   def handle_call({:push_message, message}, _from, state) do
     if state.transport_pid && state.message_processor do
       # Check queue size to prevent memory leaks
-      if length(state.to_send_r) >= state.max_pending_messages do
+      if state.to_send_count >= state.max_pending_messages do
         Telemetry.execute(
           [:phoenix_socket_client, :socket, :backpressure],
           %{
-            pending_messages: length(state.to_send_r),
+            pending_messages: state.to_send_count,
             max_pending: state.max_pending_messages
           },
           %{}
@@ -499,7 +503,12 @@ defmodule Phoenix.SocketClient.Socket do
         )
 
         # Store the message for sending once encoded
-        new_state = %{state | to_send_r: [{ref, message} | state.to_send_r]}
+        new_state = %{
+          state
+          | to_send_r: [{ref, message} | state.to_send_r],
+            to_send_count: state.to_send_count + 1
+        }
+
         {:reply, message, new_state}
       end
     else
@@ -541,11 +550,11 @@ defmodule Phoenix.SocketClient.Socket do
 
     if transport_pid && state.message_processor do
       # Check queue size to prevent memory leaks
-      if length(state.to_send_r) >= state.max_pending_messages do
+      if state.to_send_count >= state.max_pending_messages do
         Telemetry.execute(
           [:phoenix_socket_client, :socket, :backpressure],
           %{
-            pending_messages: length(state.to_send_r),
+            pending_messages: state.to_send_count,
             max_pending: state.max_pending_messages
           },
           %{}
@@ -564,7 +573,11 @@ defmodule Phoenix.SocketClient.Socket do
         )
 
         # Store for sending once encoded
-        %{state | to_send_r: [{ref, message} | state.to_send_r]}
+        %{
+          state
+          | to_send_r: [{ref, message} | state.to_send_r],
+            to_send_count: state.to_send_count + 1
+        }
       end
     else
       # Fallback to synchronous encoding
