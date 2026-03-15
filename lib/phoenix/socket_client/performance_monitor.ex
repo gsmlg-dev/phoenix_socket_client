@@ -424,8 +424,8 @@ defmodule Phoenix.SocketClient.PerformanceMonitor do
 
     %{
       memory_usage_words: memory_info,
-      # Convert words to MB
-      memory_usage_mb: memory_info / (1024 * 1024 / 8),
+      # Convert bytes to MB
+      memory_usage_mb: memory_info / (1024 * 1024),
       message_queue_depth: queue_len,
       process_count: :erlang.system_info(:process_count),
       scheduler_utilization: 0.0
