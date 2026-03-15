@@ -22,6 +22,8 @@ defmodule Phoenix.SocketClient.ChannelManager do
 
   use DynamicSupervisor
 
+  require Logger
+
   import Phoenix.SocketClient, only: [get_process_pid: 2, get_state: 2]
 
   @doc """
@@ -94,8 +96,9 @@ defmodule Phoenix.SocketClient.ChannelManager do
           end
       end
     rescue
-      ArgumentError -> nil
-      _ -> nil
+      e ->
+        Logger.warning("#{__MODULE__} operation failed: #{inspect(e)}")
+        nil
     end
   end
 

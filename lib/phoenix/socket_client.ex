@@ -9,6 +9,8 @@ defmodule Phoenix.SocketClient do
   > for Phoenix Channels.
   """
 
+  require Logger
+
   @doc """
   Starts the socket client supervisor.
 
@@ -72,8 +74,9 @@ defmodule Phoenix.SocketClient do
           end
       end
     rescue
-      ArgumentError -> nil
-      _ -> nil
+      e ->
+        Logger.warning("#{__MODULE__} operation failed: #{inspect(e)}")
+        nil
     end
   end
 
