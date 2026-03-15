@@ -13,7 +13,15 @@ defmodule Phoenix.SocketClient.Mixfile do
       description: description(),
       elixirc_paths: elixirc_paths(Mix.env()),
       package: package(),
-      docs: [extras: ["README.md"], main: "readme"],
+      docs: [
+        main: "readme",
+        extras: [
+          "README.md",
+          "CHANGELOG.md",
+          "API_DOCUMENTATION.md",
+          "PERFORMANCE_OPTIMIZATIONS.md"
+        ]
+      ],
       deps: deps(),
       aliases: aliases(),
       dialyzer: [
