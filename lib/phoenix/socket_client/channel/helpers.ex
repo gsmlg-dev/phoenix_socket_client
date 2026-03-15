@@ -98,6 +98,7 @@ defmodule Phoenix.SocketClient.Channel.Helpers do
       topic: topic,
       event: event,
       payload: payload,
+      ref: Message.generate_ref(),
       channel_pid: self(),
       join_ref: state.join_ref
     }
