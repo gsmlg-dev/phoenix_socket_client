@@ -15,7 +15,9 @@ defmodule Phoenix.SocketClient.Channel.State do
           pushes: list(),
           join_ref: String.t() | nil,
           hooks: map(),
-          registry_name: atom()
+          registry_name: atom(),
+          join_start_time: integer() | nil,
+          leave_start_time: integer() | nil
         }
 
   defstruct caller: nil,

@@ -305,12 +305,13 @@ defmodule Phoenix.SocketClient.PerformanceMonitor do
       :timer.cancel(state.collection_timer)
     end
 
+    final_metrics_size = :ets.info(state.metrics_history, :size)
     :ets.delete(state.metrics_history)
 
     Phoenix.SocketClient.Telemetry.optimization(:performance_monitor_terminating, %{
       total_collections: state.stats.collections,
       alerts_triggered: state.stats.alerts_triggered,
-      final_metrics_size: :ets.info(state.metrics_history, :size)
+      final_metrics_size: final_metrics_size
     })
 
     :ok

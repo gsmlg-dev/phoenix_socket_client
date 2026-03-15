@@ -7,6 +7,28 @@ defmodule Phoenix.SocketClient.Agent do
   All state is stored in an Agent process for concurrent access and updates.
 
   The state is managed by the `Phoenix.SocketClient.State` struct.
+
+  ## Shared State Limitation
+
+  This module uses an `Agent` as shared mutable state that is read and written to
+  by multiple processes (the Socket GenServer, Channel GenServers, and external
+  callers). While `Agent` serializes individual `get` and `update` calls, it does
+  not provide compound read-then-write atomicity across callers. This means
+  concurrent operations that depend on reading the current state and then updating
+  it can race with each other.
+
+  ### Future Refactoring Direction
+
+  A more robust approach would be to replace this Agent with a dedicated GenServer
+  that owns and mediates all state access. A GenServer would allow:
+
+  - Compound read-modify-write operations handled atomically in `handle_call`
+  - Explicit control over which operations are synchronous vs asynchronous
+  - Better visibility into state access patterns via callbacks
+  - Easier addition of validation or side effects on state transitions
+
+  See [GitHub issue #31](https://github.com/gsmlg-dev/phoenix_socket_client/issues/31)
+  for discussion.
   """
 
   use Agent

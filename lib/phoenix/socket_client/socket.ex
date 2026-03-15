@@ -81,10 +81,8 @@ defmodule Phoenix.SocketClient.Socket do
   @impl true
   @spec handle_continue(:post_start, t()) :: {:noreply, t()}
   def handle_continue(:post_start, %{sup_pid: sup_pid} = state) do
-    Process.sleep(1_000)
-
     if get_state(sup_pid, :auto_connect) do
-      Process.send(self(), :connect, [:noconnect])
+      Process.send_after(self(), :connect, 1_000)
     end
 
     {:noreply, state}
@@ -615,7 +613,8 @@ defmodule Phoenix.SocketClient.Socket do
     # Update socket state status
     update_socket_state_status(sup_pid, :disconnected)
 
-    if socket_state.reconnect do
+    # Guard against nil socket_state when Agent is already down during shutdown
+    if socket_state && socket_state.reconnect do
       put_state(sup_pid, :reconnecting, true)
 
       # Emit reconnection attempt event
