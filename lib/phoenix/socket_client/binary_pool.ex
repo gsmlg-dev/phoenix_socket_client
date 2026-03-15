@@ -197,10 +197,12 @@ defmodule Phoenix.SocketClient.BinaryPool do
     }
 
     # Warm up with common patterns
+    pid = self()
+
     Task.start(fn ->
       # Give time for system to stabilize
       :timer.sleep(1000)
-      warm_up_common_patterns(state)
+      warm_up_common_patterns(pid)
     end)
 
     {:ok, state}
@@ -352,10 +354,10 @@ defmodule Phoenix.SocketClient.BinaryPool do
 
   # Private helper functions
 
-  defp warm_up_common_patterns(_state) do
+  defp warm_up_common_patterns(pid) do
     try do
       patterns = common_patterns()
-      GenServer.call(self(), {:warm_up, patterns}, 5000)
+      GenServer.call(pid, {:warm_up, patterns}, 5000)
 
       Phoenix.SocketClient.Telemetry.optimization(:binary_pool_warmup, %{
         patterns_count: length(patterns)
