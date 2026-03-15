@@ -117,9 +117,9 @@ defmodule Phoenix.SocketClient.HibernationManager do
 
   The process will be tracked for activity and hibernated when idle.
   """
-  @spec register_process(pid(), atom() | {atom(), atom()}) :: :ok
-  def register_process(pid, name \\ nil) when is_pid(pid) do
-    GenServer.cast(__MODULE__, {:register_process, pid, name})
+  @spec register_process(pid(), pid(), atom() | {atom(), atom()}) :: :ok
+  def register_process(manager_pid, pid, name \\ nil) when is_pid(manager_pid) and is_pid(pid) do
+    GenServer.cast(manager_pid, {:register_process, pid, name})
   end
 
   @doc """
@@ -127,9 +127,9 @@ defmodule Phoenix.SocketClient.HibernationManager do
 
   The process will no longer be tracked for hibernation.
   """
-  @spec unregister_process(pid()) :: :ok
-  def unregister_process(pid) when is_pid(pid) do
-    GenServer.cast(__MODULE__, {:unregister_process, pid})
+  @spec unregister_process(pid(), pid()) :: :ok
+  def unregister_process(manager_pid, pid) when is_pid(manager_pid) and is_pid(pid) do
+    GenServer.cast(manager_pid, {:unregister_process, pid})
   end
 
   @doc """
@@ -138,9 +138,9 @@ defmodule Phoenix.SocketClient.HibernationManager do
   This should be called when a process receives a message or performs work
   to update its activity timestamp and prevent premature hibernation.
   """
-  @spec report_activity(pid()) :: :ok
-  def report_activity(pid) when is_pid(pid) do
-    GenServer.cast(__MODULE__, {:report_activity, pid})
+  @spec report_activity(pid(), pid()) :: :ok
+  def report_activity(manager_pid, pid) when is_pid(manager_pid) and is_pid(pid) do
+    GenServer.cast(manager_pid, {:report_activity, pid})
   end
 
   @doc """
@@ -148,9 +148,9 @@ defmodule Phoenix.SocketClient.HibernationManager do
 
   Returns statistics about hibernation effectiveness and current state.
   """
-  @spec stats() :: map()
-  def stats do
-    GenServer.call(__MODULE__, :stats, 5000)
+  @spec stats(pid()) :: map()
+  def stats(manager_pid) when is_pid(manager_pid) do
+    GenServer.call(manager_pid, :stats, 5000)
   end
 
   @doc """
@@ -158,9 +158,9 @@ defmodule Phoenix.SocketClient.HibernationManager do
 
   Useful for manual hibernation during maintenance or testing.
   """
-  @spec hibernate_process(pid()) :: :ok | {:error, term()}
-  def hibernate_process(pid) when is_pid(pid) do
-    GenServer.call(__MODULE__, {:hibernate_process, pid}, 5000)
+  @spec hibernate_process(pid(), pid()) :: :ok | {:error, term()}
+  def hibernate_process(manager_pid, pid) when is_pid(manager_pid) and is_pid(pid) do
+    GenServer.call(manager_pid, {:hibernate_process, pid}, 5000)
   end
 
   @doc """
@@ -168,9 +168,9 @@ defmodule Phoenix.SocketClient.HibernationManager do
 
   This is typically handled automatically when messages are received.
   """
-  @spec wake_up_process(pid()) :: :ok | {:error, term()}
-  def wake_up_process(pid) when is_pid(pid) do
-    GenServer.call(__MODULE__, {:wake_up_process, pid}, 5000)
+  @spec wake_up_process(pid(), pid()) :: :ok | {:error, term()}
+  def wake_up_process(manager_pid, pid) when is_pid(manager_pid) and is_pid(pid) do
+    GenServer.call(manager_pid, {:wake_up_process, pid}, 5000)
   end
 
   # GenServer callbacks
