@@ -203,8 +203,10 @@ defmodule Phoenix.SocketClient.PerformanceMonitor do
         {:write_concurrency, true}
       ])
 
-    # Start collection timer
-    {:ok, timer} = :timer.send_interval(collection_interval, :collect_metrics)
+    # TODO(#25): Enable periodic :collect_metrics timer once real collect_*_metrics
+    # implementations replace the current stubs that return hardcoded zeros.
+    # The stubs cause false alerts (e.g., cache hit rate 0.0 < threshold 0.8).
+    # Previously: {:ok, timer} = :timer.send_interval(collection_interval, :collect_metrics)
 
     state = %__MODULE__{
       collection_interval: collection_interval,
@@ -212,16 +214,13 @@ defmodule Phoenix.SocketClient.PerformanceMonitor do
       registry_name: registry_name,
       alert_thresholds: alert_thresholds,
       metrics_history: metrics_table,
-      collection_timer: timer
+      collection_timer: nil
     }
 
     Phoenix.SocketClient.Telemetry.optimization(:performance_monitor_started, %{
       collection_interval: collection_interval,
       retention_period: retention_period
     })
-
-    # Collect initial metrics
-    send(self(), :collect_metrics)
 
     {:ok, state}
   end
