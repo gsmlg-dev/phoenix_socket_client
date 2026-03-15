@@ -602,7 +602,8 @@ defmodule Phoenix.SocketClient.Socket do
     # Update socket state status
     update_socket_state_status(sup_pid, :disconnected)
 
-    if socket_state.reconnect do
+    # Guard against nil socket_state when Agent is already down during shutdown
+    if socket_state && socket_state.reconnect do
       put_state(sup_pid, :reconnecting, true)
 
       # Emit reconnection attempt event
