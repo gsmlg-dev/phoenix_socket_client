@@ -443,10 +443,11 @@ defmodule Phoenix.SocketClient.RouteCache do
       :timer.cancel(state.cleanup_timer)
     end
 
+    entries_cleared = :ets.info(state.cache_table, :size)
     :ets.delete(state.cache_table)
 
     Phoenix.SocketClient.Telemetry.optimization(:route_cache_terminating, %{
-      entries_cleared: :ets.info(state.cache_table, :size)
+      entries_cleared: entries_cleared
     })
 
     :ok
