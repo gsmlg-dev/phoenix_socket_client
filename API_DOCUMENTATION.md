@@ -240,39 +240,50 @@ Send a message to a channel.
 
 ### Custom Channel Modules
 
-Create custom channel behavior:
+Create custom channel behavior by using `Phoenix.SocketClient.Channel` and
+implementing the `handle_message/3` callback:
 
 ```elixir
 defmodule MyApp.ChatChannel do
   use Phoenix.SocketClient.Channel
 
   @impl true
-  def handle_join(topic, params, socket) do
-    # Handle channel join
-    {:ok, %{joined: true}, socket}
-  end
-
-  @impl true
-  def handle_message("new_message", payload, socket) do
+  def handle_message("new_message", payload, state) do
     # Handle incoming message
     IO.puts("Received: #{payload["body"]}")
-    {:noreply, socket}
+    {:noreply, state}
   end
 
-  @impl true
-  def handle_close(reason, socket) do
-    # Handle channel close
-    IO.puts("Channel closed: #{inspect(reason)}")
-    socket
+  def handle_message(_event, _payload, state) do
+    # Catch-all for other events
+    {:noreply, state}
   end
 end
+```
 
-# Use custom channel
-{:ok, _} = Phoenix.SocketClient.Channel.join(
+The `handle_message/3` callback receives the event name, payload map, and
+channel state (`%Phoenix.SocketClient.Channel.State{}`). It must return
+`{:noreply, new_state}`.
+
+Since the channel is a GenServer, you can also override standard GenServer
+callbacks (`init/1`, `handle_call/3`, `handle_cast/2`, `handle_info/2`,
+`terminate/2`) which are made overridable by the `__using__` macro.
+
+Map topics to custom channel modules using the `:topic_channel_map` option:
+
+```elixir
+{:ok, socket} = Phoenix.SocketClient.start_link([
+  url: "ws://localhost:4000/socket/websocket",
+  topic_channel_map: %{
+    "rooms:lobby" => MyApp.ChatChannel
+  }
+])
+
+# Then join as usual
+{:ok, response, channel_pid} = Phoenix.SocketClient.Channel.join(
   socket,
   "rooms:lobby",
-  %{},
-  MyApp.ChatChannel
+  %{user: "alice"}
 )
 ```
 
