@@ -35,8 +35,12 @@ defmodule Phoenix.SocketClient do
     sup_pid
     |> get_process_pid(:socket)
     |> case do
-      nil -> {:error, :no_socket_found}
-      socket_pid -> send(socket_pid, :connect) && :ok
+      nil ->
+        {:error, :no_socket_found}
+
+      socket_pid ->
+        send(socket_pid, :connect)
+        :ok
     end
   end
 
