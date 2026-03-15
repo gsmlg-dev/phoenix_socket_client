@@ -36,7 +36,8 @@ defmodule Phoenix.SocketClient.State do
           join_channels: list(String.t()),
           default_channel_module: module() | nil,
           default_channel_params: map() | nil,
-          connect_time: integer() | nil
+          connect_time: integer() | nil,
+          heartbeat_interval: non_neg_integer()
         }
 
   @derive {Jason.Encoder,
@@ -78,6 +79,7 @@ defmodule Phoenix.SocketClient.State do
     join_channels: [],
     default_channel_module: nil,
     default_channel_params: nil,
-    connect_time: nil
+    connect_time: nil,
+    heartbeat_interval: 30_000
   ]
 end
