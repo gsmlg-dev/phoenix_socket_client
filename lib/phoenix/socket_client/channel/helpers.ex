@@ -219,15 +219,18 @@ defmodule Phoenix.SocketClient.Channel.Helpers do
 
     if sup_pid && topic do
       joined_channels = Phoenix.SocketClient.get_state(sup_pid, :joined_channels)
-      channel_data = Map.get(joined_channels, topic)
 
-      if reason == :normal and (channel_data && channel_data.status != :errored) do
-        Phoenix.SocketClient.remove_channel(sup_pid, topic)
-      else
-        Phoenix.SocketClient.update_channel_status(sup_pid, self(), topic, :errored, params)
+      if joined_channels do
+        channel_data = Map.get(joined_channels, topic)
+
+        if reason == :normal and (channel_data && channel_data.status != :errored) do
+          Phoenix.SocketClient.remove_channel(sup_pid, topic)
+        else
+          Phoenix.SocketClient.update_channel_status(sup_pid, self(), topic, :errored, params)
+        end
+
+        Telemetry.channel_left(self(), topic, reason)
       end
-
-      Telemetry.channel_left(self(), topic, reason)
     end
 
     :ok
