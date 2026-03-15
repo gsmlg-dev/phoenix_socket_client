@@ -8,11 +8,23 @@ defmodule Phoenix.SocketClient.MessageProcessor do
 
   ## Features
 
-  - Asynchronous JSON encoding/decoding operations
-  - Configurable message batching for network efficiency
-  - Bounded queues with backpressure
-  - Simple and robust design with minimal complexity
+  - Synchronous mode (default) for direct JSON encoding/decoding
+  - Asynchronous mode with message batching for high-throughput scenarios
+  - Bounded queues with backpressure (async mode)
   - Comprehensive monitoring and telemetry
+
+  ## Sync Mode (Default)
+
+  By default, `:sync_mode` is `true`. In this mode, `encode/4` and `decode/4`
+  call `Jason.encode!/1` and `Jason.decode!/1` directly without going through
+  the worker pool, batching, or binary pooling. This is the recommended mode
+  for most use cases since JSON encoding/decoding takes microseconds.
+
+  ## Async Mode
+
+  Set `:sync_mode` to `false` to enable the async batch processing pipeline
+  with worker pools, message batching, and binary pooling. This may be useful
+  for extremely high-throughput scenarios.
 
   ## Usage
 
@@ -37,6 +49,7 @@ defmodule Phoenix.SocketClient.MessageProcessor do
     :json_library,
     :registry_name,
     :binary_pool_pid,
+    sync_mode: true,
     encode_queue: :queue.new(),
     decode_queue: :queue.new(),
     encode_timer: nil,
@@ -55,10 +68,11 @@ defmodule Phoenix.SocketClient.MessageProcessor do
     * `:serializer` - Message serializer module (required)
     * `:json_library` - JSON library module (defaults to Jason)
     * `:registry_name` - Registry name for channel lookup
-    * `:batch_size` - Maximum messages per batch (default: 20)
-    * `:batch_interval` - Batch timeout in ms (default: 10)
-    * `:max_queue_size` - Maximum queue size before backpressure (default: 1000)
-    * `:concurrency` - Number of worker processes (default: 8)
+    * `:sync_mode` - When true (default), encode/decode synchronously without worker pool
+    * `:batch_size` - Maximum messages per batch (default: 20, async mode only)
+    * `:batch_interval` - Batch timeout in ms (default: 10, async mode only)
+    * `:max_queue_size` - Maximum queue size before backpressure (default: 1000, async mode only)
+    * `:concurrency` - Number of worker processes (default: 8, async mode only)
 
   """
   @spec start_link(keyword()) :: GenServer.on_start()
@@ -67,9 +81,13 @@ defmodule Phoenix.SocketClient.MessageProcessor do
   end
 
   @doc """
-  Encodes a message asynchronously.
+  Encodes a message.
 
-  Returns immediately and sends the result back to the caller when complete.
+  In sync mode (default), encodes directly and sends the result to the caller.
+  In async mode, enqueues for batch processing by the worker pool.
+
+  Returns `:ok` on success. The encoded result is sent as
+  `{:encode_result, ref, {:ok, encoded}}` to the caller process.
   """
   @spec encode(pid(), Message.t(), pid(), reference()) :: :ok | {:error, term()}
   def encode(processor, message, caller \\ self(), ref \\ make_ref()) do
@@ -77,9 +95,13 @@ defmodule Phoenix.SocketClient.MessageProcessor do
   end
 
   @doc """
-  Decodes a message asynchronously.
+  Decodes a message.
 
-  Returns immediately and sends the result back to the caller when complete.
+  In sync mode (default), decodes directly and sends the result to the caller.
+  In async mode, enqueues for batch processing by the worker pool.
+
+  Returns `:ok` on success. The decoded result is sent as
+  `{:decode_result, ref, {:ok, decoded}}` to the caller process.
   """
   @spec decode(pid(), String.t(), pid(), reference()) :: :ok | {:error, term()}
   def decode(processor, raw_message, caller \\ self(), ref \\ make_ref()) do
@@ -103,17 +125,20 @@ defmodule Phoenix.SocketClient.MessageProcessor do
     serializer = Keyword.fetch!(opts, :serializer)
     json_library = Keyword.get(opts, :json_library, Jason)
     registry_name = Keyword.get(opts, :registry_name)
-    concurrency = Keyword.get(opts, :concurrency, @default_concurrency)
+    sync_mode = Keyword.get(opts, :sync_mode, true)
 
-    # Start binary pool for JSON optimization
-    {:ok, binary_pool_pid} =
-      Phoenix.SocketClient.BinaryPool.start_link(
-        pool_size: Keyword.get(opts, :binary_pool_size, 1000),
-        cleanup_interval: Keyword.get(opts, :binary_cleanup_interval, 30_000),
-        max_age: Keyword.get(opts, :binary_max_age, 300_000),
-        # No registry for binary pool
-        registry_name: nil
-      )
+    state =
+      if sync_mode do
+        # Sync mode: no worker pool, no binary pool, no route cache
+        %__MODULE__{
+          serializer: serializer,
+          json_library: json_library,
+          registry_name: registry_name,
+          sync_mode: true
+        }
+      else
+        # Async mode: start the full batch processing pipeline
+        concurrency = Keyword.get(opts, :concurrency, @default_concurrency)
 
     state = %__MODULE__{
       serializer: serializer,
@@ -125,21 +150,54 @@ defmodule Phoenix.SocketClient.MessageProcessor do
       max_queue_size: Keyword.get(opts, :max_queue_size, @default_max_queue_size)
     }
 
-    # Start worker supervisor
-    {:ok, worker_sup} =
-      start_worker_supervisor(concurrency, serializer, json_library, binary_pool_pid)
+    state =
+      if sync_mode do
+        state
+      else
+        {:ok, worker_sup} =
+          start_worker_supervisor(concurrency, serializer, json_library, binary_pool_pid)
 
-    state = %{state | worker_sup: worker_sup}
+        %__MODULE__{state | sync_mode: false, worker_sup: worker_sup}
+      end
 
     Telemetry.execute([:phoenix_socket_client, :message_processor, :started], %{}, %{
-      registry_name: registry_name
+      registry_name: registry_name,
+      sync_mode: sync_mode
     })
 
     {:ok, state}
   end
 
   @impl true
+  def handle_call({:enqueue, operation, data, caller, ref}, _from, %{sync_mode: true} = state) do
+    # Sync mode: encode/decode directly and send result to caller
+    result =
+      case operation do
+        :encode ->
+          try do
+            encoded = Message.encode!(state.serializer, data, state.json_library)
+            {:ok, encoded}
+          catch
+            kind, reason -> {:error, {kind, reason}}
+          end
+
+        :decode ->
+          try do
+            decoded = Message.decode!(state.serializer, data, state.json_library)
+            {:ok, decoded}
+          catch
+            kind, reason -> {:error, {kind, reason}}
+          end
+      end
+
+    result_tag = if operation == :encode, do: :encode_result, else: :decode_result
+    send(caller, {result_tag, ref, result})
+
+    {:reply, :ok, state}
+  end
+
   def handle_call({:enqueue, operation, data, caller, ref}, _from, state) do
+    # Async mode: enqueue for batch processing
     queue_size = :queue.len(state.encode_queue) + :queue.len(state.decode_queue)
 
     if queue_size >= state.max_queue_size do
@@ -189,8 +247,20 @@ defmodule Phoenix.SocketClient.MessageProcessor do
     end
   end
 
+  def handle_call(:stats, _from, %{sync_mode: true} = state) do
+    stats = %{
+      sync_mode: true,
+      encode_queue_size: 0,
+      decode_queue_size: 0,
+      pending_replies: 0
+    }
+
+    {:reply, stats, state}
+  end
+
   def handle_call(:stats, _from, state) do
     stats = %{
+      sync_mode: false,
       encode_queue_size: :queue.len(state.encode_queue),
       decode_queue_size: :queue.len(state.decode_queue),
       pending_replies: map_size(state.pending_replies),
