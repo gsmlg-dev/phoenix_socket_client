@@ -252,7 +252,12 @@ defmodule Phoenix.SocketClient.Socket do
   @spec handle_info(:flush, t()) :: {:noreply, t()}
   def handle_info(:flush, %{sup_pid: _sup_pid} = state) do
     to_send = state.to_send_r || []
-    Enum.each(to_send, &transport_send(&1, state))
+
+    state =
+      Enum.reduce(to_send, state, fn msg, acc_state ->
+        transport_send(msg, acc_state)
+      end)
+
     {:noreply, %__MODULE__{state | to_send_r: []}}
   end
 
