@@ -16,6 +16,25 @@ defmodule Phoenix.SocketClient.Channel do
   @callback handle_message(event :: String.t(), payload :: map(), state :: state()) ::
               {:noreply, new_state :: state()}
 
+  @doc """
+  Callback invoked when the server replies to a channel join request.
+
+  `status` is `:ok` on successful join or `:error` on failure.
+  `payload` contains the server's response payload.
+  """
+  @callback handle_join_reply(status :: atom(), payload :: map(), state :: state()) ::
+              {:noreply, new_state :: state()}
+
+  @doc """
+  Callback invoked when the channel process is terminating.
+
+  `reason` is the termination reason (e.g. `:normal`, `:shutdown`, or an error).
+  """
+  @callback handle_close(reason :: term(), state :: state()) ::
+              {:noreply, new_state :: state()}
+
+  @optional_callbacks [handle_join_reply: 3, handle_close: 2]
+
   defmacro __using__(_opts) do
     quote do
       @behaviour Phoenix.SocketClient.Channel
@@ -51,20 +70,37 @@ defmodule Phoenix.SocketClient.Channel do
 
       @impl true
       def handle_info(%Message{event: "phx_reply"} = msg, state),
-        do: Helpers.handle_phx_reply_info(msg, state, &handle_message/3)
+        do:
+          Helpers.handle_phx_reply_info(
+            msg,
+            state,
+            &handle_message/3,
+            &handle_join_reply/3
+          )
 
       @impl true
       def handle_info(%Message{} = message, state),
         do: Helpers.handle_message_info(message, state, &handle_message/3)
 
       @impl true
-      def terminate(reason, state), do: Helpers.terminate_impl(reason, state)
+      def terminate(reason, state) do
+        {_, new_state} = handle_close(reason, state)
+        Helpers.terminate_impl(reason, new_state)
+      end
+
+      @doc false
+      def handle_join_reply(_status, _payload, state), do: {:noreply, state}
+
+      @doc false
+      def handle_close(_reason, state), do: {:noreply, state}
 
       defoverridable init: 1,
                      handle_call: 3,
                      handle_cast: 2,
                      handle_info: 2,
-                     terminate: 2
+                     terminate: 2,
+                     handle_join_reply: 3,
+                     handle_close: 2
     end
   end
 

@@ -114,22 +114,34 @@ defmodule Phoenix.SocketClient.Channel.Helpers do
   def handle_phx_reply_info(
         %Message{event: "phx_reply", ref: ref} = msg,
         %{pushes: pushes, topic: topic, join_ref: join_ref, params: params} = s,
-        _handle_message_fun
+        _handle_message_fun,
+        handle_join_reply_fun \\ nil
       ) do
-    pushes =
+    {pushes, state} =
       case Enum.split_with(pushes, &(elem(&1, 1).ref == ref)) do
         {[{from_ref, _push}], pushes} ->
           %{"status" => status, "response" => response} = msg.payload
           handle_reply_status(status, ref, join_ref, topic, msg, s, params)
           GenServer.reply(from_ref, {status_to_atom(status), response})
-          pushes
+
+          new_state =
+            if ref == join_ref && handle_join_reply_fun do
+              {:noreply, updated} =
+                handle_join_reply_fun.(status_to_atom(status), response, s)
+
+              updated
+            else
+              s
+            end
+
+          {pushes, new_state}
 
         {[], pushes} ->
           send(s.caller, %{msg | channel_pid: s.caller, topic: s.topic})
-          pushes
+          {pushes, s}
       end
 
-    {:noreply, %State{s | pushes: pushes}}
+    {:noreply, %State{state | pushes: pushes}}
   end
 
   defp handle_reply_status("ok", ref, join_ref, topic, msg, s, params) do
