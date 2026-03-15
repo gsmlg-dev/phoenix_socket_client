@@ -1,6 +1,12 @@
 defmodule Phoenix.SocketClient do
   @moduledoc """
   The main API for the Phoenix Socket Client.
+
+  > #### Namespace Notice {: .info}
+  >
+  > This library is not part of the official Phoenix Framework.
+  > The `Phoenix.SocketClient` namespace is used for clarity as this is a client
+  > for Phoenix Channels.
   """
 
   @doc """
