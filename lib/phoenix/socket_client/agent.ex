@@ -110,7 +110,7 @@ defmodule Phoenix.SocketClient.Agent do
   """
   @spec put(pid(), atom() | String.t(), any()) :: :ok
   def put(pid, key, value) do
-    Agent.update(pid, fn state ->
+    Agent.update(pid, fn %State{} = state ->
       if Map.has_key?(state, key) do
         Map.put(state, key, value)
       else
@@ -133,7 +133,7 @@ defmodule Phoenix.SocketClient.Agent do
   """
   @spec pop_all_to_send(pid()) :: [Message.t()]
   def pop_all_to_send(pid) do
-    Agent.get_and_update(pid, fn state ->
+    Agent.get_and_update(pid, fn %State{} = state ->
       to_send = state.to_send_r |> Enum.reverse()
       {to_send, %State{state | to_send_r: []}}
     end)
@@ -144,7 +144,7 @@ defmodule Phoenix.SocketClient.Agent do
   """
   @spec update_channel_status(pid(), pid(), String.t(), atom(), map() | nil) :: :ok
   def update_channel_status(pid, channel_pid, topic, status, params \\ nil) do
-    Agent.update(pid, fn state ->
+    Agent.update(pid, fn %State{} = state ->
       old_channel_data = Map.get(state.joined_channels, topic, %{})
       old_status = Map.get(old_channel_data, :status)
 
@@ -172,7 +172,7 @@ defmodule Phoenix.SocketClient.Agent do
   """
   @spec remove_channel(pid(), String.t()) :: :ok
   def remove_channel(pid, topic) do
-    Agent.update(pid, fn state ->
+    Agent.update(pid, fn %State{} = state ->
       joined_channels = Map.delete(state.joined_channels, topic)
       %State{state | joined_channels: joined_channels}
     end)

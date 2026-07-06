@@ -264,7 +264,7 @@ defmodule Phoenix.SocketClient.Socket do
 
   @impl true
   @spec handle_info(:flush, t()) :: {:noreply, t()}
-  def handle_info(:flush, %{sup_pid: _sup_pid} = state) do
+  def handle_info(:flush, %__MODULE__{sup_pid: _sup_pid} = state) do
     to_send = state.to_send_r || []
 
     state =
@@ -641,7 +641,7 @@ defmodule Phoenix.SocketClient.Socket do
     end
   end
 
-  defp close(reason, %{sup_pid: sup_pid} = state) do
+  defp close(reason, %__MODULE__{sup_pid: sup_pid} = state) do
     # Cancel heartbeat timer if active
     if state.heartbeat_timer do
       Process.cancel_timer(state.heartbeat_timer)
