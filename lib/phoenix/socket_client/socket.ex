@@ -649,6 +649,7 @@ defmodule Phoenix.SocketClient.Socket do
 
     socket_state = Phoenix.SocketClient.get_state(sup_pid)
     socket_ref = Phoenix.SocketClient.get_state(sup_pid, :socket_ref)
+    close_transport(socket_state, state)
 
     # Update socket state status
     update_socket_state_status(sup_pid, :disconnected)
@@ -668,8 +669,26 @@ defmodule Phoenix.SocketClient.Socket do
       Process.send_after(self(), :connect, socket_state.reconnect_interval)
     end
 
-    %__MODULE__{state | status: :disconnected, heartbeat_timer: nil}
+    %__MODULE__{
+      state
+      | status: :disconnected,
+        heartbeat_timer: nil,
+        transport_pid: nil,
+        transport_ref: nil,
+        connect_start_time: nil
+    }
   end
+
+  defp close_transport(%{transport: transport}, %{
+         transport_pid: transport_pid,
+         transport_ref: ref
+       })
+       when is_pid(transport_pid) do
+    if ref, do: Process.demonitor(ref, [:flush])
+    transport.close(transport_pid)
+  end
+
+  defp close_transport(_socket_state, _state), do: :ok
 
   defp update_socket_state_status(sup_pid, new_status) do
     old_status = get_state(sup_pid, :status)
