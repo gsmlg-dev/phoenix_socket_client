@@ -1,0 +1,69 @@
+name: E2E
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        required: true
+        description: 'Released version to test'
+        default: '0.7.0'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  e2e:
+    name: E2E release package
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Elixir
+        uses: erlef/setup-beam@v1
+        with:
+          elixir-version: '1.18'
+          otp-version: '28'
+
+      - name: Restore E2E dependencies cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            e2e/deps
+            e2e/_build
+          key: ${{ runner.os }}-e2e-mix-${{ inputs.version }}-${{ hashFiles('e2e/mix.exs') }}
+          restore-keys: |
+            ${{ runner.os }}-e2e-mix-${{ inputs.version }}-
+            ${{ runner.os }}-e2e-mix-
+
+      - name: Fetch release artifacts
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p /tmp/phoenix-socket-client-release
+          gh release download "v${{ inputs.version }}" \
+            --repo "${{ github.repository }}" \
+            --pattern "*.tar" \
+            --dir /tmp/phoenix-socket-client-release
+          ls -la /tmp/phoenix-socket-client-release
+
+      - name: Install E2E dependencies
+        working-directory: e2e
+        env:
+          PHOENIX_SOCKET_CLIENT_VERSION: '== ${{ inputs.version }}'
+        run: |
+          mix local.hex --force
+          mix local.rebar --force
+          mix deps.get
+
+      - name: Run E2E tests
+        working-directory: e2e
+        env:
+          PHOENIX_SOCKET_CLIENT_VERSION: '== ${{ inputs.version }}'
+        run: mix test --max-cases 1 --trace --timeout 120000

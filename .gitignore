@@ -25,3 +25,8 @@ devenv.local.nix
 
 # pre-commit
 .pre-commit-config.yaml
+
+# E2E fixture build artifacts
+/e2e/_build/
+/e2e/deps/
+/e2e/mix.lock
