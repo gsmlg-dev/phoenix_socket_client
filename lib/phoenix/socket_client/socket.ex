@@ -105,6 +105,10 @@ defmodule Phoenix.SocketClient.Socket do
   end
 
   @spec handle_info(:connect, t()) :: {:noreply, t()}
+  def handle_info(:connect, %{status: status} = state) when status in [:connecting, :connected] do
+    {:noreply, state}
+  end
+
   def handle_info(:connect, %{sup_pid: sup_pid} = state) do
     socket_state = Phoenix.SocketClient.get_state(sup_pid)
 
