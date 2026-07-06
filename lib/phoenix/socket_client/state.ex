@@ -40,7 +40,7 @@ defmodule Phoenix.SocketClient.State do
           heartbeat_interval: non_neg_integer()
         }
 
-  @derive {Jason.Encoder,
+  @derive {JSON.Encoder,
            only: [
              :url,
              :params,

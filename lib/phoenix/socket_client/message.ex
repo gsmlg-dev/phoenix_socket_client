@@ -65,13 +65,13 @@ defmodule Phoenix.SocketClient.Message do
   ## Parameters
     * `serializer` - Serializer module (V2)
     * `msg` - Raw JSON message string
-    * `json_library` - JSON library module (e.g., Jason)
+    * `json_library` - JSON library module (e.g., `JSON` or `Jason`)
 
   ## Returns
     * `Phoenix.SocketClient.Message.t()` - Decoded message struct
 
   ## Examples
-      message = Phoenix.SocketClient.Message.decode!(V2, raw_json, Jason)
+      message = Phoenix.SocketClient.Message.decode!(V2, raw_json, JSON)
   """
   @spec decode!(module(), String.t(), module()) :: t()
   def decode!(serializer, msg, json_library) do
@@ -85,13 +85,13 @@ defmodule Phoenix.SocketClient.Message do
   ## Parameters
     * `serializer` - Serializer module (V2)
     * `msg` - Message struct to encode
-    * `json_library` - JSON library module (e.g., Jason)
+    * `json_library` - JSON library module (e.g., `JSON` or `Jason`)
 
   ## Returns
     * String - JSON-encoded message
 
   ## Examples
-      json = Phoenix.SocketClient.Message.encode!(V2, message, Jason)
+      json = Phoenix.SocketClient.Message.encode!(V2, message, JSON)
   """
   @spec encode!(module(), t(), module()) :: String.t()
   def encode!(serializer, %__MODULE__{} = msg, json_library) do

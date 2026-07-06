@@ -4,9 +4,6 @@ defmodule Phoenix.SocketClientTest.MockServer do
   """
 
   def start do
-    # Configure Phoenix
-    Application.put_env(:phoenix, :json_library, Jason)
-
     # Find an available port
     port = find_available_port()
     Application.put_env(:phoenix_socket_client_test, :port, port)

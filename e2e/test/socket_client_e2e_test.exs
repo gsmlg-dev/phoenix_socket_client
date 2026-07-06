@@ -224,8 +224,7 @@ defmodule PhoenixSocketClientE2E.SocketClientTest do
         [
           name: name,
           url: server_url(),
-          reconnect_interval: 50,
-          serializer: Jason
+          reconnect_interval: 50
         ],
         opts
       )

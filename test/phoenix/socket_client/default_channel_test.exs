@@ -23,7 +23,6 @@ defmodule Phoenix.SocketClient.DefaultChannelTest do
 
     [
       url: "ws://127.0.0.1:#{port}/ws/admin/websocket",
-      serializer: Jason,
       reconnect_interval: 10
     ]
   end
@@ -31,7 +30,6 @@ defmodule Phoenix.SocketClient.DefaultChannelTest do
   setup_all do
     Application.ensure_all_started(:bandit)
     Application.ensure_all_started(:phoenix)
-    Application.ensure_all_started(:jason)
     :ok
   end
 

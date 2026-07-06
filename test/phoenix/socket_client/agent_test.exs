@@ -8,7 +8,6 @@ defmodule Phoenix.SocketClient.AgentTest do
       {:ok, pid} =
         Agent.start_link(
           url: "ws://localhost:4000/socket/websocket",
-          serializer: Jason,
           params: %{"test" => "value"}
         )
 
@@ -19,7 +18,7 @@ defmodule Phoenix.SocketClient.AgentTest do
       assert url =~ "test=value"
       assert %{"test" => "value"} == Agent.get(pid, :params)
       assert :disconnected == Agent.get(pid, :status)
-      assert Jason == Agent.get(pid, :json_library)
+      assert JSON == Agent.get(pid, :json_library)
     end
 
     test "get and put operations work correctly" do

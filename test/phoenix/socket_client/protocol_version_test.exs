@@ -12,12 +12,12 @@ defmodule Phoenix.SocketClient.ProtocolVersionTest do
 
     test "V2 protocol serialization" do
       message = Message.push("rooms:test", "new_msg", %{body: "Hello"})
-      encoded = Message.encode!(Message.V2, message, Jason)
+      encoded = Message.encode!(Message.V2, message, JSON)
 
       assert is_binary(encoded)
 
       # Decode back and verify
-      decoded = Message.decode!(Message.V2, encoded, Jason)
+      decoded = Message.decode!(Message.V2, encoded, JSON)
       assert decoded.topic == "rooms:test"
       assert decoded.event == "new_msg"
       assert decoded.payload == %{"body" => "Hello"}

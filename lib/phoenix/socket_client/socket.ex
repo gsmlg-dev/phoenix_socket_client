@@ -569,7 +569,7 @@ defmodule Phoenix.SocketClient.Socket do
   defp fallback_decode_and_route(message, sup_pid) do
     socket_state = Phoenix.SocketClient.get_state(sup_pid)
     serializer = Phoenix.SocketClient.Message.serializer(socket_state.vsn)
-    json_library = socket_state.json_library || Jason
+    json_library = socket_state.json_library || JSON
     decoded = Message.decode!(serializer, message, json_library)
 
     case Registry.lookup(socket_state.registry_name, decoded.topic) do
@@ -617,7 +617,7 @@ defmodule Phoenix.SocketClient.Socket do
       if transport_pid do
         socket_state = Phoenix.SocketClient.get_state(sup_pid)
         serializer = Phoenix.SocketClient.Message.serializer(socket_state.vsn)
-        json_library = socket_state.json_library || Jason
+        json_library = socket_state.json_library || JSON
         send(transport_pid, {:send, Message.encode!(serializer, message, json_library)})
       end
 

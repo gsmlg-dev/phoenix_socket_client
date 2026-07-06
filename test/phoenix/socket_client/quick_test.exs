@@ -8,7 +8,6 @@ defmodule Phoenix.SocketClient.QuickTest do
   setup_all do
     Application.ensure_all_started(:bandit)
     Application.ensure_all_started(:phoenix)
-    Application.ensure_all_started(:jason)
     :ok
   end
 
@@ -28,7 +27,6 @@ defmodule Phoenix.SocketClient.QuickTest do
          [
            name: name,
            url: "ws://127.0.0.1:#{get_port()}/ws/admin/websocket",
-           serializer: Jason,
            auto_connect: false,
            reconnect: false,
            registry_name: registry_name

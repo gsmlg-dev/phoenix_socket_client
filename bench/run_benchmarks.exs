@@ -3,7 +3,7 @@
 # Simple benchmark runner for development
 # Usage: mix run bench/run_benchmarks.exs
 
-Mix.install([{:benchee, "~> 1.3"}, {:benchee_html, "~> 1.0"}, {:jason, "~> 1.2"}])
+Mix.install([{:benchee, "~> 1.3"}, {:benchee_html, "~> 1.0"}])
 
 # Load the application code
 Code.append_path("_build/dev/lib/phoenix_socket_client/ebin")

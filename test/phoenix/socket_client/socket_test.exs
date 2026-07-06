@@ -10,7 +10,6 @@ defmodule Phoenix.SocketClient.SocketTest do
 
     [
       url: "ws://127.0.0.1:#{port}/ws/admin/websocket",
-      serializer: Jason,
       reconnect_interval: 10
     ]
   end
@@ -18,7 +17,6 @@ defmodule Phoenix.SocketClient.SocketTest do
   setup_all do
     Application.ensure_all_started(:bandit)
     Application.ensure_all_started(:phoenix)
-    Application.ensure_all_started(:jason)
     :ok
   end
 
@@ -85,7 +83,6 @@ defmodule Phoenix.SocketClient.SocketTest do
 
       config = [
         url: "ws://127.0.0.1:9999/ws/admin/websocket",
-        serializer: Jason,
         name: name,
         reconnect_interval: 100
       ]

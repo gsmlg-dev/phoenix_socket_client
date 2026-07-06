@@ -18,7 +18,7 @@ defmodule Phoenix.SocketClient.Supervisor do
     * `:reconnect_interval` - The reconnect interval in milliseconds.
     * `:reconnect?` - Whether to reconnect automatically.
     * `:auto_connect` - Whether to connect automatically on startup.
-    * `:serializer` - The serializer to use.
+    * `:json_library` - The JSON encoder/decoder module to use.
     * `:vsn` - The Phoenix Channels protocol version.
     * `:topic_channel_map` - A map from a topic string to a channel module.
     * `:default_channel_module` - The default channel module to use.

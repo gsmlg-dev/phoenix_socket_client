@@ -16,7 +16,7 @@ defmodule Phoenix.SocketClient.MessageProcessor do
   ## Sync Mode (Default)
 
   By default, `:sync_mode` is `true`. In this mode, `encode/4` and `decode/4`
-  call `Jason.encode!/1` and `Jason.decode!/1` directly without going through
+  call `JSON.encode!/1` and `JSON.decode!/1` directly without going through
   the worker pool, batching, or binary pooling. This is the recommended mode
   for most use cases since JSON encoding/decoding takes microseconds.
 
@@ -66,7 +66,7 @@ defmodule Phoenix.SocketClient.MessageProcessor do
 
   ## Options
     * `:serializer` - Message serializer module (required)
-    * `:json_library` - JSON library module (defaults to Jason)
+    * `:json_library` - JSON library module (defaults to `JSON`)
     * `:registry_name` - Registry name for channel lookup
     * `:sync_mode` - When true (default), encode/decode synchronously without worker pool
     * `:batch_size` - Maximum messages per batch (default: 20, async mode only)
@@ -123,7 +123,7 @@ defmodule Phoenix.SocketClient.MessageProcessor do
     opts = if Keyword.keyword?(opts), do: opts, else: Enum.into(opts, [])
 
     serializer = Keyword.fetch!(opts, :serializer)
-    json_library = Keyword.get(opts, :json_library, Jason)
+    json_library = Keyword.get(opts, :json_library, JSON)
     registry_name = Keyword.get(opts, :registry_name)
     sync_mode = Keyword.get(opts, :sync_mode, true)
 
@@ -140,24 +140,31 @@ defmodule Phoenix.SocketClient.MessageProcessor do
         # Async mode: start the full batch processing pipeline
         concurrency = Keyword.get(opts, :concurrency, @default_concurrency)
 
-    state = %__MODULE__{
-      serializer: serializer,
-      json_library: json_library,
-      registry_name: registry_name,
-      binary_pool_pid: binary_pool_pid,
-      batch_size: Keyword.get(opts, :batch_size, @default_batch_size),
-      batch_interval: Keyword.get(opts, :batch_interval, @default_batch_interval),
-      max_queue_size: Keyword.get(opts, :max_queue_size, @default_max_queue_size)
-    }
+        binary_pool_opts =
+          [
+            registry_name: registry_name,
+            pool_size: Keyword.get(opts, :binary_pool_size),
+            cleanup_interval: Keyword.get(opts, :binary_cleanup_interval),
+            max_age: Keyword.get(opts, :binary_max_age)
+          ]
+          |> Enum.reject(fn {_key, value} -> is_nil(value) end)
 
-    state =
-      if sync_mode do
-        state
-      else
+        {:ok, binary_pool_pid} = Phoenix.SocketClient.BinaryPool.start_link(binary_pool_opts)
+
         {:ok, worker_sup} =
           start_worker_supervisor(concurrency, serializer, json_library, binary_pool_pid)
 
-        %__MODULE__{state | sync_mode: false, worker_sup: worker_sup}
+        %__MODULE__{
+          serializer: serializer,
+          json_library: json_library,
+          registry_name: registry_name,
+          binary_pool_pid: binary_pool_pid,
+          sync_mode: false,
+          worker_sup: worker_sup,
+          batch_size: Keyword.get(opts, :batch_size, @default_batch_size),
+          batch_interval: Keyword.get(opts, :batch_interval, @default_batch_interval),
+          max_queue_size: Keyword.get(opts, :max_queue_size, @default_max_queue_size)
+        }
       end
 
     Telemetry.execute([:phoenix_socket_client, :message_processor, :started], %{}, %{

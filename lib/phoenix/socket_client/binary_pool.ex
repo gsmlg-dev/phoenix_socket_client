@@ -130,7 +130,7 @@ defmodule Phoenix.SocketClient.BinaryPool do
   """
   @spec common_patterns() :: list(binary())
   def common_patterns do
-    json_lib = Application.get_env(:phoenix_socket_client, :json_library, Jason)
+    json_lib = Application.get_env(:phoenix_socket_client, :json_library, JSON)
 
     # Common Phoenix Channel message patterns
     [

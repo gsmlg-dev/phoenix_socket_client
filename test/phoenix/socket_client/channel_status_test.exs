@@ -11,7 +11,6 @@ defmodule Phoenix.SocketClient.ChannelStatusTest do
 
     [
       url: "ws://127.0.0.1:#{port}/ws/admin/websocket",
-      serializer: Jason,
       reconnect_interval: 10,
       auto_connect: true,
       reconnect: false,
@@ -22,7 +21,6 @@ defmodule Phoenix.SocketClient.ChannelStatusTest do
   setup_all do
     Application.ensure_all_started(:bandit)
     Application.ensure_all_started(:phoenix)
-    Application.ensure_all_started(:jason)
     :ok
   end
 

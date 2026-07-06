@@ -594,10 +594,13 @@ end)
 
 ### JSON Library Configuration
 
+`JSON` is used by default. If your application depends on another compatible
+JSON module, pass it explicitly:
+
 ```elixir
 {:ok, socket} = Phoenix.SocketClient.start_link([
   url: "ws://localhost:4000/socket/websocket",
-  json_library: Poison  # Use Poison instead of Jason
+  json_library: Jason
 ])
 ```
 

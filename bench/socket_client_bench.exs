@@ -66,30 +66,30 @@ defmodule Phoenix.SocketClient.Benchmarks do
 
     Benchee.run(benchee, %{
       "encode_small_message" => fn ->
-        Phoenix.SocketClient.Message.encode!(Phoenix.SocketClient.Message.V2, small_message, Jason)
+        Phoenix.SocketClient.Message.encode!(Phoenix.SocketClient.Message.V2, small_message, JSON)
       end,
       "encode_medium_message" => fn ->
-        Phoenix.SocketClient.Message.encode!(Phoenix.SocketClient.Message.V2, medium_message, Jason)
+        Phoenix.SocketClient.Message.encode!(Phoenix.SocketClient.Message.V2, medium_message, JSON)
       end,
       "encode_large_message" => fn ->
-        Phoenix.SocketClient.Message.encode!(Phoenix.SocketClient.Message.V2, large_message, Jason)
+        Phoenix.SocketClient.Message.encode!(Phoenix.SocketClient.Message.V2, large_message, JSON)
       end
     }, time: 5, memory_time: 2)
 
     # Benchmark decoding
-    encoded_small = Phoenix.SocketClient.Message.encode!(Phoenix.SocketClient.Message.V2, small_message, Jason)
-    encoded_medium = Phoenix.SocketClient.Message.encode!(Phoenix.SocketClient.Message.V2, medium_message, Jason)
-    encoded_large = Phoenix.SocketClient.Message.encode!(Phoenix.SocketClient.Message.V2, large_message, Jason)
+    encoded_small = Phoenix.SocketClient.Message.encode!(Phoenix.SocketClient.Message.V2, small_message, JSON)
+    encoded_medium = Phoenix.SocketClient.Message.encode!(Phoenix.SocketClient.Message.V2, medium_message, JSON)
+    encoded_large = Phoenix.SocketClient.Message.encode!(Phoenix.SocketClient.Message.V2, large_message, JSON)
 
     Benchee.run(%Benchee.Runner{benchee | title: "Message Decoding Performance"}, %{
       "decode_small_message" => fn ->
-        Phoenix.SocketClient.Message.decode!(Phoenix.SocketClient.Message.V2, encoded_small, Jason)
+        Phoenix.SocketClient.Message.decode!(Phoenix.SocketClient.Message.V2, encoded_small, JSON)
       end,
       "decode_medium_message" => fn ->
-        Phoenix.SocketClient.Message.decode!(Phoenix.SocketClient.Message.V2, encoded_medium, Jason)
+        Phoenix.SocketClient.Message.decode!(Phoenix.SocketClient.Message.V2, encoded_medium, JSON)
       end,
       "decode_large_message" => fn ->
-        Phoenix.SocketClient.Message.decode!(Phoenix.SocketClient.Message.V2, encoded_large, Jason)
+        Phoenix.SocketClient.Message.decode!(Phoenix.SocketClient.Message.V2, encoded_large, JSON)
       end
     }, time: 5, memory_time: 2)
 
@@ -222,11 +222,11 @@ defmodule Phoenix.SocketClient.Benchmarks do
 
     Benchee.run(%{
       "message_encode" => fn ->
-        Phoenix.SocketClient.Message.encode!(Phoenix.SocketClient.Message.V2, message, Jason)
+        Phoenix.SocketClient.Message.encode!(Phoenix.SocketClient.Message.V2, message, JSON)
       end,
       "message_decode" => fn ->
-        encoded = Phoenix.SocketClient.Message.encode!(Phoenix.SocketClient.Message.V2, message, Jason)
-        Phoenix.SocketClient.Message.decode!(Phoenix.SocketClient.Message.V2, encoded, Jason)
+        encoded = Phoenix.SocketClient.Message.encode!(Phoenix.SocketClient.Message.V2, message, JSON)
+        Phoenix.SocketClient.Message.decode!(Phoenix.SocketClient.Message.V2, encoded, JSON)
       end,
       "ref_generation" => fn ->
         Phoenix.SocketClient.Message.generate_ref()
@@ -257,7 +257,7 @@ defmodule Phoenix.SocketClient.Benchmarks do
 
     # Encode all messages
     encoded = Enum.map(messages, fn msg ->
-      Phoenix.SocketClient.Message.encode!(Phoenix.SocketClient.Message.V2, msg, Jason)
+      Phoenix.SocketClient.Message.encode!(Phoenix.SocketClient.Message.V2, msg, JSON)
     end)
 
     :erlang.garbage_collect()

@@ -44,7 +44,7 @@ defmodule Phoenix.SocketClient.MixProject do
 
   defp deps do
     [
-      {:jason, "~> 1.2"},
+      {:jason, "~> 1.2", optional: true},
       {:http_web_socket, "~> 0.11.0"},
       {:telemetry, "~> 1.0"},
       {:benchee, "~> 1.4", only: :dev},

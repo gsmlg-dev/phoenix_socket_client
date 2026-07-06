@@ -6,7 +6,6 @@ defmodule Phoenix.SocketClientTest do
   @socket_config [
     # Will be set dynamically
     url: nil,
-    serializer: Jason,
     reconnect_interval: 10,
     auto_connect: true,
     vsn: "2.0.0"
@@ -26,7 +25,6 @@ defmodule Phoenix.SocketClientTest do
   setup_all do
     Application.ensure_all_started(:bandit)
     Application.ensure_all_started(:phoenix)
-    Application.ensure_all_started(:jason)
     :ok
   end
 
@@ -154,7 +152,6 @@ defmodule Phoenix.SocketClientTest do
         Phoenix.SocketClient.Supervisor.start_link(
           name: name,
           url: "ws://127.0.0.1:#{port}/ws/admin/websocket",
-          serializer: Jason,
           registry_name: registry_name
         )
 
@@ -186,7 +183,6 @@ defmodule Phoenix.SocketClientTest do
         Phoenix.SocketClient.Supervisor.start_link(
           name: name,
           url: "ws://127.0.0.1:#{get_port()}/ws/admin/websocket",
-          serializer: Jason,
           params: %{"test" => "value"},
           registry_name: registry_name
         )
@@ -222,7 +218,6 @@ defmodule Phoenix.SocketClientTest do
         Phoenix.SocketClient.Supervisor.start_link(
           name: name,
           url: "ws://127.0.0.1:#{port}/ws/admin/websocket",
-          serializer: Jason,
           registry_name: registry_name
         )
 
@@ -260,7 +255,6 @@ defmodule Phoenix.SocketClientTest do
         Phoenix.SocketClient.Supervisor.start_link(
           name: name1,
           url: "ws://127.0.0.1:#{get_port()}/ws/admin/websocket",
-          serializer: Jason,
           registry_name: registry_name1
         )
 
@@ -270,7 +264,6 @@ defmodule Phoenix.SocketClientTest do
         Phoenix.SocketClient.Supervisor.start_link(
           name: name2,
           url: "ws://127.0.0.1:#{get_port()}/ws/admin/websocket",
-          serializer: Jason,
           registry_name: registry_name2
         )
 

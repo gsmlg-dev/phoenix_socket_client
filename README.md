@@ -157,7 +157,7 @@ Phoenix.SocketClient.reconfigure(socket, params: %{"token" => "new-token"})
 | `:reconnect_interval` | `integer()` | `60_000` | Reconnection delay in milliseconds |
 | `:reconnect?` | `boolean()` | `true` | Enable automatic reconnection |
 | `:auto_connect` | `boolean()` | `true` | Connect automatically on startup |
-| `:serializer` | `module()` | `Jason` | JSON serializer module |
+| `:json_library` | `module()` | `JSON` | JSON encoder/decoder module |
 | `:vsn` | `String.t()` | `"2.0.0"` | Phoenix Channels protocol version |
 | `:topic_channel_map` | `map()` | `%_` | A map from a topic string to a channel module. |
 | `:join_channels` | `list()` | `[]` | A list of channels to automatically join on connect. |

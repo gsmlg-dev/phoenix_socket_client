@@ -2,8 +2,6 @@ defmodule PhoenixSocketClientE2E.SocketServer do
   @moduledoc false
 
   def start do
-    Application.put_env(:phoenix, :json_library, Jason)
-
     port = find_available_port()
 
     Application.put_env(

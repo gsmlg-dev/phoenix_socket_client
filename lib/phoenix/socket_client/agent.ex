@@ -190,7 +190,7 @@ defmodule Phoenix.SocketClient.Agent do
 
   defp init_state(opts) do
     defaults = %{
-      json_library: Jason,
+      json_library: JSON,
       reconnect: true,
       auto_connect: true,
       vsn: "2.0.0",
