@@ -1,6 +1,8 @@
 name: E2E
 
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
     inputs:
       version:
@@ -17,7 +19,7 @@ concurrency:
 
 jobs:
   e2e:
-    name: E2E release package
+    name: E2E
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
@@ -37,12 +39,12 @@ jobs:
           path: |
             e2e/deps
             e2e/_build
-          key: ${{ runner.os }}-e2e-mix-${{ inputs.version }}-${{ hashFiles('e2e/mix.exs') }}
+          key: ${{ runner.os }}-e2e-mix-${{ github.event_name == 'workflow_dispatch' && inputs.version || github.sha }}-${{ hashFiles('mix.exs', 'e2e/mix.exs') }}
           restore-keys: |
-            ${{ runner.os }}-e2e-mix-${{ inputs.version }}-
             ${{ runner.os }}-e2e-mix-
 
       - name: Fetch release artifacts
+        if: github.event_name == 'workflow_dispatch'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -53,7 +55,8 @@ jobs:
             --dir /tmp/phoenix-socket-client-release
           ls -la /tmp/phoenix-socket-client-release
 
-      - name: Install E2E dependencies
+      - name: Install E2E dependencies from release
+        if: github.event_name == 'workflow_dispatch'
         working-directory: e2e
         env:
           PHOENIX_SOCKET_CLIENT_VERSION: '== ${{ inputs.version }}'
@@ -62,8 +65,26 @@ jobs:
           mix local.rebar --force
           mix deps.get
 
-      - name: Run E2E tests
+      - name: Install E2E dependencies from checkout
+        if: github.event_name == 'push'
+        working-directory: e2e
+        env:
+          PHOENIX_SOCKET_CLIENT_PATH: '..'
+        run: |
+          mix local.hex --force
+          mix local.rebar --force
+          mix deps.get
+
+      - name: Run E2E release tests
+        if: github.event_name == 'workflow_dispatch'
         working-directory: e2e
         env:
           PHOENIX_SOCKET_CLIENT_VERSION: '== ${{ inputs.version }}'
+        run: mix test --max-cases 1 --trace --timeout 120000
+
+      - name: Run E2E checkout tests
+        if: github.event_name == 'push'
+        working-directory: e2e
+        env:
+          PHOENIX_SOCKET_CLIENT_PATH: '..'
         run: mix test --max-cases 1 --trace --timeout 120000

@@ -11,6 +11,7 @@ defmodule Phoenix.SocketClient.Transport do
               | {:error, any}
 
   @callback close(socket :: pid) ::
-              {:ok, any}
+              :ok
+              | {:ok, any}
               | {:error, any}
 end
