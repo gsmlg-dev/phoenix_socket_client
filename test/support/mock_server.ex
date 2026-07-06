@@ -94,7 +94,9 @@ defmodule Phoenix.SocketClientTest.Endpoint do
     signing_salt: "test_salt"
   ]
 
-  socket("/ws/admin", Phoenix.SocketClientTest.AdminSocket, websocket: [check_origin: false])
+  socket("/ws/admin", Phoenix.SocketClientTest.AdminSocket,
+    websocket: [check_origin: false, connect_info: [:x_headers]]
+  )
 
   # Add this plug to handle basic HTTP requests
   plug(Plug.RequestId)
@@ -123,10 +125,17 @@ defmodule Phoenix.SocketClientTest.AdminSocket do
   channel("test:*", Phoenix.SocketClientTest.RoomChannel)
 
   def connect(params, socket, connect_info) do
+    headers =
+      connect_info
+      |> Map.get(:x_headers, [])
+      |> Map.new(fn {key, value} -> {String.downcase(to_string(key)), to_string(value)} end)
+
     on_connect(self(), %{
       params: params,
       connect_info: connect_info
     })
+
+    socket = assign(socket, :headers, headers)
 
     {:ok, socket}
   end
