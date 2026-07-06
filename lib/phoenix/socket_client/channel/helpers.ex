@@ -30,7 +30,7 @@ defmodule Phoenix.SocketClient.Channel.Helpers do
   """
   def handle_join_call(
         {_pid, _ref} = from,
-        %{sup_pid: sup_pid, topic: topic, params: params} = state
+        %State{sup_pid: sup_pid, topic: topic, params: params} = state
       ) do
     message = Message.join(topic, params)
 
@@ -65,7 +65,7 @@ defmodule Phoenix.SocketClient.Channel.Helpers do
   def handle_push_call(
         {event, payload},
         from,
-        %{sup_pid: sup_pid, topic: topic} = state
+        %State{sup_pid: sup_pid, topic: topic} = state
       ) do
     message = %Message{
       topic: topic,
@@ -113,7 +113,7 @@ defmodule Phoenix.SocketClient.Channel.Helpers do
   """
   def handle_phx_reply_info(
         %Message{event: "phx_reply", ref: ref} = msg,
-        %{pushes: pushes, topic: topic, join_ref: join_ref, params: params} = s,
+        %State{pushes: pushes, topic: topic, join_ref: join_ref, params: params} = s,
         _handle_message_fun,
         handle_join_reply_fun \\ nil
       ) do
@@ -126,7 +126,7 @@ defmodule Phoenix.SocketClient.Channel.Helpers do
 
           new_state =
             if ref == join_ref && handle_join_reply_fun do
-              {:noreply, updated} =
+              {:noreply, %State{} = updated} =
                 handle_join_reply_fun.(status_to_atom(status), response, s)
 
               updated
