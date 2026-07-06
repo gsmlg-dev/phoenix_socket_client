@@ -261,7 +261,7 @@ mix format
 
 ### Requirements
 
-- Elixir 1.17+
+- Elixir 1.18+
 - Erlang/OTP 26+
 
 ## Architecture
@@ -318,4 +318,3 @@ def deps do
   ]
 end
 ```
-

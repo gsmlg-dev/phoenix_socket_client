@@ -104,9 +104,17 @@ defmodule Phoenix.SocketClient.RouteCache do
   def start_link(opts \\ []) do
     opts = if Keyword.keyword?(opts), do: opts, else: Enum.into(opts, [])
     registry_name = Keyword.get(opts, :registry_name)
-    name = if registry_name, do: {:via, Registry, {registry_name, :route_cache}}, else: nil
+    name = route_cache_name(registry_name)
 
     GenServer.start_link(__MODULE__, opts, name: name)
+  end
+
+  defp route_cache_name(nil), do: nil
+
+  defp route_cache_name(registry_name) do
+    if Process.whereis(registry_name) do
+      {:via, Registry, {registry_name, :route_cache}}
+    end
   end
 
   @doc """

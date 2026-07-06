@@ -55,6 +55,10 @@ defmodule Phoenix.SocketClient do
     end
   end
 
+  def get_process_pid(sup_pid, :socket_state) when is_pid(sup_pid) do
+    fallback_process_discovery(sup_pid, :socket_state)
+  end
+
   def get_process_pid(sup_pid, name) when is_pid(sup_pid) do
     try do
       # First try to get registry name from the supervisor's state

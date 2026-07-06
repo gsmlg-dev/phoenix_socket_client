@@ -1,91 +1,20 @@
 defmodule Phoenix.SocketClient.Transports.Websocket do
   @moduledoc """
-  WebSocket transport implementation using the websocket_client library.
+  WebSocket transport implementation using the http_web_socket library.
 
   Provides WebSocket connectivity for Phoenix Socket Client using the
-  Erlang websocket_client library as the underlying transport mechanism.
+  `HTTP.WebSocket` API as the underlying transport mechanism.
   """
 
   @behaviour Phoenix.SocketClient.Transport
 
-  require Logger
+  alias Phoenix.SocketClient.Transports.HTTPWebSocketAdapter
 
   def open(url, transport_opts) do
-    headers = Keyword.get(transport_opts, :headers, [])
-    headers = Enum.map(headers, fn {k, v} -> {to_charlist(k), to_charlist(v)} end)
-
-    :websocket_client.start_link(
-      String.to_charlist(url),
-      __MODULE__,
-      transport_opts,
-      extra_headers: headers
-    )
+    HTTPWebSocketAdapter.start_link(url, transport_opts, transport: :websocket)
   end
 
   def close(socket) do
-    send(socket, :close)
-  end
-
-  def init(opts) do
-    {:once,
-     %{
-       opts: opts,
-       sender: opts[:sender]
-     }}
-  end
-
-  def onconnect(_, state) do
-    send(state.sender, {:connected, self()})
-    {:ok, state}
-  end
-
-  def ondisconnect(reason, state) do
-    send(state.sender, {:disconnected, reason, self()})
-    {:close, :normal, state}
-  end
-
-  @doc """
-  Receives JSON encoded Socket.Message from remote WS endpoint and
-  forwards message to client sender process
-  """
-  def websocket_handle({:text, msg}, _conn_state, state) do
-    send(state.sender, {:receive, msg})
-    {:ok, state}
-  end
-
-  def websocket_handle({:pong, _msg}, _conn_state, state) do
-    # Ignore pong responses when :websocket_client is configured to send
-    # keepalive messages.
-    {:ok, state}
-  end
-
-  def websocket_handle(other_msg, _req, state) do
-    Phoenix.SocketClient.Telemetry.error(%{
-      transport: :websocket,
-      event: :unknown_message,
-      message: other_msg
-    })
-
-    {:ok, state}
-  end
-
-  @doc """
-  Sends JSON encoded Socket.Message to remote WS endpoint
-  """
-  def websocket_info({:send, msg}, _conn_state, state) do
-    {:reply, {:text, msg}, state}
-  end
-
-  def websocket_info(:close, _conn_state, state) do
-    send(state.sender, {:closed, :normal, self()})
-    {:close, <<>>, "done"}
-  end
-
-  def websocket_info(_message, _req, state) do
-    {:ok, state}
-  end
-
-  def websocket_terminate(_reason, _conn_state, _state) do
-    :ok
+    HTTPWebSocketAdapter.close(socket)
   end
 end

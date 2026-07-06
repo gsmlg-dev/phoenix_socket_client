@@ -277,7 +277,7 @@ defmodule Phoenix.SocketClient.MessageProcessor do
     {batch, new_encode_queue} = take_batch(state.encode_queue, state.batch_size)
     new_state = %{state | encode_queue: new_encode_queue, encode_timer: nil}
 
-    if :queue.len(batch) > 0 do
+    if length(batch) > 0 do
       process_batch_async(:encode, batch, new_state)
     end
 
@@ -288,7 +288,7 @@ defmodule Phoenix.SocketClient.MessageProcessor do
     {batch, new_decode_queue} = take_batch(state.decode_queue, state.batch_size)
     new_state = %{state | decode_queue: new_decode_queue, decode_timer: nil}
 
-    if :queue.len(batch) > 0 do
+    if length(batch) > 0 do
       process_batch_async(:decode, batch, new_state)
     end
 
@@ -420,10 +420,10 @@ defmodule Phoenix.SocketClient.MessageProcessor do
         # No available workers, re-queue
         case operation do
           :encode ->
-            %{state | encode_queue: :queue.join(batch, state.encode_queue)}
+            %{state | encode_queue: requeue_batch(batch, state.encode_queue)}
 
           :decode ->
-            %{state | decode_queue: :queue.join(batch, state.decode_queue)}
+            %{state | decode_queue: requeue_batch(batch, state.decode_queue)}
         end
     end
   end
@@ -432,11 +432,17 @@ defmodule Phoenix.SocketClient.MessageProcessor do
     case :queue.out(queue) do
       {{:value, item}, remaining_queue} ->
         {batch, final_queue} = take_batch_helper([item], remaining_queue, max_size - 1)
-        {:queue.from_list(batch), final_queue}
+        {Enum.reverse(batch), final_queue}
 
       {:empty, _queue} ->
-        {:queue.new(), queue}
+        {[], queue}
     end
+  end
+
+  defp requeue_batch(batch, queue) do
+    batch
+    |> :queue.from_list()
+    |> :queue.join(queue)
   end
 
   defp take_batch_helper(batch, queue, 0), do: {batch, queue}

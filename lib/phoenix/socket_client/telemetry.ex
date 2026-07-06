@@ -1038,6 +1038,17 @@ defmodule Phoenix.SocketClient.Telemetry do
       %{duration: duration, system_time: System.system_time()},
       %{channel_pid: channel_pid, topic: topic}
     )
+
+    emit_event(
+      [:phoenix_socket_client, :channel],
+      %{duration: duration},
+      %{
+        action: :join_duration,
+        pid: channel_pid,
+        topic: topic,
+        timestamp: System.system_time()
+      }
+    )
   end
 
   @doc """
@@ -1049,6 +1060,17 @@ defmodule Phoenix.SocketClient.Telemetry do
       [:phoenix, :socket_client, :channel, :leave_duration],
       %{duration: duration, system_time: System.system_time()},
       %{channel_pid: channel_pid, topic: topic}
+    )
+
+    emit_event(
+      [:phoenix_socket_client, :channel],
+      %{duration: duration},
+      %{
+        action: :leave_duration,
+        pid: channel_pid,
+        topic: topic,
+        timestamp: System.system_time()
+      }
     )
   end
 
@@ -1092,6 +1114,23 @@ defmodule Phoenix.SocketClient.Telemetry do
   @spec socket_connection_error(pid(), String.t(), any(), metadata()) :: :ok
   def socket_connection_error(pid, url, error, metadata \\ %{}) do
     connection_error(Map.merge(metadata, %{pid: pid, url: url, error: error}))
+  end
+
+  @doc """
+  Legacy: Emits socket connection duration event.
+  """
+  @spec socket_connection_duration(pid(), String.t(), non_neg_integer()) :: :ok
+  def socket_connection_duration(pid, url, duration) do
+    emit_event(
+      [:phoenix_socket_client, :socket],
+      %{duration: duration},
+      %{
+        action: :connection_duration,
+        pid: pid,
+        url: url,
+        timestamp: System.system_time()
+      }
+    )
   end
 
   @doc """
@@ -1437,14 +1476,14 @@ defmodule Phoenix.SocketClient.Telemetry do
 
   defp get_component_from_event(event_name) do
     case event_name do
-      [:phoenix, :socket_client, :connection, _] -> "Connection"
-      [:phoenix, :socket_client, :reconnection, _] -> "Reconnection"
-      [:phoenix, :socket_client, :channel, _] -> "Channel"
-      [:phoenix, :socket_client, :message, _] -> "Message"
-      [:phoenix, :socket_client, :heartbeat, _] -> "Heartbeat"
-      [:phoenix, :socket_client, :error] -> "Error"
-      [:phoenix, :socket_client, :optimization, _] -> "Optimization"
-      _ -> "Unknown"
+      [:phoenix, :socket_client, :connection, _] -> "connection"
+      [:phoenix, :socket_client, :reconnection, _] -> "reconnection"
+      [:phoenix, :socket_client, :channel, _] -> "channel"
+      [:phoenix, :socket_client, :message, _] -> "message"
+      [:phoenix, :socket_client, :heartbeat, _] -> "heartbeat"
+      [:phoenix, :socket_client, :error] -> "error"
+      [:phoenix, :socket_client, :optimization, _] -> "optimization"
+      _ -> "unknown"
     end
   end
 

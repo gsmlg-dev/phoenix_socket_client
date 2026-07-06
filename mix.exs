@@ -7,7 +7,7 @@ defmodule Phoenix.SocketClient.MixProject do
     [
       app: :phoenix_socket_client,
       version: @version,
-      elixir: "~> 1.17",
+      elixir: "~> 1.18",
       build_embedded: Mix.env() == :prod,
       start_permanent: Mix.env() == :prod,
       description: description(),
@@ -45,7 +45,7 @@ defmodule Phoenix.SocketClient.MixProject do
   defp deps do
     [
       {:jason, "~> 1.2"},
-      {:websocket_client, "~> 1.3"},
+      {:http_web_socket, "~> 0.11.0"},
       {:telemetry, "~> 1.0"},
       {:benchee, "~> 1.4", only: :dev},
       {:benchee_html, "~> 1.0", only: :dev},

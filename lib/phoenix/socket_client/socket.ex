@@ -57,11 +57,15 @@ defmodule Phoenix.SocketClient.Socket do
     opts = if Keyword.keyword?(opts), do: Enum.into(opts, %{}), else: opts
 
     sup_pid = Map.get(opts, :sup_pid)
-    _registry_name = Map.get(opts, :registry_name)
+    registry_name = Map.get(opts, :registry_name)
     Process.flag(:trap_exit, true)
 
     # Get message processor PID
-    message_processor = get_process_pid(sup_pid, :message_processor)
+    message_processor =
+      case registry_name && Registry.lookup(registry_name, :message_processor) do
+        [{pid, _}] -> pid
+        _ -> get_process_pid(sup_pid, :message_processor)
+      end
 
     # Configure limits
     max_pending = Map.get(opts, :max_pending_messages, 500)
@@ -180,6 +184,12 @@ defmodule Phoenix.SocketClient.Socket do
         duration: duration,
         status: :connected
       })
+
+      Phoenix.SocketClient.Telemetry.socket_connection_duration(
+        self(),
+        socket_state.url,
+        duration
+      )
     else
       Phoenix.SocketClient.Telemetry.connection_established_stop(%{
         socket_ref: socket_ref,

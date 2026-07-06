@@ -39,7 +39,7 @@ defmodule Phoenix.SocketClient.ChannelManager do
   def start_link(opts) do
     opts = if Keyword.keyword?(opts), do: opts, else: Map.to_list(opts)
     registry_name = Keyword.get(opts, :registry_name)
-    name = if registry_name, do: {registry_name, :channel_manager}, else: nil
+    name = if registry_name, do: {:via, Registry, {registry_name, :channel_manager}}, else: nil
     DynamicSupervisor.start_link(__MODULE__, opts, name: name)
   end
 
