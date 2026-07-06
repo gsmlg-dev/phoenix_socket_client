@@ -2,7 +2,7 @@
 
 [![release](https://github.com/gsmlg-dev/phoenix_socket_client/actions/workflows/release.yml/badge.svg)](https://github.com/gsmlg-dev/phoenix_socket_client/actions/workflows/release.yml)
 [![Hex.pm](https://img.shields.io/hexpm/v/phoenix_socket_client.svg)](https://hex.pm/packages/phoenix_socket_client)
-[![Documentation](https://img.shields.io/badge/documentation-v0.8.0-blue)](https://hexdocs.pm/phoenix_socket_client/0.8.0)
+[![Documentation](https://img.shields.io/badge/documentation-v0.8.1-blue)](https://hexdocs.pm/phoenix_socket_client/0.8.1)
 
 Elixir client for Phoenix Channels WebSocket connections.
 
@@ -14,7 +14,7 @@ The package is available on [Hex.pm](https://hex.pm/packages/phoenix_socket_clie
 ```elixir
 def deps do
   [
-    {:phoenix_socket_client, "~> 0.8.0"}
+    {:phoenix_socket_client, "~> 0.8.1"}
   ]
 end
 ```
