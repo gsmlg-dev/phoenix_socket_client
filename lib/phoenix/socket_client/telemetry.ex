@@ -291,11 +291,30 @@ defmodule Phoenix.SocketClient.Telemetry do
   """
   @spec emit_event(event_name(), measurements(), metadata()) :: :ok
   def emit_event(event_name, measurements \\ %{}, metadata \\ %{}) do
+    metadata = sanitize_metadata(metadata)
+
     if enabled?() and should_sample?() and passes_filters?(event_name, measurements) do
       :telemetry.execute(event_name, measurements, metadata)
     else
       :ok
     end
+  end
+
+  defp sanitize_metadata(%{url: url} = metadata) when is_binary(url) do
+    %{metadata | url: sanitize_url(url)}
+  end
+
+  defp sanitize_metadata(metadata), do: metadata
+
+  defp sanitize_url(url) do
+    uri = URI.parse(url)
+
+    case {uri.query, uri.fragment} do
+      {nil, nil} -> url
+      _ -> URI.to_string(%{uri | query: nil, fragment: nil})
+    end
+  rescue
+    _ -> url
   end
 
   # Span-based duration tracking

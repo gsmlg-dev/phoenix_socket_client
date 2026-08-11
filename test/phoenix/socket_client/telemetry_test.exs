@@ -52,7 +52,10 @@ defmodule Phoenix.SocketClient.TelemetryTest do
       name = :"telemetry_conn_duration_#{System.unique_integer([:positive])}"
 
       config =
-        get_socket_config() |> Keyword.put(:name, name) |> Keyword.put(:auto_connect, false)
+        get_socket_config()
+        |> Keyword.put(:name, name)
+        |> Keyword.put(:auto_connect, false)
+        |> Keyword.put(:params, %{"token" => "secret", "server_id" => "server-1"})
 
       {:ok, sup_pid} = Phoenix.SocketClient.Supervisor.start_link(config)
 
@@ -71,11 +74,24 @@ defmodule Phoenix.SocketClient.TelemetryTest do
       Phoenix.SocketClient.connect(sup_pid)
       wait_for_socket(name)
 
+      internal_url = Phoenix.SocketClient.get_state(sup_pid, :url)
+      assert internal_url =~ "token=secret"
+      refute internal_url == get_socket_config()[:url]
+
       assert_receive {[:phoenix_socket_client, :socket], %{duration: duration},
-                      %{action: :connection_duration, pid: _, url: _, timestamp: _}},
+                      %{
+                        action: :connection_duration,
+                        pid: _,
+                        url: sanitized_url,
+                        timestamp: _
+                      }},
                      5_000
 
       assert is_integer(duration) and duration > 0
+      assert sanitized_url == get_socket_config()[:url]
+      refute sanitized_url =~ "token"
+      refute sanitized_url =~ "secret"
+      refute sanitized_url =~ "server_id"
 
       :telemetry.detach(handler_id)
     end
