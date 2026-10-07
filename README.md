@@ -6,6 +6,9 @@
 
 Elixir client for Phoenix Channels WebSocket connections.
 
+Both WebSocket transports use `HTTP.WebSocket` from `http_web_socket` 0.17,
+part of the [gsmlg-dev/http_fetch](https://github.com/gsmlg-dev/http_fetch) package family.
+
 ## Installation
 
 Add `phoenix_socket_client` to your list of dependencies in `mix.exs`.

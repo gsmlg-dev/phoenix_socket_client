@@ -37,7 +37,7 @@ Phoenix.SocketClient (API wrapper, starts Supervisor)
         └── Phoenix.SocketClient.Channel (GenServer per joined channel)
 ```
 
-- **Transport**: WebSocket via `websocket_client` library
+- **Transport**: Both WebSocket transports use `HTTP.WebSocket` from `http_web_socket`, part of the `gsmlg-dev/http_fetch` package family
 - **Protocol**: V1 ("1.0.0", deprecated) and V2 ("2.0.0") — message encoding in `Message.V1`/`Message.V2`
 - **Message delivery**: Channel broadcasts are sent as `%Phoenix.SocketClient.Message{}` to the caller process, or handled via registered hooks
 - **Custom channels**: `use Phoenix.SocketClient.Channel` and map topics via `:topic_channel_map` option
@@ -49,7 +49,7 @@ Integration tests start a real Phoenix server (bandit) on a dynamic port (`test/
 V1 protocol is deprecated — tests default to V2.
 
 ## Dependencies
-- Runtime: `jason`, `websocket_client`, `telemetry`
+- Runtime: `jason` (optional), `http_web_socket` 0.17, `telemetry`
 - Dev: `credo`, `dialyxir`, `ex_doc`, `benchee`
 - Test: `phoenix`, `phoenix_pubsub`, `bandit`
 - Requires Elixir 1.17+ and Erlang/OTP 26+
