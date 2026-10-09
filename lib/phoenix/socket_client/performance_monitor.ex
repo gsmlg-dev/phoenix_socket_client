@@ -350,7 +350,7 @@ defmodule Phoenix.SocketClient.PerformanceMonitor do
       new_state = %{state | current_metrics: final_metrics, stats: new_stats}
 
       # Log alerts
-      if length(alerts) > 0 do
+      if alerts != [] do
         Phoenix.SocketClient.Telemetry.optimization(:performance_monitor_alerts_triggered, %{
           alerts_count: length(alerts),
           alerts: alerts
@@ -546,7 +546,7 @@ defmodule Phoenix.SocketClient.PerformanceMonitor do
 
     Recent Alerts:
     ---------------
-    #{if length(metrics.alerts) > 0 do
+    #{if metrics.alerts != [] do
       Enum.map_join(metrics.alerts, "\n", fn alert -> "#{alert.type}: #{alert.message}" end)
     else
       "No recent alerts"

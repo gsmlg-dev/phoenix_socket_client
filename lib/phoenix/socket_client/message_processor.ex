@@ -284,7 +284,7 @@ defmodule Phoenix.SocketClient.MessageProcessor do
     {batch, new_encode_queue} = take_batch(state.encode_queue, state.batch_size)
     new_state = %{state | encode_queue: new_encode_queue, encode_timer: nil}
 
-    if length(batch) > 0 do
+    if batch != [] do
       process_batch_async(:encode, batch, new_state)
     end
 
@@ -295,7 +295,7 @@ defmodule Phoenix.SocketClient.MessageProcessor do
     {batch, new_decode_queue} = take_batch(state.decode_queue, state.batch_size)
     new_state = %{state | decode_queue: new_decode_queue, decode_timer: nil}
 
-    if length(batch) > 0 do
+    if batch != [] do
       process_batch_async(:decode, batch, new_state)
     end
 

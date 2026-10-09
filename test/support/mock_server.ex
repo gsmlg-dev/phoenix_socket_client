@@ -167,6 +167,7 @@ defmodule Phoenix.SocketClientTest.AdminSocket do
 end
 
 defmodule Phoenix.SocketClientTest.RoomChannel do
+  @moduledoc false
   use Phoenix.Channel
   require Logger
 
@@ -237,6 +238,7 @@ defmodule Phoenix.SocketClientTest.RoomChannel do
 end
 
 defmodule Phoenix.SocketClientTest.TopicChannel do
+  @moduledoc false
   use Phoenix.Channel
 
   def join("topic:fail", _message, _socket) do

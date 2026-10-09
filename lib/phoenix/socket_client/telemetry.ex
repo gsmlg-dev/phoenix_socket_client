@@ -1444,7 +1444,7 @@ defmodule Phoenix.SocketClient.Telemetry do
       |> maybe_add_metadata_part(metadata, :reason)
       |> maybe_add_metadata_part(metadata, :error)
 
-    if length(metadata_parts) > 0 do
+    if metadata_parts != [] do
       "#{message} #{Enum.join(metadata_parts, " ")}"
     else
       message
