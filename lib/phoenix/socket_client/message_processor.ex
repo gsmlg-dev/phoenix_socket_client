@@ -117,6 +117,9 @@ defmodule Phoenix.SocketClient.MessageProcessor do
   end
 
   @impl true
+  def format_status(status), do: Phoenix.SocketClient.Privacy.format_status(status)
+
+  @impl true
   def init(opts) do
     Process.flag(:trap_exit, true)
 

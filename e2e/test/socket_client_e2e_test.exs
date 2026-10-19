@@ -182,27 +182,42 @@ defmodule PhoenixSocketClientE2E.SocketClientTest do
 
     assert_connected(name)
 
-    assert {:ok, _reply, _channel_pid} =
-             Channel.join(sup, "topic:rejoin", %{"generation" => "one"})
+    params = %{"generation" => "one"}
+    assert {:ok, ^params, old_channel_pid} = Channel.join(sup, "rooms:reply", params)
+    assert {:ok, _reply, leaving_pid} = Channel.join(sup, "topic:leave")
+    assert :ok = Channel.leave(leaving_pid)
 
     assert_eventually(fn ->
-      get_in(Phoenix.SocketClient.get_state(name, :joined_channels), ["topic:rejoin", :status]) ==
+      get_in(Phoenix.SocketClient.get_state(name, :joined_channels), ["rooms:reply", :status]) ==
         :joined
     end)
 
     transport_pid = Phoenix.SocketClient.get_process_pid(name, :socket) |> current_transport_pid()
     assert is_pid(transport_pid)
+    old_channel_ref = Process.monitor(old_channel_pid)
     Process.exit(transport_pid, :kill)
-
-    assert_connected(name)
+    assert_receive {:DOWN, ^old_channel_ref, :process, ^old_channel_pid, _reason}, 1_000
 
     assert_eventually(fn ->
       channel_data =
-        get_in(Phoenix.SocketClient.get_state(name, :joined_channels), ["topic:rejoin"])
+        get_in(Phoenix.SocketClient.get_state(name, :joined_channels), ["rooms:reply"])
+
+      new_transport_pid =
+        Phoenix.SocketClient.get_process_pid(name, :socket) |> current_transport_pid()
 
       channel_data && channel_data.status == :joined &&
-        channel_data.params == %{"generation" => "one"}
+        channel_data.pid != old_channel_pid && channel_data.params == params &&
+        is_pid(new_transport_pid) && new_transport_pid != transport_pid
     end)
+
+    %{pid: new_channel_pid} =
+      Phoenix.SocketClient.get_state(name, :joined_channels)["rooms:reply"]
+
+    assert {:ok, %{"ping" => "pong"}} = Channel.push(new_channel_pid, "ping", %{})
+    payload = %{"reconnected" => true}
+    assert {:ok, ^payload} = Channel.push(new_channel_pid, "new:msg", payload)
+    assert_receive ^payload, 1_000
+    refute Map.has_key?(Phoenix.SocketClient.get_state(name, :joined_channels), "topic:leave")
   end
 
   test "disconnect marks the client disconnected" do

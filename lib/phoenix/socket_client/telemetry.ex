@@ -300,22 +300,7 @@ defmodule Phoenix.SocketClient.Telemetry do
     end
   end
 
-  defp sanitize_metadata(%{url: url} = metadata) when is_binary(url) do
-    %{metadata | url: sanitize_url(url)}
-  end
-
-  defp sanitize_metadata(metadata), do: metadata
-
-  defp sanitize_url(url) do
-    uri = URI.parse(url)
-
-    case {uri.query, uri.fragment} do
-      {nil, nil} -> url
-      _ -> URI.to_string(%{uri | query: nil, fragment: nil})
-    end
-  rescue
-    _ -> url
-  end
+  defp sanitize_metadata(metadata), do: Phoenix.SocketClient.Privacy.metadata(metadata)
 
   # Span-based duration tracking
 
@@ -406,7 +391,7 @@ defmodule Phoenix.SocketClient.Telemetry do
         operation: operation,
         start_time: System.monotonic_time(),
         start_system_time: System.system_time(),
-        metadata: metadata
+        metadata: sanitize_metadata(metadata)
       }
 
       emit_event(
@@ -494,7 +479,7 @@ defmodule Phoenix.SocketClient.Telemetry do
         component: component,
         start_time: System.monotonic_time(),
         operations: %{},
-        metadata: metadata
+        metadata: sanitize_metadata(metadata)
       }
     else
       :disabled

@@ -50,6 +50,9 @@ defmodule Phoenix.SocketClient.Transports.HTTPWebSocketAdapter do
   def get_stats(_socket), do: {:error, :timeout}
 
   @impl true
+  def format_status(status), do: Phoenix.SocketClient.Privacy.format_status(status)
+
+  @impl true
   def init({url, transport_opts, opts}) do
     transport = Keyword.get(opts, :transport, :websocket)
     tcp_opts = Keyword.get(opts, :tcp_opts, Keyword.get(transport_opts, :socket_opts, []))
@@ -69,6 +72,8 @@ defmodule Phoenix.SocketClient.Transports.HTTPWebSocketAdapter do
       Telemetry.connection_start(%{url: url, transport: transport, tcp_opts: tcp_opts})
     end
 
+    # TODO(upstream): gsmlg-dev/http_fetch#136
+    # The underlying connection still exposes private state in OTP diagnostics.
     with {:ok, _apps} <- Application.ensure_all_started(:http_web_socket),
          %WebSocket{} = socket <-
            WebSocket.new(
@@ -172,7 +177,7 @@ defmodule Phoenix.SocketClient.Transports.HTTPWebSocketAdapter do
       Telemetry.error(%{
         transport: state.transport,
         event: :websocket_error,
-        error: inspect(reason)
+        error: reason
       })
 
       unless state.connected? do
@@ -271,7 +276,7 @@ defmodule Phoenix.SocketClient.Transports.HTTPWebSocketAdapter do
         Telemetry.error(%{
           transport: state.transport,
           event: :send_failed,
-          error: inspect(reason)
+          error: reason
         })
 
         {:noreply, %{state | last_error: reason}}

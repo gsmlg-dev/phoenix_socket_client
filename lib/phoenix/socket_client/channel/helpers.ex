@@ -32,6 +32,8 @@ defmodule Phoenix.SocketClient.Channel.Helpers do
         {_pid, _ref} = from,
         %State{sup_pid: sup_pid, topic: topic, params: params} = state
       ) do
+    state_pid = Phoenix.SocketClient.get_process_pid(sup_pid, :socket_state)
+    caller = Phoenix.SocketClient.Agent.get_or_set_channel_caller(state_pid, topic, elem(from, 0))
     message = Message.join(topic, params)
 
     push = Phoenix.SocketClient.push(sup_pid, message)
@@ -40,7 +42,7 @@ defmodule Phoenix.SocketClient.Channel.Helpers do
      %State{
        state
        | join_ref: push.ref,
-         caller: elem(from, 0),
+         caller: caller,
          pushes: [{from, push} | state.pushes],
          join_start_time: System.monotonic_time()
      }}
@@ -234,11 +236,23 @@ defmodule Phoenix.SocketClient.Channel.Helpers do
 
       if joined_channels do
         channel_data = Map.get(joined_channels, topic)
+        state_pid = Phoenix.SocketClient.get_process_pid(sup_pid, :socket_state)
 
-        if reason == :normal and (channel_data && channel_data.status != :errored) do
-          Phoenix.SocketClient.remove_channel(sup_pid, topic)
-        else
-          Phoenix.SocketClient.update_channel_status(sup_pid, self(), topic, :errored, params)
+        cond do
+          start_time && state_pid ->
+            Phoenix.SocketClient.Agent.remove_channel(state_pid, topic)
+
+          start_time ->
+            :ok
+
+          channel_data && channel_data.status == :rejoining ->
+            :ok
+
+          reason == :normal and (channel_data && channel_data.status != :errored) ->
+            Phoenix.SocketClient.remove_channel(sup_pid, topic)
+
+          true ->
+            Phoenix.SocketClient.update_channel_status(sup_pid, self(), topic, :errored, params)
         end
 
         Telemetry.channel_left(self(), topic, reason)

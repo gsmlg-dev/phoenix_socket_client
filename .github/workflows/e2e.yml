@@ -49,7 +49,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           mkdir -p /tmp/phoenix-socket-client-release
-          gh release download "v${{ inputs.version }}" \
+          gh release download "${{ inputs.version }}" \
             --repo "${{ github.repository }}" \
             --pattern "*.tar" \
             --dir /tmp/phoenix-socket-client-release

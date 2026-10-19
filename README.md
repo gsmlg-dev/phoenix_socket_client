@@ -6,7 +6,7 @@
 
 Elixir client for Phoenix Channels WebSocket connections.
 
-Both WebSocket transports use `HTTP.WebSocket` from `http_web_socket` 0.17,
+Both WebSocket transports use `HTTP.WebSocket` from `http_web_socket` 0.20 or 0.21,
 part of the [gsmlg-dev/http_fetch](https://github.com/gsmlg-dev/http_fetch) package family.
 
 ## Installation
@@ -280,6 +280,18 @@ All processes are properly supervised with automatic restart strategies.
 ## Telemetry
 
 The library includes comprehensive telemetry events for monitoring and debugging.
+Telemetry metadata contains allowlisted operational fields. Message payloads,
+reply bodies, transport options, arbitrary custom metadata, and exception details
+are omitted; URLs omit credentials, query parameters, and fragments.
+
+Client status callbacks redact private state, current messages, and the termination
+fields supplied to those callbacks. Full crash confidentiality remains blocked:
+OTP can append original exception arguments, and the underlying `http_web_socket`
+connection exposes private state. See [#108](https://github.com/gsmlg-dev/phoenix_socket_client/issues/108)
+and [http_fetch #136](https://github.com/gsmlg-dev/http_fetch/issues/136).
+`MIX_ENV=test mix run scripts/privacy_crash_probe.exs` reproduces the remaining
+OTP crash-report exposure with a synthetic sentinel and currently exits with status 1.
+
 The events are structured as follows:
 
 - `[:phoenix_socket_client, :socket]` - Events related to the socket lifecycle.

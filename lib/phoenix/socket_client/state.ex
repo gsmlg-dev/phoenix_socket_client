@@ -28,7 +28,8 @@ defmodule Phoenix.SocketClient.State do
           joined_channels: %{
             String.t() => %{
               params: map(),
-              status: :joining | :joined | :leaving | :left | :errored
+              caller: pid(),
+              status: :joining | :joined | :rejoining | :leaving | :left | :errored
             }
           },
           reconnecting: boolean(),

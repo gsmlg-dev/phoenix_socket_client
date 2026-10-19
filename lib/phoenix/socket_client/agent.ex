@@ -1,37 +1,26 @@
 defmodule Phoenix.SocketClient.Agent do
   @moduledoc """
-  Agent-based state management for WebSocket connection configuration and status.
+  Agent-compatible state management for WebSocket connection configuration and status.
 
   This module provides centralized state management for socket connections,
   including configuration parameters, connection status, and custom state values.
-  All state is stored in an Agent process for concurrent access and updates.
+  State is stored in a GenServer that supports the Agent call protocol and owns
+  diagnostic formatting to omit private configuration and queued content.
 
   The state is managed by the `Phoenix.SocketClient.State` struct.
 
   ## Shared State Limitation
 
-  This module uses an `Agent` as shared mutable state that is read and written to
-  by multiple processes (the Socket GenServer, Channel GenServers, and external
-  callers). While `Agent` serializes individual `get` and `update` calls, it does
-  not provide compound read-then-write atomicity across callers. This means
-  concurrent operations that depend on reading the current state and then updating
-  it can race with each other.
-
-  ### Future Refactoring Direction
-
-  A more robust approach would be to replace this Agent with a dedicated GenServer
-  that owns and mediates all state access. A GenServer would allow:
-
-  - Compound read-modify-write operations handled atomically in `handle_call`
-  - Explicit control over which operations are synchronous vs asynchronous
-  - Better visibility into state access patterns via callbacks
-  - Easier addition of validation or side effects on state transitions
+  Multiple processes (the Socket, Channels and external callers) read and write
+  this state. Individual Agent operations are serialized, but separate read and
+  write calls are not atomic together and can race. Compound changes must use a
+  single `Agent.get_and_update/2` operation or a dedicated callback.
 
   See [GitHub issue #31](https://github.com/gsmlg-dev/phoenix_socket_client/issues/31)
   for discussion.
   """
 
-  use Agent
+  use GenServer
 
   alias Phoenix.SocketClient.Message
   alias Phoenix.SocketClient.State
@@ -60,10 +49,10 @@ defmodule Phoenix.SocketClient.Agent do
 
     case registry_name do
       nil ->
-        Agent.start_link(fn -> init_state(opts) end)
+        GenServer.start_link(__MODULE__, opts)
 
       _ ->
-        Agent.start_link(fn -> init_state(opts) end,
+        GenServer.start_link(__MODULE__, opts,
           name: {:via, Registry, {registry_name, :socket_state}}
         )
     end
@@ -148,6 +137,13 @@ defmodule Phoenix.SocketClient.Agent do
       old_channel_data = Map.get(state.joined_channels, topic, %{})
       old_status = Map.get(old_channel_data, :status)
 
+      old_channel_data =
+        if status == :joining and old_status != :rejoining do
+          Map.delete(old_channel_data, :caller)
+        else
+          old_channel_data
+        end
+
       new_channel_data =
         if params do
           Map.put(old_channel_data, :params, params)
@@ -164,6 +160,20 @@ defmodule Phoenix.SocketClient.Agent do
       end
 
       %State{state | joined_channels: joined_channels}
+    end)
+  end
+
+  @doc false
+  @spec get_or_set_channel_caller(pid(), String.t(), pid()) :: pid()
+  def get_or_set_channel_caller(pid, topic, fallback) do
+    Agent.get_and_update(pid, fn %State{} = state ->
+      channel_data = Map.fetch!(state.joined_channels, topic)
+      caller = Map.get(channel_data, :caller, fallback)
+
+      joined_channels =
+        Map.put(state.joined_channels, topic, Map.put(channel_data, :caller, caller))
+
+      {caller, %State{state | joined_channels: joined_channels}}
     end)
   end
 
@@ -187,6 +197,31 @@ defmodule Phoenix.SocketClient.Agent do
       %{state | connect_time: System.monotonic_time(:millisecond)}
     end)
   end
+
+  @impl true
+  def init(opts), do: {:ok, init_state(opts)}
+
+  @impl true
+  def format_status(status), do: Phoenix.SocketClient.Privacy.format_status(status)
+
+  # Preserve the Agent call protocol while owning diagnostic formatting.
+  @impl true
+  def handle_call({:get, fun}, _from, state), do: {:reply, run(fun, state), state}
+
+  def handle_call({:update, fun}, _from, state), do: {:reply, :ok, run(fun, state)}
+
+  def handle_call({:get_and_update, fun}, _from, state) do
+    case run(fun, state) do
+      {reply, new_state} -> {:reply, reply, new_state}
+      other -> {:stop, {:bad_return_value, other}, state}
+    end
+  end
+
+  @impl true
+  def handle_cast({:cast, fun}, state), do: {:noreply, run(fun, state)}
+
+  defp run(fun, state) when is_function(fun, 1), do: fun.(state)
+  defp run({module, function, args}, state), do: apply(module, function, [state | args])
 
   defp init_state(opts) do
     defaults = %{

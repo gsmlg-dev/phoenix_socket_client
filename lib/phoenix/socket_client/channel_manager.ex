@@ -123,7 +123,7 @@ defmodule Phoenix.SocketClient.ChannelManager do
 
     spec =
       {channel_module, {sup_pid, socket_pid, topic, params, registry_name}}
-      |> Supervisor.child_spec(id: topic)
+      |> Supervisor.child_spec(id: topic, restart: :transient)
 
     case DynamicSupervisor.start_child(cm_pid, spec) do
       {:ok, channel_pid} ->

@@ -25,6 +25,7 @@ defmodule Phoenix.SocketClient.Socket do
           last_activity: integer() | nil,
           hibernation_enabled: boolean(),
           heartbeat_timer: reference() | nil,
+          initial_channels_joined: boolean(),
           pending_decodes: %{reference() => {pid() | atom(), String.t()}}
         }
 
@@ -40,6 +41,7 @@ defmodule Phoenix.SocketClient.Socket do
             last_activity: nil,
             hibernation_enabled: true,
             heartbeat_timer: nil,
+            initial_channels_joined: false,
             pending_decodes: %{}
 
   @doc false
@@ -50,6 +52,9 @@ defmodule Phoenix.SocketClient.Socket do
     name = if registry_name, do: {:via, Registry, {registry_name, :socket}}, else: nil
     GenServer.start_link(__MODULE__, opts, name: name)
   end
+
+  @impl true
+  def format_status(status), do: Phoenix.SocketClient.Privacy.format_status(status)
 
   @impl true
   @spec init(map()) :: {:ok, t(), {:continue, :post_start}}
@@ -172,7 +177,7 @@ defmodule Phoenix.SocketClient.Socket do
   @spec handle_info({:connected, pid()}, t()) :: {:noreply, t()}
   def handle_info(
         {:connected, transport_pid},
-        %{sup_pid: sup_pid, connect_start_time: start_time} = state
+        %{sup_pid: sup_pid, transport_pid: transport_pid, connect_start_time: start_time} = state
       ) do
     socket_state = Phoenix.SocketClient.get_state(sup_pid)
     socket_ref = Phoenix.SocketClient.get_state(sup_pid, :socket_ref)
@@ -203,9 +208,11 @@ defmodule Phoenix.SocketClient.Socket do
       })
     end
 
-    # Mark as connected and setup channels
+    # Publish the connection before channel joins call back into the socket.
     put_state(sup_pid, :reconnecting, false)
-    join_initial_channels(sup_pid)
+    update_socket_state_status(sup_pid, :connected)
+
+    unless state.initial_channels_joined, do: join_initial_channels(sup_pid)
     rejoin_channels(sup_pid)
 
     # Start heartbeat timer
@@ -216,10 +223,9 @@ defmodule Phoenix.SocketClient.Socket do
       state
       | status: :connected,
         transport_pid: transport_pid,
+        initial_channels_joined: true,
         heartbeat_timer: heartbeat_timer
     }
-
-    update_socket_state_status(sup_pid, :connected)
 
     case get_process_pid(sup_pid, :socket_state) do
       nil -> :ok
@@ -237,9 +243,14 @@ defmodule Phoenix.SocketClient.Socket do
     {:noreply, new_state}
   end
 
+  def handle_info({:connected, _transport_pid}, state), do: {:noreply, state}
+
   @impl true
   @spec handle_info({:disconnected, any(), pid()}, t()) :: {:noreply, t()}
-  def handle_info({:disconnected, reason, _transport_pid}, %{sup_pid: sup_pid} = state) do
+  def handle_info(
+        {:disconnected, reason, transport_pid},
+        %{sup_pid: sup_pid, transport_pid: transport_pid} = state
+      ) do
     url = get_state(sup_pid, :url)
     socket_ref = Phoenix.SocketClient.get_state(sup_pid, :socket_ref)
 
@@ -251,13 +262,10 @@ defmodule Phoenix.SocketClient.Socket do
       status: :disconnected
     })
 
-    case get_process_pid(sup_pid, :channel_manager) do
-      nil -> :ok
-      cm_pid -> ChannelManager.terminate(cm_pid)
-    end
-
     {:noreply, close(reason, state)}
   end
+
+  def handle_info({:disconnected, _reason, _transport_pid}, state), do: {:noreply, state}
 
   @impl true
   @spec handle_info({:receive, String.t()}, t()) :: {:noreply, t()}
@@ -327,9 +335,11 @@ defmodule Phoenix.SocketClient.Socket do
 
   @impl true
   @spec handle_info({:closed, any(), pid()}, t()) :: {:noreply, t()}
-  def handle_info({:closed, reason, _transport_pid}, %{sup_pid: _sup_pid} = state) do
+  def handle_info({:closed, reason, transport_pid}, %{transport_pid: transport_pid} = state) do
     {:noreply, close(reason, state)}
   end
+
+  def handle_info({:closed, _reason, _transport_pid}, state), do: {:noreply, state}
 
   @impl true
   @spec handle_info({:encode_result, reference(), {:ok, String.t()}}, t()) :: {:noreply, t()}
@@ -451,13 +461,15 @@ defmodule Phoenix.SocketClient.Socket do
   @impl true
   @spec handle_info({:EXIT, pid(), any()}, t()) :: {:noreply, t()}
   def handle_info(
-        {:EXIT, _from_pid, reason},
-        state
+        {:EXIT, transport_pid, reason},
+        %{transport_pid: transport_pid} = state
       ) do
     terminate(reason, state)
 
     {:noreply, close(reason, state)}
   end
+
+  def handle_info({:EXIT, _from_pid, _reason}, state), do: {:noreply, state}
 
   @impl true
   @spec handle_info(:hibernate_request, t()) :: {:noreply, t()}
@@ -632,8 +644,19 @@ defmodule Phoenix.SocketClient.Socket do
   defp rejoin_channels(sup_pid) do
     joined_channels = get_state(sup_pid, :joined_channels)
 
-    for {topic, %{status: :joined, params: params}} <- joined_channels do
-      Phoenix.SocketClient.Channel.join(sup_pid, topic, params)
+    for {topic, %{status: :rejoining}} <- joined_channels do
+      Task.start(__MODULE__, :rejoin_channel, [sup_pid, topic])
+    end
+  end
+
+  @doc false
+  def rejoin_channel(sup_pid, topic) do
+    case get_state(sup_pid, :joined_channels)[topic] do
+      %{status: :rejoining, params: params} ->
+        Phoenix.SocketClient.Channel.join(sup_pid, topic, params)
+
+      _ ->
+        :ok
     end
   end
 
@@ -641,7 +664,7 @@ defmodule Phoenix.SocketClient.Socket do
     join_channels = get_state(sup_pid, :join_channels)
 
     for topic <- join_channels do
-      Task.start(fn -> Phoenix.SocketClient.Channel.join(sup_pid, topic) end)
+      Task.start(Phoenix.SocketClient.Channel, :join, [sup_pid, topic])
     end
   end
 
@@ -653,10 +676,24 @@ defmodule Phoenix.SocketClient.Socket do
 
     socket_state = Phoenix.SocketClient.get_state(sup_pid)
     socket_ref = Phoenix.SocketClient.get_state(sup_pid, :socket_ref)
-    close_transport(socket_state, state)
 
     # Update socket state status
     update_socket_state_status(sup_pid, :disconnected)
+
+    # Keep subscription intent separate from the processes being shut down.
+    joined_channels = (socket_state && socket_state.joined_channels) || %{}
+
+    for {topic, %{status: status, pid: pid, params: params}} <- joined_channels,
+        status in [:joined, :joining] do
+      Phoenix.SocketClient.update_channel_status(sup_pid, pid, topic, :rejoining, params)
+    end
+
+    case get_process_pid(sup_pid, :channel_manager) do
+      nil -> :ok
+      cm_pid -> ChannelManager.terminate(cm_pid)
+    end
+
+    close_transport(socket_state, state)
 
     # Guard against nil socket_state when Agent is already down during shutdown
     if socket_state && socket_state.reconnect do

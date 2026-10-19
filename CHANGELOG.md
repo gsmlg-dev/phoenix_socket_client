@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.6] - 2026-10-19
+
+### Fixed
+- Restore active channels after transport reconnect, preserving join params,
+  custom channel callbacks, and the original message recipient. Channels left
+  explicitly stay left.
+- Omit private message content, transport options, and exception details from
+  telemetry before dispatching to handlers.
+- Redact private state, current messages, and callback-provided termination fields
+  in client status callbacks.
+- Use the numeric release tag when running published-package E2E checks.
+
+### Changed
+- Support `http_web_socket` 0.20.x and 0.21.x, locking development to 0.21.13.
+
+### Known Issues
+- Full private RPC confidentiality remains blocked by OTP crash reports retaining
+  original exception arguments and private state exposure in the underlying
+  transport: [#108](https://github.com/gsmlg-dev/phoenix_socket_client/issues/108),
+  [http_fetch #136](https://github.com/gsmlg-dev/http_fetch/issues/136).
+
 ## [0.7.0] - 2025-09-23
 
 ### Changed

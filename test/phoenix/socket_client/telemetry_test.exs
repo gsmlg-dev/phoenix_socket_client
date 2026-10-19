@@ -347,12 +347,14 @@ defmodule Phoenix.SocketClient.TelemetryTest do
       Telemetry.emit_event(
         [:phoenix, :socket_client, :test, :event],
         %{test_measurement: 123},
-        %{test_metadata: "value"}
+        %{operation: :test, private: "value"}
       )
 
       assert_receive {[:phoenix, :socket_client, :test, :event], %{test_measurement: 123},
-                      %{test_metadata: "value"}},
+                      %{operation: :test} = metadata},
                      1000
+
+      assert metadata == %{operation: :test}
 
       :telemetry.detach(handler_id)
     end
@@ -375,7 +377,7 @@ defmodule Phoenix.SocketClient.TelemetryTest do
       Telemetry.emit_event(
         [:phoenix, :socket_client, :test, :event],
         %{test_measurement: 123},
-        %{test_metadata: "value"}
+        %{operation: :test, private: "value"}
       )
 
       refute_receive {[:phoenix, :socket_client, :test, :event], _, _}, 100
@@ -403,7 +405,7 @@ defmodule Phoenix.SocketClient.TelemetryTest do
       Telemetry.emit_event(
         [:phoenix, :socket_client, :test, :event],
         %{test_measurement: 123},
-        %{test_metadata: "value"}
+        %{operation: :test, private: "value"}
       )
 
       refute_receive {[:phoenix, :socket_client, :test, :event], _, _}, 100
@@ -444,7 +446,7 @@ defmodule Phoenix.SocketClient.TelemetryTest do
       result =
         Telemetry.span(
           [:phoenix, :socket_client, :test, :operation],
-          %{test_meta: "value"},
+          %{operation: :test},
           fn ->
             :timer.sleep(10)
             {:ok, %{result: "test"}}
@@ -454,7 +456,7 @@ defmodule Phoenix.SocketClient.TelemetryTest do
       assert result == {:ok, %{result: "test"}}
 
       assert_receive {:start, [:phoenix, :socket_client, :test, :operation, :start], _,
-                      %{test_meta: "value"}},
+                      %{operation: :test}},
                      1000
 
       assert_receive {:stop, [:phoenix, :socket_client, :test, :operation, :stop],
@@ -485,7 +487,7 @@ defmodule Phoenix.SocketClient.TelemetryTest do
       result =
         Telemetry.span(
           [:phoenix, :socket_client, :test, :operation],
-          %{test_meta: "value"},
+          %{operation: :test},
           fn ->
             {:ok, %{result: "test"}}
           end
@@ -522,20 +524,20 @@ defmodule Phoenix.SocketClient.TelemetryTest do
         %{}
       )
 
-      token = Telemetry.start_duration(:test, :test_op, %{test_meta: "value"})
+      token = Telemetry.start_duration(:test, :test_op, %{operation: :test})
       assert is_map(token)
       assert token.component == :test
       assert token.operation == :test_op
 
       assert_receive {:start, [:phoenix, :socket_client, :test, :test_op, :start], _,
-                      %{test_meta: "value"}},
+                      %{operation: :test}},
                      1000
 
       :timer.sleep(10)
-      Telemetry.stop_duration(token, %{additional_meta: "data"})
+      Telemetry.stop_duration(token, %{status: :success})
 
       assert_receive {:stop, [:phoenix, :socket_client, :test, :test_op, :stop],
-                      %{duration: duration}, %{additional_meta: "data"}},
+                      %{duration: duration}, %{status: :success}},
                      1000
 
       assert duration > 0
@@ -567,7 +569,7 @@ defmodule Phoenix.SocketClient.TelemetryTest do
       )
 
       result =
-        Telemetry.measure_duration(:test, :test_op, %{test_meta: "value"}, fn ->
+        Telemetry.measure_duration(:test, :test_op, %{operation: :test}, fn ->
           :timer.sleep(10)
           "test_result"
         end)
@@ -575,7 +577,7 @@ defmodule Phoenix.SocketClient.TelemetryTest do
       assert result == "test_result"
 
       assert_receive {:start, [:phoenix, :socket_client, :test, :test_op, :start], _,
-                      %{test_meta: "value"}},
+                      %{operation: :test}},
                      1000
 
       assert_receive {:stop, [:phoenix, :socket_client, :test, :test_op, :stop],
@@ -607,7 +609,7 @@ defmodule Phoenix.SocketClient.TelemetryTest do
         %{}
       )
 
-      context = Telemetry.create_duration_context(:test, %{test_meta: "value"})
+      context = Telemetry.create_duration_context(:test, %{operation: :test})
       assert is_map(context)
       assert context.component == :test
 
@@ -630,7 +632,7 @@ defmodule Phoenix.SocketClient.TelemetryTest do
       assert result2 == "result2"
 
       # Complete the context
-      Telemetry.complete_duration_context(context, %{final_meta: "data"})
+      Telemetry.complete_duration_context(context, %{status: :success})
 
       assert_receive {[:phoenix, :socket_client, :test, :sub_op1, :complete],
                       %{duration: _duration1}, _},
@@ -641,7 +643,7 @@ defmodule Phoenix.SocketClient.TelemetryTest do
                      1000
 
       assert_receive {[:phoenix, :socket_client, :test, :context_complete], measurements,
-                      %{final_meta: "data"}},
+                      %{status: :success}},
                      1000
 
       assert measurements.total_duration > 0
@@ -685,7 +687,7 @@ defmodule Phoenix.SocketClient.TelemetryTest do
                      1000
 
       assert_receive {[:phoenix, :socket_client, :connection, :error], _,
-                      %{url: "ws://test.com", error: "connection_failed"}},
+                      %{url: "ws://test.com", error: :redacted}},
                      1000
 
       :telemetry.detach(handler_id)
@@ -842,7 +844,7 @@ defmodule Phoenix.SocketClient.TelemetryTest do
       Telemetry.error(%{component: :socket, error: "connection_failed", reason: "timeout"})
 
       assert_receive {[:phoenix, :socket_client, :error], _,
-                      %{component: :socket, error: "connection_failed", reason: "timeout"}},
+                      %{component: :socket, error: :redacted, reason: :redacted}},
                      1000
 
       :telemetry.detach(handler_id)
@@ -915,12 +917,14 @@ defmodule Phoenix.SocketClient.TelemetryTest do
                Telemetry.execute(
                  [:phoenix, :socket_client, :legacy, :event],
                  %{test_measurement: 123},
-                 %{test_metadata: "value"}
+                 %{operation: :test, private: "value"}
                )
 
       assert_receive {[:phoenix, :socket_client, :legacy, :event], %{test_measurement: 123},
-                      %{test_metadata: "value"}},
+                      %{operation: :test} = metadata},
                      1000
+
+      assert metadata == %{operation: :test}
 
       :telemetry.detach(handler_id)
     end

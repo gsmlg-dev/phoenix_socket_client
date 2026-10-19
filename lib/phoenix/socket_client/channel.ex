@@ -47,6 +47,9 @@ defmodule Phoenix.SocketClient.Channel do
         GenServer.start_link(__MODULE__, args)
       end
 
+      @impl true
+      def format_status(status), do: Phoenix.SocketClient.Privacy.format_status(status)
+
       # Callbacks - delegate to Helpers module
       @impl true
       def init(args), do: Helpers.init_impl(args)
