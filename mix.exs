@@ -1,7 +1,7 @@
 defmodule Phoenix.SocketClient.MixProject do
   use Mix.Project
 
-  @version "0.8.5"
+  @version "0.8.6"
 
   def project do
     [
