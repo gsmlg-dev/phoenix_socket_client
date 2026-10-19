@@ -6,7 +6,7 @@
 
 Elixir client for Phoenix Channels WebSocket connections.
 
-Both WebSocket transports use `HTTP.WebSocket` from `http_web_socket` 0.20 or 0.21,
+Both WebSocket transports use `HTTP.WebSocket` from `http_web_socket` 0.21.14 or later in the 0.21 series,
 part of the [gsmlg-dev/http_fetch](https://github.com/gsmlg-dev/http_fetch) package family.
 
 ## Installation
@@ -284,13 +284,23 @@ Telemetry metadata contains allowlisted operational fields. Message payloads,
 reply bodies, transport options, arbitrary custom metadata, and exception details
 are omitted; URLs omit credentials, query parameters, and fragments.
 
-Client status callbacks redact private state, current messages, and the termination
-fields supplied to those callbacks. Full crash confidentiality remains blocked:
-OTP can append original exception arguments, and the underlying `http_web_socket`
-connection exposes private state. See [#108](https://github.com/gsmlg-dev/phoenix_socket_client/issues/108)
-and [http_fetch #136](https://github.com/gsmlg-dev/http_fetch/issues/136).
-`MIX_ENV=test mix run scripts/privacy_crash_probe.exs` reproduces the remaining
-OTP crash-report exposure with a synthetic sentinel and currently exits with status 1.
+Client status and termination diagnostics omit private state, queued payloads,
+current messages, and original exception arguments. Initialization, callback,
+cleanup, and message-worker failures emit a fixed diagnostic and exit with
+`:private_callback_failure`, preserving supervisor restart behavior. Normal exits
+and explicit channel leaves retain their behavior. The underlying transport
+requires `http_web_socket` 0.21.14, which protects its own diagnostics.
+
+Supervisor startup and restart reports carry opaque references to private
+configuration. A supervised client's configuration stays available until its
+supervising parent exits; a directly started client's storage closes when the
+client stops. Creating a child specification allocates this storage; release an
+unused specification with `Phoenix.SocketClient.discard_child_spec(spec)`.
+
+Explicit debugger access, including `:sys.get_state/1`, `:sys.log/2`, and
+`:sys.trace/2`, still exposes live state or messages. Run
+`MIX_ENV=test mix run scripts/privacy_crash_probe.exs` to verify the original
+FunctionClauseError confidentiality regression with a synthetic sentinel.
 
 The events are structured as follows:
 

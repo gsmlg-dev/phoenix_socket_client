@@ -4,6 +4,29 @@ defmodule Phoenix.SocketClient.Supervisor do
   """
   use Supervisor
 
+  alias Phoenix.SocketClient.ConfigStore
+
+  def child_spec(opts) do
+    {:ok, config} = ConfigStore.new(opts)
+
+    %{
+      id: __MODULE__,
+      start: {__MODULE__, :start_link, [{:supervised, config}]},
+      type: :supervisor
+    }
+  end
+
+  @doc """
+  Releases the private configuration of a child specification that will not be started.
+
+  Returns `{:error, :in_use}` once a supervising parent has activated the specification.
+  Activated configuration is retained until that parent exits, including across
+  client restarts.
+  """
+  @spec discard_child_spec(Supervisor.child_spec()) :: :ok | {:error, :in_use}
+  def discard_child_spec(%{start: {__MODULE__, :start_link, [{:supervised, config}]}}),
+    do: ConfigStore.discard(config)
+
   @doc """
   Starts the socket client supervisor.
 
@@ -26,15 +49,43 @@ defmodule Phoenix.SocketClient.Supervisor do
 
   """
   @spec start_link(keyword()) :: Supervisor.on_start()
-  def start_link(opts) do
-    name = Keyword.get(opts, :name, Phoenix.SocketClient)
-    opts = Keyword.put(opts, :name, name)
+  def start_link(opts) when is_list(opts) do
+    {:ok, config} = ConfigStore.new(opts)
 
-    Supervisor.start_link(__MODULE__, opts, name: name)
+    case start_with_config(config) do
+      {:ok, pid} = result ->
+        :ok = ConfigStore.bind_owner(config, pid)
+        result
+
+      error ->
+        ConfigStore.close(config)
+        error
+    end
+  end
+
+  def start_link({:supervised, config}) do
+    with :ok <- ConfigStore.bind_owner(config, self()) do
+      start_with_config(config)
+    end
+  end
+
+  defp start_with_config(config) do
+    opts = ConfigStore.options(config)
+    name = Keyword.get(opts, :name, Phoenix.SocketClient)
+    Supervisor.start_link(__MODULE__, config, name: name)
+  catch
+    _kind, _private_reason -> {:error, :private_callback_failure}
   end
 
   @impl true
-  def init(opts) do
+  def init(config) do
+    Phoenix.SocketClient.Privacy.run(fn -> init_private(config) end)
+  end
+
+  defp init_private(config) do
+    opts = ConfigStore.options(config)
+    name = Keyword.get(opts, :name, Phoenix.SocketClient)
+    opts = opts |> Keyword.put(:name, name) |> Keyword.put(:private_config, config)
     sup_pid = self()
     opts = Keyword.put(opts, :sup_pid, sup_pid)
 
@@ -50,6 +101,7 @@ defmodule Phoenix.SocketClient.Supervisor do
       |> String.to_atom()
 
     registry_name = Keyword.get(opts, :registry_name, default_registry_name)
+    true = is_atom(registry_name)
 
     # Get serializer from opts for MessageProcessor
     serializer = Phoenix.SocketClient.Message.serializer(Keyword.get(opts, :vsn, "2.0.0"))
@@ -57,20 +109,16 @@ defmodule Phoenix.SocketClient.Supervisor do
     opts =
       opts |> Keyword.put(:registry_name, registry_name) |> Keyword.put(:serializer, serializer)
 
+    :ok = ConfigStore.put_options(config, opts)
+
     children = [
       {Registry, keys: :unique, name: registry_name},
-      {Phoenix.SocketClient.Agent, opts}
-      |> Supervisor.child_spec(id: :socket_state),
-      {Phoenix.SocketClient.HibernationManager, opts}
-      |> Supervisor.child_spec(id: :hibernation_manager),
-      {Phoenix.SocketClient.RouteCache, opts}
-      |> Supervisor.child_spec(id: :route_cache),
-      {Phoenix.SocketClient.MessageProcessor, opts}
-      |> Supervisor.child_spec(id: :message_processor),
-      {Phoenix.SocketClient.Socket, opts}
-      |> Supervisor.child_spec(id: :socket),
-      {Phoenix.SocketClient.ChannelManager, opts}
-      |> Supervisor.child_spec(id: :channel_manager),
+      private_child(Phoenix.SocketClient.Agent, opts, config, :socket_state),
+      private_child(Phoenix.SocketClient.HibernationManager, opts, config, :hibernation_manager),
+      private_child(Phoenix.SocketClient.RouteCache, opts, config, :route_cache),
+      private_child(Phoenix.SocketClient.MessageProcessor, opts, config, :message_processor),
+      private_child(Phoenix.SocketClient.Socket, opts, config, :socket),
+      private_child(Phoenix.SocketClient.ChannelManager, opts, config, :channel_manager),
       {Task,
        fn ->
          # Store registry name in agent state for fast access
@@ -100,5 +148,10 @@ defmodule Phoenix.SocketClient.Supervisor do
     ]
 
     Supervisor.init(children, strategy: :rest_for_one)
+  end
+
+  defp private_child(module, opts, config, id) do
+    spec = Supervisor.child_spec({module, opts}, id: id)
+    %{spec | start: {ConfigStore, :start_child, [module, config]}}
   end
 end

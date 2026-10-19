@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.7] - 2026-10-19
+
+### Fixed
+- Keep private callback arguments and queued messages out of OTP crash reports,
+  including initialization, cleanup, and asynchronous message-worker failures.
+  Failures use the safe exit reason `:private_callback_failure`, preserving
+  transient channel restarts and explicit leave behavior (#108).
+- Keep private startup options and channel parameters out of supervisor status,
+  startup, and restart reports using separate configuration storage. Supervised
+  storage follows the supervising parent's lifetime; direct-start storage closes
+  with the client. Release unused specifications with `discard_child_spec/1`.
+- Verify published transport status, crash reports, and private reply delivery
+  against the upstream diagnostic fix.
+
+### Changed
+- Require `http_web_socket` 0.21.14 or later in the 0.21 series, consuming the
+  published fix for [http_fetch #136](https://github.com/gsmlg-dev/http_fetch/issues/136).
+
 ## [0.8.6] - 2026-10-19
 
 ### Fixed

@@ -28,6 +28,7 @@ defmodule Phoenix.SocketClient.RouteCache do
   """
 
   use GenServer
+  use Phoenix.SocketClient.Privacy
   require Logger
 
   @default_cache_size 1000
@@ -189,6 +190,9 @@ defmodule Phoenix.SocketClient.RouteCache do
   end
 
   # GenServer callbacks
+
+  @impl true
+  def format_status(status), do: Phoenix.SocketClient.Privacy.format_status(status)
 
   @impl true
   def init(opts) do

@@ -3,6 +3,7 @@ defmodule Phoenix.SocketClient.Socket do
   The socket process for handling the WebSocket connection.
   """
   use GenServer
+  use Phoenix.SocketClient.Privacy
   require Logger
 
   alias Phoenix.SocketClient.ChannelManager
@@ -464,8 +465,6 @@ defmodule Phoenix.SocketClient.Socket do
         {:EXIT, transport_pid, reason},
         %{transport_pid: transport_pid} = state
       ) do
-    terminate(reason, state)
-
     {:noreply, close(reason, state)}
   end
 

@@ -34,6 +34,7 @@ defmodule Phoenix.SocketClient.MessageProcessor do
   """
 
   use GenServer
+  use Phoenix.SocketClient.Privacy
   require Logger
 
   alias Phoenix.SocketClient.Message
@@ -118,6 +119,9 @@ defmodule Phoenix.SocketClient.MessageProcessor do
 
   @impl true
   def format_status(status), do: Phoenix.SocketClient.Privacy.format_status(status)
+
+  @impl true
+  def terminate(_reason, _state), do: :ok
 
   @impl true
   def init(opts) do
@@ -364,7 +368,12 @@ defmodule Phoenix.SocketClient.MessageProcessor do
     children =
       for i <- 1..concurrency do
         Supervisor.child_spec(
-          {Task, fn -> worker_loop(i, serializer, json_library, binary_pool_pid) end},
+          {Task,
+           fn ->
+             Phoenix.SocketClient.Privacy.run(fn ->
+               worker_loop(i, serializer, json_library, binary_pool_pid)
+             end)
+           end},
           id: i
         )
       end

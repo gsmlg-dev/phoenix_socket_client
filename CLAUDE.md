@@ -49,7 +49,7 @@ Integration tests start a real Phoenix server (bandit) on a dynamic port (`test/
 V1 protocol is deprecated — tests default to V2.
 
 ## Dependencies
-- Runtime: `jason` (optional), `http_web_socket` 0.20 or 0.21, `telemetry`
+- Runtime: `jason` (optional), `http_web_socket` 0.21.14+, `telemetry`
 - Dev: `credo`, `dialyxir`, `ex_doc`, `benchee`
 - Test: `phoenix`, `phoenix_pubsub`, `bandit`
 - Requires Elixir 1.17+ and Erlang/OTP 26+

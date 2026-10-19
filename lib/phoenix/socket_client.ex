@@ -28,6 +28,14 @@ defmodule Phoenix.SocketClient do
   defdelegate child_spec(options), to: Phoenix.SocketClient.Supervisor
 
   @doc """
+  Releases private configuration for an unused client child specification.
+
+  See `Phoenix.SocketClient.Supervisor.discard_child_spec/1` for its lifetime.
+  """
+  @spec discard_child_spec(Supervisor.child_spec()) :: :ok | {:error, :in_use}
+  defdelegate discard_child_spec(spec), to: Phoenix.SocketClient.Supervisor
+
+  @doc """
   Connects the socket.
   """
   @spec connect(pid() | atom()) :: :ok | {:error, :no_socket_found}

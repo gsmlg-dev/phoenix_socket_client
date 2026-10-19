@@ -40,7 +40,7 @@ defmodule Phoenix.SocketClient.ChannelManager do
     opts = if Keyword.keyword?(opts), do: opts, else: Map.to_list(opts)
     registry_name = Keyword.get(opts, :registry_name)
     name = if registry_name, do: {:via, Registry, {registry_name, :channel_manager}}, else: nil
-    DynamicSupervisor.start_link(__MODULE__, opts, name: name)
+    DynamicSupervisor.start_link(__MODULE__, :ok, name: name)
   end
 
   @doc """
@@ -105,7 +105,8 @@ defmodule Phoenix.SocketClient.ChannelManager do
   @doc """
   Starts a channel process.
   """
-  @spec start_channel(pid(), String.t(), map(), module() | nil) :: {:ok, pid()} | {:error, term()}
+  @spec start_channel(pid(), String.t(), map(), module() | nil) ::
+          {:ok, pid()} | {:ok, pid(), term()} | {:error, term()}
   def start_channel(sup_pid, topic, params, channel_module \\ nil) do
     socket_pid = get_process_pid(sup_pid, :socket)
     cm_pid = get_process_pid(sup_pid, :channel_manager)
@@ -125,10 +126,24 @@ defmodule Phoenix.SocketClient.ChannelManager do
       {channel_module, {sup_pid, socket_pid, topic, params, registry_name}}
       |> Supervisor.child_spec(id: topic, restart: :transient)
 
-    case DynamicSupervisor.start_child(cm_pid, spec) do
+    config = get_state(sup_pid, :private_config)
+    key = Phoenix.SocketClient.ConfigStore.put_channel(config, spec.start, cm_pid)
+    spec = %{spec | start: {Phoenix.SocketClient.ConfigStore, :start_channel, [config, key]}}
+
+    result = DynamicSupervisor.start_child(cm_pid, spec)
+
+    unless match?({:ok, _}, result) or match?({:ok, _, _}, result) do
+      Phoenix.SocketClient.ConfigStore.delete_channel(config, key)
+    end
+
+    case result do
       {:ok, channel_pid} ->
         Phoenix.SocketClient.update_channel_status(sup_pid, channel_pid, topic, :joining, params)
         {:ok, channel_pid}
+
+      {:ok, channel_pid, _info} = result ->
+        Phoenix.SocketClient.update_channel_status(sup_pid, channel_pid, topic, :joining, params)
+        result
 
       {:error, {:already_started, channel_pid}} ->
         {:error, {:already_started, channel_pid}}

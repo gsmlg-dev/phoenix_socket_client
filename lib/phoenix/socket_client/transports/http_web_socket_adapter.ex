@@ -2,6 +2,7 @@ defmodule Phoenix.SocketClient.Transports.HTTPWebSocketAdapter do
   @moduledoc false
 
   use GenServer
+  use Phoenix.SocketClient.Privacy
 
   alias HTTP.WebSocket
   alias HTTP.WebSocket.ArrayBuffer
@@ -72,8 +73,6 @@ defmodule Phoenix.SocketClient.Transports.HTTPWebSocketAdapter do
       Telemetry.connection_start(%{url: url, transport: transport, tcp_opts: tcp_opts})
     end
 
-    # TODO(upstream): gsmlg-dev/http_fetch#136
-    # The underlying connection still exposes private state in OTP diagnostics.
     with {:ok, _apps} <- Application.ensure_all_started(:http_web_socket),
          %WebSocket{} = socket <-
            WebSocket.new(

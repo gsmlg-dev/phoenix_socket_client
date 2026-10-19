@@ -23,6 +23,58 @@ defmodule Phoenix.SocketClient.PrivacyTest do
     def terminate(_, _), do: :ok
   end
 
+  defmodule CleanupFailureChannel do
+    use Phoenix.SocketClient.Channel
+
+    def init(state), do: {:ok, state}
+    @impl true
+    def handle_message(_, _, state), do: {:noreply, state}
+    def terminate(_, state), do: raise(state.params["private_key"])
+  end
+
+  defmodule RawLogger do
+    def log(event, %{config: %{owner: owner}}), do: send(owner, {:raw_log, event})
+  end
+
+  defmodule InitFailureChannel do
+    use Phoenix.SocketClient.Channel
+
+    def init({mode, owner, private}) do
+      send(owner, {:initializing, self()})
+
+      receive do
+        :continue ->
+          case mode do
+            :raise -> raise private
+            :throw -> throw(private)
+            :exit -> exit(private)
+            :stop -> {:stop, {:private, private}}
+            :bad_return -> {:private, private}
+            :bad_action -> {:ok, %{private: private}, {:timeout, private, :message}}
+            :ignore -> :ignore
+            :normal_stop -> {:stop, :normal}
+            :shutdown_stop -> {:stop, :shutdown}
+          end
+      end
+    end
+
+    @impl true
+    def handle_message(_, _, state), do: {:noreply, state}
+  end
+
+  defmodule LifecycleChannel do
+    use Phoenix.SocketClient.Channel
+
+    def init(args) do
+      {:ok, state} = Helpers.init_impl(args)
+      send(state.params["owner"], {:channel_started, self()})
+      {:ok, state}
+    end
+
+    @impl true
+    def handle_message("crash", payload, _state), do: raise(payload["private_key"])
+  end
+
   setup do
     old_config = Application.get_env(:phoenix_socket_client, :telemetry)
     Telemetry.reset_config()
@@ -301,6 +353,9 @@ defmodule Phoenix.SocketClient.PrivacyTest do
       PrivateChannel,
       Phoenix.SocketClient.Agent,
       Phoenix.SocketClient.BinaryPool,
+      Phoenix.SocketClient.HibernationManager,
+      Phoenix.SocketClient.RouteCache,
+      Phoenix.SocketClient.PerformanceMonitor,
       Phoenix.SocketClient.Transports.HTTPWebSocketAdapter
     ]
 
@@ -329,11 +384,295 @@ defmodule Phoenix.SocketClient.PrivacyTest do
     log =
       capture_log(fn ->
         send(channel, %Message{event: "crash", payload: %{"private_key" => @sentinel}})
-        assert_receive {:DOWN, ^ref, :process, ^channel, _}
+        assert_receive {:DOWN, ^ref, :process, ^channel, :private_callback_failure}
       end)
 
     assert log =~ "terminating"
     refute log =~ @sentinel
+  end
+
+  test "FunctionClauseError termination omits callback arguments and queued private messages" do
+    sup =
+      start_supervised!(
+        {Phoenix.SocketClient.Supervisor, [name: :privacy_crash_socket, auto_connect: false]}
+      )
+
+    port = Application.fetch_env!(:phoenix_socket_client_test, :port)
+    alias Phoenix.SocketClient.Transports.HTTPWebSocketAdapter, as: Adapter
+
+    starters = [
+      fn -> Socket.start_link(sup_pid: sup) end,
+      fn -> MessageProcessor.start_link(serializer: Message.V2) end,
+      fn -> Phoenix.SocketClient.Agent.start_link(private_key: @sentinel) end,
+      fn -> Phoenix.SocketClient.BinaryPool.start_link([]) end,
+      fn -> Phoenix.SocketClient.HibernationManager.start_link([]) end,
+      fn -> Phoenix.SocketClient.RouteCache.start_link([]) end,
+      fn -> Phoenix.SocketClient.PerformanceMonitor.start_link([]) end,
+      fn -> PrivateChannel.start_link(%State{params: %{"private_key" => @sentinel}}) end,
+      fn ->
+        Adapter.start_link(
+          "ws://127.0.0.1:#{port}/ws/admin/websocket?vsn=2.0.0",
+          sender: self()
+        )
+      end
+    ]
+
+    for start <- starters do
+      assert_private_crash(start, {:unexpected_private_call, @sentinel})
+    end
+  end
+
+  test "Agent function and MFA failures hide private state and callback arguments" do
+    for operation <- [:get, :update, :get_and_update] do
+      for callback <- [
+            fn state -> raise state.custom.private_key end,
+            {String, :to_integer, [@sentinel]}
+          ] do
+        assert_private_crash(
+          fn -> Phoenix.SocketClient.Agent.start_link(private_key: @sentinel) end,
+          {operation, callback}
+        )
+      end
+    end
+
+    for callback <- [
+          fn state -> raise state.custom.private_key end,
+          {String, :to_integer, [@sentinel]}
+        ] do
+      assert_private_crash(
+        fn -> Phoenix.SocketClient.Agent.start_link(private_key: @sentinel) end,
+        {:cast, callback},
+        :cast
+      )
+    end
+  end
+
+  test "overridden Channel cleanup failures hide private exception text" do
+    assert_private_crash(
+      fn -> CleanupFailureChannel.start_link(%State{params: %{"private_key" => @sentinel}}) end,
+      {:unexpected_private_call, @sentinel}
+    )
+  end
+
+  test "normal and shutdown process stops retain their exit reason" do
+    for reason <- [:normal, :shutdown] do
+      {:ok, agent} = Phoenix.SocketClient.Agent.start_link([])
+      Process.unlink(agent)
+      ref = Process.monitor(agent)
+      assert :ok = GenServer.stop(agent, reason)
+      assert_receive {:DOWN, ^ref, :process, ^agent, ^reason}
+    end
+  end
+
+  test "abnormal transport exits disconnect the Socket without terminating it" do
+    sup =
+      start_supervised!(
+        {Phoenix.SocketClient.Supervisor,
+         [name: :privacy_transport_exit, auto_connect: false, reconnect: false]}
+      )
+
+    socket = Phoenix.SocketClient.get_process_pid(sup, :socket)
+    transport = self()
+    :sys.replace_state(socket, &%{&1 | transport_pid: transport, status: :connected})
+    send(socket, {:EXIT, transport, {:transport_failed, @sentinel}})
+    assert GenServer.call(socket, :get_status) == :disconnected
+    assert Process.alive?(socket)
+  end
+
+  test "overridden init failures hide private arguments, reasons and queued messages" do
+    for mode <- [:raise, :throw, :exit, :stop, :bad_return, :bad_action] do
+      owner = self()
+      id = __MODULE__.RawLogger
+      :ok = :logger.add_handler(id, RawLogger, %{level: :all, config: %{owner: owner}})
+
+      log =
+        try do
+          capture_log(fn ->
+            starter =
+              Task.async(fn ->
+                Process.flag(:trap_exit, true)
+                InitFailureChannel.start_link({mode, owner, @sentinel})
+              end)
+
+            assert_receive {:initializing, pid}
+            ref = Process.monitor(pid)
+            send(pid, {:queued_private_message, @sentinel})
+            send(pid, :continue)
+            assert Task.await(starter) == {:error, :private_callback_failure}
+            assert_receive {:DOWN, ^ref, :process, ^pid, :private_callback_failure}
+            Logger.flush()
+          end)
+        after
+          :logger.remove_handler(id)
+        end
+
+      assert log =~ "terminating"
+      refute log =~ @sentinel
+      events = raw_logs([])
+      assert events != []
+      refute :erlang.term_to_binary(events) =~ @sentinel
+    end
+  end
+
+  test "Agent init failures return a private error classification" do
+    log =
+      capture_log(fn ->
+        starter =
+          Task.async(fn ->
+            Process.flag(:trap_exit, true)
+            Phoenix.SocketClient.Agent.start_link(url: @sentinel, params: @sentinel)
+          end)
+
+        assert Task.await(starter) == {:error, :private_callback_failure}
+      end)
+
+    assert log =~ "terminating"
+    refute log =~ @sentinel
+  end
+
+  test "overridden init preserves ignore and orderly stop results" do
+    owner = self()
+
+    for {mode, expected} <- [
+          {:ignore, :ignore},
+          {:normal_stop, {:error, :normal}},
+          {:shutdown_stop, {:error, :shutdown}}
+        ] do
+      starter =
+        Task.async(fn ->
+          Process.flag(:trap_exit, true)
+          InitFailureChannel.start_link({mode, owner, @sentinel})
+        end)
+
+      assert_receive {:initializing, pid}
+      send(pid, :continue)
+      assert Task.await(starter) == expected
+    end
+  end
+
+  test "async worker Task failures omit batch arguments and queued private messages" do
+    processor =
+      start_supervised!(
+        {MessageProcessor, [serializer: Message.V2, sync_mode: false, concurrency: 1]}
+      )
+
+    %{worker_sup: worker_sup} = :sys.get_state(processor)
+    [{_, worker, :worker, _}] = Supervisor.which_children(worker_sup)
+    ref = Process.monitor(worker)
+    id = __MODULE__.RawLogger
+    :ok = :logger.add_handler(id, RawLogger, %{level: :all, config: %{owner: self()}})
+
+    log =
+      try do
+        capture_log(fn ->
+          :erlang.suspend_process(worker)
+          send(worker, {:encode_batch, [{:invalid_batch_item, @sentinel}], self()})
+          send(worker, {:queued_private_message, @sentinel})
+          :erlang.resume_process(worker)
+          assert_receive {:DOWN, ^ref, :process, ^worker, :private_callback_failure}
+          Logger.flush()
+        end)
+      after
+        :logger.remove_handler(id)
+        if Process.alive?(worker_sup), do: Supervisor.stop(worker_sup)
+      end
+
+    assert log =~ "terminating"
+    refute log =~ @sentinel
+    events = raw_logs([])
+    assert events != []
+    refute :erlang.term_to_binary(events) =~ @sentinel
+  end
+
+  test "supervised private channel failures restart while explicit leaves stay stopped" do
+    sup =
+      start_supervised!(
+        {Phoenix.SocketClient.Supervisor,
+         [name: :privacy_channel_lifecycle, auto_connect: false, reconnect: false]}
+      )
+
+    id = __MODULE__.RawLogger
+    :ok = :logger.add_handler(id, RawLogger, %{level: :all, config: %{owner: self()}})
+
+    log =
+      try do
+        capture_log(fn ->
+          {:ok, channel} =
+            Phoenix.SocketClient.ChannelManager.start_channel(
+              sup,
+              "privacy:lifecycle",
+              %{"owner" => self(), "private_key" => @sentinel},
+              LifecycleChannel
+            )
+
+          assert_receive {:channel_started, ^channel}
+          ref = Process.monitor(channel)
+          :sys.suspend(channel)
+          send(channel, %Message{event: "crash", payload: %{"private_key" => @sentinel}})
+          send(channel, {:queued_private_message, @sentinel})
+          :sys.resume(channel)
+          assert_receive {:DOWN, ^ref, :process, ^channel, :private_callback_failure}
+          assert_receive {:channel_started, replacement}
+          assert replacement != channel
+          ref = Process.monitor(replacement)
+          assert Phoenix.SocketClient.Channel.leave(replacement) == :ok
+          assert_receive {:DOWN, ^ref, :process, ^replacement, :normal}
+
+          manager = Phoenix.SocketClient.get_process_pid(sup, :channel_manager)
+          assert DynamicSupervisor.count_children(manager).active == 0
+          refute_receive {:channel_started, _}
+          Logger.flush()
+        end)
+      after
+        :logger.remove_handler(id)
+      end
+
+    assert log =~ "terminating"
+    refute log =~ @sentinel
+    events = raw_logs([])
+    assert events != []
+    refute :erlang.term_to_binary(events) =~ @sentinel
+  end
+
+  defp assert_private_crash(start, request, kind \\ :call) do
+    {:ok, pid} = start.()
+    Process.unlink(pid)
+    ref = Process.monitor(pid)
+    id = __MODULE__.RawLogger
+    :ok = :logger.add_handler(id, RawLogger, %{level: :all, config: %{owner: self()}})
+
+    log =
+      try do
+        capture_log(fn ->
+          :ok = :sys.suspend(pid)
+
+          case kind do
+            :call -> send(pid, {:"$gen_call", {self(), make_ref()}, request})
+            :cast -> send(pid, {:"$gen_cast", request})
+          end
+
+          send(pid, {:queued_private_message, @sentinel})
+          :ok = :sys.resume(pid)
+          assert_receive {:DOWN, ^ref, :process, ^pid, :private_callback_failure}
+          Logger.flush()
+        end)
+      after
+        :logger.remove_handler(id)
+      end
+
+    assert log =~ "terminating"
+    refute log =~ @sentinel
+    events = raw_logs([])
+    assert Enum.any?(events, &match?(%{meta: %{pid: ^pid}}, &1))
+    refute :erlang.term_to_binary(events) =~ @sentinel
+  end
+
+  defp raw_logs(events) do
+    receive do
+      {:raw_log, event} -> raw_logs([event | events])
+    after
+      0 -> events
+    end
   end
 
   defp status_report(status) do

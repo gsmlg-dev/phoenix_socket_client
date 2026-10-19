@@ -39,6 +39,7 @@ defmodule Phoenix.SocketClient.Channel do
     quote do
       @behaviour Phoenix.SocketClient.Channel
       use GenServer
+      use Phoenix.SocketClient.Privacy
       alias Phoenix.SocketClient.Channel.{Helpers, State}
       alias Phoenix.SocketClient.Message
 

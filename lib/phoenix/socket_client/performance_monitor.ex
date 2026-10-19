@@ -34,6 +34,7 @@ defmodule Phoenix.SocketClient.PerformanceMonitor do
   """
 
   use GenServer
+  use Phoenix.SocketClient.Privacy
   require Logger
 
   # 30 seconds
@@ -186,6 +187,9 @@ defmodule Phoenix.SocketClient.PerformanceMonitor do
   end
 
   # GenServer callbacks
+
+  @impl true
+  def format_status(status), do: Phoenix.SocketClient.Privacy.format_status(status)
 
   @impl true
   def init(opts) do

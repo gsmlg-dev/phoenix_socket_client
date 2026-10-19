@@ -29,6 +29,7 @@ defmodule Phoenix.SocketClient.HibernationManager do
   """
 
   use GenServer
+  use Phoenix.SocketClient.Privacy
   require Logger
 
   # 5 minutes
@@ -174,6 +175,9 @@ defmodule Phoenix.SocketClient.HibernationManager do
   end
 
   # GenServer callbacks
+
+  @impl true
+  def format_status(status), do: Phoenix.SocketClient.Privacy.format_status(status)
 
   @impl true
   def init(opts) do

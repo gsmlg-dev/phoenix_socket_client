@@ -21,6 +21,7 @@ defmodule Phoenix.SocketClient.Agent do
   """
 
   use GenServer
+  use Phoenix.SocketClient.Privacy
 
   alias Phoenix.SocketClient.Message
   alias Phoenix.SocketClient.State
@@ -203,6 +204,9 @@ defmodule Phoenix.SocketClient.Agent do
 
   @impl true
   def format_status(status), do: Phoenix.SocketClient.Privacy.format_status(status)
+
+  @impl true
+  def terminate(_reason, _state), do: :ok
 
   # Preserve the Agent call protocol while owning diagnostic formatting.
   @impl true

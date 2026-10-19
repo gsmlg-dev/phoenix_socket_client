@@ -1,6 +1,111 @@
 defmodule Phoenix.SocketClient.Privacy do
   @moduledoc false
 
+  require Logger
+
+  defmacro __using__(_opts) do
+    quote do
+      @before_compile Phoenix.SocketClient.Privacy
+    end
+  end
+
+  defmacro __before_compile__(_env) do
+    quote do
+      defoverridable init: 1, terminate: 2
+
+      @impl true
+      def init(args) do
+        Phoenix.SocketClient.Privacy.init(fn -> super(args) end)
+      end
+
+      @impl true
+      def terminate(reason, state) do
+        Phoenix.SocketClient.Privacy.terminate(reason, fn -> super(reason, state) end)
+      end
+    end
+  end
+
+  def init(callback) do
+    try do
+      case callback.() do
+        {:ok, _state} = result ->
+          result
+
+        {:ok, _state, action} = result ->
+          if init_action?(action), do: result, else: private_failure()
+
+        :ignore ->
+          :ignore
+
+        {:stop, reason} when reason in [:normal, :shutdown] ->
+          {:stop, reason}
+
+        _private_failure ->
+          private_failure()
+      end
+    catch
+      _kind, _private_reason -> private_failure()
+    end
+  end
+
+  def run(callback) do
+    try do
+      callback.()
+    catch
+      _kind, _private_reason -> private_failure()
+    end
+  end
+
+  defp init_action?({:continue, _}), do: true
+  defp init_action?(action) when action in [:hibernate, :infinity], do: true
+  defp init_action?(action) when is_integer(action) and action >= 0, do: true
+
+  defp init_action?({kind, time, _message}) when kind in [:timeout, :hibernate],
+    do: time == :infinity or (is_integer(time) and time >= 0)
+
+  defp init_action?({kind, time, _message, opts}) when kind in [:timeout, :hibernate] do
+    opts = if is_list(opts), do: opts, else: [opts]
+
+    absolute =
+      Enum.reduce_while(opts, false, fn
+        {:abs, value}, _ when is_boolean(value) -> {:cont, value}
+        _, _ -> {:halt, :invalid}
+      end)
+
+    absolute != :invalid and
+      (time == :infinity or (is_integer(time) and (absolute or time >= 0)))
+  end
+
+  defp init_action?(_), do: false
+
+  # OTP reports original exception arguments and queued messages independently
+  # of format_status/1. A self-directed exit signal bypasses those reports while
+  # retaining an abnormal reason so transient children still restart.
+  def terminate(reason, cleanup) do
+    try do
+      cleanup.()
+    catch
+      _kind, _private_reason -> private_failure()
+    end
+
+    case reason do
+      :normal -> :ok
+      :shutdown -> :ok
+      {:shutdown, _private_reason} -> exit_signal(:shutdown)
+      _private_reason -> private_failure()
+    end
+  end
+
+  defp private_failure do
+    Logger.error("Phoenix.SocketClient process terminating: private callback failure")
+    exit_signal(:private_callback_failure)
+  end
+
+  defp exit_signal(reason) do
+    Process.flag(:trap_exit, false)
+    Process.exit(self(), reason)
+  end
+
   @text_fields [:topic, :event, :ref, :join_ref, :host]
   @atom_fields [
     :event,
@@ -106,9 +211,8 @@ defmodule Phoenix.SocketClient.Privacy do
   defp reason({value, _}) when is_atom(value), do: value
   defp reason(_), do: :redacted
 
-  # format_status/1 also receives the current message, debug events and reason
-  # on termination. OTP adds stacktraces outside this callback; these summaries
-  # do not provide a guarantee that arbitrary callback crashes are private.
+  # Termination handling also replaces the original exception stacktrace, which
+  # OTP appends outside this callback.
   def format_status(status) do
     Map.new(status, fn
       {:state, state} -> {:state, state_summary(state)}
