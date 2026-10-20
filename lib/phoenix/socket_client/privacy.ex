@@ -40,6 +40,9 @@ defmodule Phoenix.SocketClient.Privacy do
         {:stop, reason} when reason in [:normal, :shutdown] ->
           {:stop, reason}
 
+        {:stop, {:already_registered, pid}} when is_pid(pid) ->
+          exit_signal({:already_registered, pid})
+
         _private_failure ->
           private_failure()
       end

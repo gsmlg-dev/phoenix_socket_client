@@ -13,16 +13,20 @@ defmodule Phoenix.SocketClient.Channel.Helpers do
   Initializes a channel process.
   """
   def init_impl({sup_pid, socket_pid, topic, params, registry_name}) do
-    Registry.register(registry_name, topic, self())
+    case Registry.register(registry_name, topic, self()) do
+      {:ok, _registry_pid} ->
+        {:ok,
+         %State{
+           sup_pid: sup_pid,
+           socket_pid: socket_pid,
+           topic: topic,
+           params: params,
+           registry_name: registry_name
+         }}
 
-    {:ok,
-     %State{
-       sup_pid: sup_pid,
-       socket_pid: socket_pid,
-       topic: topic,
-       params: params,
-       registry_name: registry_name
-     }}
+      {:error, reason} ->
+        {:stop, reason}
+    end
   end
 
   @doc """
