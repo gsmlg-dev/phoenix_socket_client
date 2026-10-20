@@ -253,7 +253,9 @@ defmodule Phoenix.SocketClient.Agent do
       default_channel_params: %{}
     }
 
-    config = Map.merge(defaults, Enum.into(opts, %{}))
+    opts = Map.new(opts)
+    opts = Map.put_new(opts, :reconnect, Map.get(opts, :reconnect?, true))
+    config = Map.merge(defaults, opts)
     custom_opts = Map.drop(config, Map.keys(defaults))
     config = Map.put(config, :custom, custom_opts)
 

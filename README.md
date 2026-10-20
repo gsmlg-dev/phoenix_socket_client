@@ -158,7 +158,7 @@ Phoenix.SocketClient.reconfigure(socket, params: %{"token" => "new-token"})
 | `:transport` | `module()` | `Phoenix.SocketClient.Transports.Websocket` | Transport module |
 | `:heartbeat_interval` | `integer()` | `30_000` | Keep-alive interval in milliseconds |
 | `:reconnect_interval` | `integer()` | `60_000` | Reconnection delay in milliseconds |
-| `:reconnect?` | `boolean()` | `true` | Enable automatic reconnection |
+| `:reconnect?` | `boolean()` | `true` | Enable automatic reconnection; `:reconnect` is also supported and takes precedence if both are supplied. |
 | `:auto_connect` | `boolean()` | `true` | Connect automatically on startup |
 | `:json_library` | `module()` | `JSON` | JSON encoder/decoder module |
 | `:vsn` | `String.t()` | `"2.0.0"` | Phoenix Channels protocol version |
@@ -166,6 +166,40 @@ Phoenix.SocketClient.reconfigure(socket, params: %{"token" => "new-token"})
 | `:join_channels` | `list()` | `[]` | A list of channels to automatically join on connect. |
 | `:default_channel_module` | `module()` | `Phoenix.SocketClient.Channel.EchoRoom` | The default channel module to use. |
 | `:default_channel_params` | `map()` | `%_` | The default parameters to use for channels. |
+
+### Connection Attempt Results
+
+`Phoenix.SocketClient.connect/1` remains asynchronous and returns `:ok` when the
+request is sent. Use `Phoenix.SocketClient.connection_info/1` to read the current
+attempt's authoritative snapshot, independently of telemetry, sampling, or log
+settings:
+
+```elixir
+Phoenix.SocketClient.connection_info(socket)
+# %{attempt_ref: attempt_ref, status: :disconnected,
+#   last_error: {:unexpected_status, 403}}
+```
+
+`:attempt_ref` is `nil` before the first attempt and is unique for every new
+attempt, including automatic retries and socket restarts. `:status` is
+`:connecting`, `:connected`, or `:disconnected`. HTTP upgrade rejections preserve
+the concrete `{:unexpected_status, 401}` or `{:unexpected_status, 403}`; network
+refusal and timeout retain their distinct error atoms. Structured failures
+expose their category without private details. Starting a new attempt clears
+the previous error, and success keeps it clear.
+
+For authentication decisions that must inspect each result, start the client
+with `auto_connect: false, reconnect?: false`, call `connect/1`, and poll
+`connection_info/1` until that attempt settles. The caller then decides when to
+retry. Automatic retries replace the previous snapshot. Compare `:attempt_ref`
+and read the current snapshot before applying an earlier result so a stale
+failure cannot supersede a newer connection. Authentication policy remains with
+the application.
+
+`disconnect/1` cancels pending automatic connection/retry timers, disables
+automatic reconnection, and records `:cancelled`. Late events from an older
+transport cannot change a newer attempt. A missing client returns
+`{:error, :no_socket_found}` from `connection_info/1`.
 
 ### Message Handling Examples
 

@@ -52,6 +52,39 @@ defmodule Phoenix.SocketClient do
     end
   end
 
+  @doc """
+  Returns the current connection attempt independently of telemetry configuration.
+
+  The snapshot contains `:attempt_ref`, `:status`, and `:last_error`. The reference
+  is `nil` before the first attempt and changes whenever a new transport is opened,
+  including automatic retries. Failures retain the reference and reason until
+  another attempt starts. Successful connections clear the error.
+
+  HTTP upgrade rejections retain `{:unexpected_status, status}` (including 401
+  and 403); transient failures retain their error atom, such as `:econnrefused`
+  or `:timeout`. Other structured errors expose their category without private
+  details. Explicit disconnect records `:cancelled` and cancels pending retries.
+
+  Read the snapshot again before acting on a previously observed failure; an
+  older attempt must not override a newer connection. Automatic retries replace
+  the snapshot, so use `reconnect?: false` and let the caller initiate retries
+  when each rejection must be classified. This function reports
+  connection state and leaves authentication policy to the caller.
+  """
+  @spec connection_info(pid() | atom()) ::
+          %{
+            attempt_ref: reference() | nil,
+            status: :disconnected | :connecting | :connected,
+            last_error: atom() | {atom(), integer()} | nil
+          }
+          | {:error, :no_socket_found}
+  def connection_info(sup_pid) do
+    case get_process_pid(sup_pid, :socket) do
+      nil -> {:error, :no_socket_found}
+      socket_pid -> GenServer.call(socket_pid, :connection_info)
+    end
+  end
+
   @doc false
   def get_process_pid(sup_name, name) when is_atom(sup_name) do
     case Process.whereis(sup_name) do

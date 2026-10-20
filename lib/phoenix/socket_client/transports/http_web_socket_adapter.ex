@@ -208,7 +208,7 @@ defmodule Phoenix.SocketClient.Transports.HTTPWebSocketAdapter do
 
   def handle_info({:DOWN, ref, :process, _pid, reason}, %{socket_ref: ref} = state) do
     unless state.closing? do
-      send(state.sender, {:disconnected, reason, self()})
+      send(state.sender, {:disconnected, state.last_error || reason, self()})
     end
 
     {:stop, :normal, %{state | connected?: false, socket: nil}}

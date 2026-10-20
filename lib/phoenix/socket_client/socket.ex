@@ -21,6 +21,9 @@ defmodule Phoenix.SocketClient.Socket do
           to_send_r: list(),
           to_send_count: non_neg_integer(),
           connect_start_time: integer() | nil,
+          attempt_ref: reference() | nil,
+          last_error: atom() | {atom(), integer()} | nil,
+          connect_timer: {reference(), reference()} | nil,
           message_processor: pid() | nil,
           max_pending_messages: pos_integer(),
           last_activity: integer() | nil,
@@ -37,6 +40,9 @@ defmodule Phoenix.SocketClient.Socket do
             to_send_r: [],
             to_send_count: 0,
             connect_start_time: nil,
+            attempt_ref: nil,
+            last_error: nil,
+            connect_timer: nil,
             message_processor: nil,
             max_pending_messages: 500,
             last_activity: nil,
@@ -96,10 +102,10 @@ defmodule Phoenix.SocketClient.Socket do
   @spec handle_continue(:post_start, t()) :: {:noreply, t()}
   def handle_continue(:post_start, %{sup_pid: sup_pid} = state) do
     if get_state(sup_pid, :auto_connect) do
-      Process.send_after(self(), :connect, 1_000)
+      {:noreply, schedule_connect(state, 1_000)}
+    else
+      {:noreply, state}
     end
-
-    {:noreply, state}
   end
 
   @impl true
@@ -107,8 +113,13 @@ defmodule Phoenix.SocketClient.Socket do
   def handle_info(:disconnect, state) do
     current_time = System.monotonic_time(:millisecond)
     new_state = %{state | last_activity: current_time}
-    {:noreply, close(:normal, new_state)}
+    {:noreply, close(:cancelled, cancel_connect_timer(new_state), false)}
   end
+
+  def handle_info({:connect, token}, %{connect_timer: {_timer, token}} = state),
+    do: handle_info(:connect, state)
+
+  def handle_info({:connect, _token}, state), do: {:noreply, state}
 
   @spec handle_info(:connect, t()) :: {:noreply, t()}
   def handle_info(:connect, %{status: status} = state) when status in [:connecting, :connected] do
@@ -123,6 +134,7 @@ defmodule Phoenix.SocketClient.Socket do
         {:noreply, state}
 
       url ->
+        state = cancel_connect_timer(%{state | attempt_ref: make_ref(), last_error: nil})
         transport = socket_state.transport
         transport_opts = socket_state.transport_opts |> Keyword.put(:sender, self())
 
@@ -178,7 +190,12 @@ defmodule Phoenix.SocketClient.Socket do
   @spec handle_info({:connected, pid()}, t()) :: {:noreply, t()}
   def handle_info(
         {:connected, transport_pid},
-        %{sup_pid: sup_pid, transport_pid: transport_pid, connect_start_time: start_time} = state
+        %{
+          sup_pid: sup_pid,
+          status: :connecting,
+          transport_pid: transport_pid,
+          connect_start_time: start_time
+        } = state
       ) do
     socket_state = Phoenix.SocketClient.get_state(sup_pid)
     socket_ref = Phoenix.SocketClient.get_state(sup_pid, :socket_ref)
@@ -223,6 +240,7 @@ defmodule Phoenix.SocketClient.Socket do
     new_state = %__MODULE__{
       state
       | status: :connected,
+        last_error: nil,
         transport_pid: transport_pid,
         initial_channels_joined: true,
         heartbeat_timer: heartbeat_timer
@@ -449,11 +467,11 @@ defmodule Phoenix.SocketClient.Socket do
   @impl true
   @spec handle_info({:DOWN, reference(), :process, pid(), any()}, t()) :: {:noreply, t()}
   def handle_info(
-        {:DOWN, ref, :process, _pid, _reason},
+        {:DOWN, ref, :process, _pid, reason},
         %{sup_pid: _sup_pid, transport_ref: transport_ref, transport_pid: _transport_pid} = state
       ) do
     if ref == transport_ref do
-      {:noreply, close(:shutdown, state)}
+      {:noreply, close(reason, state)}
     else
       {:noreply, state}
     end
@@ -513,6 +531,10 @@ defmodule Phoenix.SocketClient.Socket do
           {:reply, :connected | :connecting | :disconnected, t()}
   def handle_call(:get_status, _from, state) do
     {:reply, state.status, state}
+  end
+
+  def handle_call(:connection_info, _from, state) do
+    {:reply, Map.take(state, [:attempt_ref, :status, :last_error]), state}
   end
 
   @impl true
@@ -667,7 +689,7 @@ defmodule Phoenix.SocketClient.Socket do
     end
   end
 
-  defp close(reason, %__MODULE__{sup_pid: sup_pid} = state) do
+  defp close(reason, %__MODULE__{sup_pid: sup_pid} = state, reconnect? \\ true) do
     # Cancel heartbeat timer if active
     if state.heartbeat_timer do
       Process.cancel_timer(state.heartbeat_timer)
@@ -694,8 +716,18 @@ defmodule Phoenix.SocketClient.Socket do
 
     close_transport(socket_state, state)
 
+    state = %__MODULE__{
+      state
+      | status: :disconnected,
+        last_error: connection_error(reason),
+        heartbeat_timer: nil,
+        transport_pid: nil,
+        transport_ref: nil,
+        connect_start_time: nil
+    }
+
     # Guard against nil socket_state when Agent is already down during shutdown
-    if socket_state && socket_state.reconnect do
+    if reconnect? && socket_state && socket_state.reconnect do
       put_state(sup_pid, :reconnecting, true)
 
       # Emit reconnection attempt event
@@ -706,18 +738,37 @@ defmodule Phoenix.SocketClient.Socket do
         reason: reason
       })
 
-      Process.send_after(self(), :connect, socket_state.reconnect_interval)
-    end
-
-    %__MODULE__{
+      schedule_connect(state, socket_state.reconnect_interval)
+    else
+      put_state(sup_pid, :reconnecting, false)
       state
-      | status: :disconnected,
-        heartbeat_timer: nil,
-        transport_pid: nil,
-        transport_ref: nil,
-        connect_start_time: nil
-    }
+    end
   end
+
+  defp schedule_connect(state, interval) do
+    state = cancel_connect_timer(state)
+    token = make_ref()
+    timer = Process.send_after(self(), {:connect, token}, interval)
+    %{state | connect_timer: {timer, token}}
+  end
+
+  defp cancel_connect_timer(%{connect_timer: nil} = state), do: state
+
+  defp cancel_connect_timer(%{connect_timer: {timer, _token}} = state) do
+    Process.cancel_timer(timer)
+    %{state | connect_timer: nil}
+  end
+
+  defp connection_error({:unexpected_status, status}) when is_integer(status),
+    do: {:unexpected_status, status}
+
+  defp connection_error({:closed, code, _private_reason, _clean?}) when is_integer(code),
+    do: {:closed, code}
+
+  defp connection_error({:error, reason}), do: connection_error(reason)
+  defp connection_error(reason) when is_atom(reason), do: reason
+  defp connection_error({category, _private_detail}) when is_atom(category), do: category
+  defp connection_error(_private_reason), do: :transport_error
 
   defp close_transport(%{transport: transport}, %{
          transport_pid: transport_pid,

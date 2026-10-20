@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.8] - 2026-10-20
+
+### Added
+- Expose `connection_info/1` with a unique attempt reference, current status, and
+  retained error independently of telemetry configuration. HTTP 401/403 upgrade
+  rejections remain distinct from transient refusal and timeout (#110).
+
+### Fixed
+- Reject duplicate channel topic registration with the existing PID, retaining
+  one usable channel and avoiding duplicate wire joins. Safe registration
+  failures preserve initialization privacy (#109).
+- Cancel pending auto-connect and retry timers on explicit disconnect; ignore
+  stale timer and transport events. Duplicate connection notifications no longer
+  restart heartbeat timers, and successful attempts clear prior errors (#110).
+- Honor the documented `:reconnect?` option, with `:reconnect` taking precedence
+  when both are supplied (#110).
+
 ## [0.8.7] - 2026-10-19
 
 ### Fixed
