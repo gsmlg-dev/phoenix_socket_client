@@ -98,6 +98,10 @@ defmodule Phoenix.SocketClientTest.Endpoint do
     websocket: [check_origin: false, connect_info: [:x_headers]]
   )
 
+  socket("/ws/heartbeat", Phoenix.SocketClientTest.AdminSocket,
+    websocket: [check_origin: false, timeout: 500, connect_info: [:x_headers]]
+  )
+
   # Add this plug to handle basic HTTP requests
   plug(Plug.RequestId)
   plug(Plug.Telemetry, event_prefix: [:phoenix, :endpoint])

@@ -315,7 +315,7 @@ defmodule Phoenix.SocketClient.Socket do
       ref: Message.generate_ref()
     }
 
-    transport_send(heartbeat_msg, state)
+    state = transport_send(heartbeat_msg, state)
 
     # Schedule next heartbeat
     heartbeat_interval = get_state(sup_pid, :heartbeat_interval) || 30_000
