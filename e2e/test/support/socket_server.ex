@@ -13,7 +13,7 @@ defmodule PhoenixSocketClientE2E.SocketServer do
       debug_errors: false,
       code_reloader: false,
       server: true,
-      adapter: Bandit.PhoenixAdapter,
+      adapter: Gaoxy.PhoenixAdapter,
       pubsub_server: PhoenixSocketClientE2E.PubSub,
       render_errors: [formats: [json: PhoenixSocketClientE2E.ErrorView], accepts: ~w(json)]
     )

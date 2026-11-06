@@ -45,13 +45,14 @@ defmodule Phoenix.SocketClient.MixProject do
   defp deps do
     [
       {:jason, "~> 1.2", optional: true},
-      {:http_web_socket, "~> 0.21.14"},
+      {:http_web_socket, "~> 1.0.0-rc.4"},
       {:telemetry, "~> 1.0"},
       {:benchee, "~> 1.4", only: :dev},
       {:benchee_html, "~> 1.0", only: :dev},
       {:phoenix, "~> 1.8", only: :test},
       {:phoenix_pubsub, "~> 2.1", only: :test},
-      {:bandit, "~> 1.8", only: :test},
+      {:gaoxy_http, "~> 0.15.0", only: :test},
+      {:websock_adapter, "~> 0.15.0", hex: :gaoxy_websock_adapter, only: :test, override: true},
       {:ex_doc, "~> 0.38", only: :dev},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false}

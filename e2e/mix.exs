@@ -26,7 +26,8 @@ defmodule PhoenixSocketClientE2E.MixProject do
       phoenix_socket_client_dep(),
       {:phoenix, "~> 1.8"},
       {:phoenix_pubsub, "~> 2.1"},
-      {:bandit, "~> 1.8"}
+      {:gaoxy_http, "~> 0.15.0"},
+      {:websock_adapter, "~> 0.15.0", hex: :gaoxy_websock_adapter, override: true}
     ]
   end
 

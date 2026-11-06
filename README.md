@@ -6,7 +6,7 @@
 
 Elixir client for Phoenix Channels WebSocket connections.
 
-Both WebSocket transports use `HTTP.WebSocket` from `http_web_socket` 0.21.14 or later in the 0.21 series,
+Both WebSocket transports use `HTTP.WebSocket` from `http_web_socket` 1.0.0-rc.4 or later in the 1.0 series,
 part of the [gsmlg-dev/http_fetch](https://github.com/gsmlg-dev/http_fetch) package family.
 
 ## Installation
@@ -323,7 +323,7 @@ current messages, and original exception arguments. Initialization, callback,
 cleanup, and message-worker failures emit a fixed diagnostic and exit with
 `:private_callback_failure`, preserving supervisor restart behavior. Normal exits
 and explicit channel leaves retain their behavior. The underlying transport
-requires `http_web_socket` 0.21.14, which protects its own diagnostics.
+requires `http_web_socket` 1.0.0-rc.4, which protects its own diagnostics.
 
 Supervisor startup and restart reports carry opaque references to private
 configuration. A supervised client's configuration stays available until its

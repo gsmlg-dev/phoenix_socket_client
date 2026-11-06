@@ -18,7 +18,7 @@ defmodule Phoenix.SocketClient.TelemetryTest do
   end
 
   setup_all do
-    Application.ensure_all_started(:bandit)
+    Application.ensure_all_started(:gaoxy_http)
     Application.ensure_all_started(:phoenix)
     :ok
   end

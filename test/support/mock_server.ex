@@ -20,7 +20,7 @@ defmodule Phoenix.SocketClientTest.MockServer do
       debug_errors: false,
       code_reloader: false,
       server: true,
-      adapter: Bandit.PhoenixAdapter,
+      adapter: Gaoxy.PhoenixAdapter,
       pubsub_server: Phoenix.SocketClientTest.PubSub,
       render_errors: [formats: [json: Phoenix.SocketClientTest.ErrorView], accepts: ~w(json)]
     )

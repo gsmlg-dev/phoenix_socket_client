@@ -44,12 +44,12 @@ Phoenix.SocketClient (API wrapper, starts Supervisor)
 - **Telemetry**: Events under `[:phoenix_socket_client, :socket | :channel | :message | :state]`
 
 ## Testing
-Integration tests start a real Phoenix server (bandit) on a dynamic port (`test/support/`). Test support modules are compiled only in `:test` env via `elixirc_paths`.
+Integration tests start a real Phoenix server (Gaoxy) on a dynamic port (`test/support/`). Test support modules are compiled only in `:test` env via `elixirc_paths`.
 
 V1 protocol is deprecated — tests default to V2.
 
 ## Dependencies
-- Runtime: `jason` (optional), `http_web_socket` 0.21.14+, `telemetry`
+- Runtime: `jason` (optional), `http_web_socket` 1.0.0-rc.4+, `telemetry`
 - Dev: `credo`, `dialyxir`, `ex_doc`, `benchee`
-- Test: `phoenix`, `phoenix_pubsub`, `bandit`
+- Test: `phoenix`, `phoenix_pubsub`, `gaoxy_http`, `gaoxy_websock_adapter` (as `websock_adapter`)
 - Requires Elixir 1.17+ and Erlang/OTP 26+
