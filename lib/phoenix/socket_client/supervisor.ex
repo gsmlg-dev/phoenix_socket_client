@@ -102,6 +102,7 @@ defmodule Phoenix.SocketClient.Supervisor do
 
     registry_name = Keyword.get(opts, :registry_name, default_registry_name)
     true = is_atom(registry_name)
+    Phoenix.SocketClient.put_registry_name(registry_name)
 
     # Get serializer from opts for MessageProcessor
     serializer = Phoenix.SocketClient.Message.serializer(Keyword.get(opts, :vsn, "2.0.0"))

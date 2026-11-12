@@ -96,50 +96,37 @@ defmodule Phoenix.SocketClient do
     end
   end
 
-  def get_process_pid(sup_pid, :socket_state) when is_pid(sup_pid) do
-    fallback_process_discovery(sup_pid, :socket_state)
+  def get_process_pid(sup_pid, name) when is_pid(sup_pid) do
+    case registry_name(sup_pid) do
+      nil ->
+        nil
+
+      registry_name ->
+        case Registry.lookup(registry_name, name) do
+          [{pid, _}] when is_pid(pid) -> pid
+          _ -> nil
+        end
+    end
+  rescue
+    # The registry may already be gone while the supervisor shuts down.
+    ArgumentError -> nil
   end
 
-  def get_process_pid(sup_pid, name) when is_pid(sup_pid) do
-    try do
-      # First try to get registry name from the supervisor's state
-      case Process.alive?(sup_pid) do
-        false ->
-          nil
+  @registry_key {__MODULE__, :registry_name}
 
-        true ->
-          # Get registry name from state for O(1) lookup
-          case get_state(sup_pid, :registry_name) do
-            nil ->
-              # Fallback to the old way if registry not found
-              fallback_process_discovery(sup_pid, name)
+  @doc false
+  # Called from the supervisor's `init/1` so lookups never need to message the
+  # supervisor, which cannot answer while it executes `Supervisor.stop/3`.
+  def put_registry_name(registry_name), do: Process.put(@registry_key, registry_name)
 
-            registry_name ->
-              # Use Registry for O(1) lookup instead of O(n) Supervisor.which_children()
-              case Registry.lookup(registry_name, name) do
-                [{pid, _}] when is_pid(pid) -> pid
-                _ -> nil
-              end
-          end
-      end
-    rescue
-      e ->
-        Logger.warning("#{__MODULE__} operation failed: #{inspect(e)}")
+  defp registry_name(sup_pid) do
+    case Process.info(sup_pid, :dictionary) do
+      {:dictionary, dictionary} ->
+        List.keyfind(dictionary, @registry_key, 0, {nil, nil}) |> elem(1)
+
+      nil ->
         nil
     end
-  end
-
-  # Fallback to the old discovery method (only used during transition)
-  defp fallback_process_discovery(sup_pid, name) do
-    sup_pid
-    |> Supervisor.which_children()
-    |> Enum.find_value(fn
-      {process_name, process_pid, _, _} when is_pid(process_pid) and process_name == name ->
-        process_pid
-
-      _ ->
-        nil
-    end)
   end
 
   @doc """
