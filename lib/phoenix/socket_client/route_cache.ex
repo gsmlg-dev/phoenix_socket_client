@@ -29,7 +29,6 @@ defmodule Phoenix.SocketClient.RouteCache do
 
   use GenServer
   use Phoenix.SocketClient.Privacy
-  require Logger
 
   @default_cache_size 1000
   # 5 minutes

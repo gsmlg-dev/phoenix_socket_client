@@ -30,7 +30,6 @@ defmodule Phoenix.SocketClient.HibernationManager do
 
   use GenServer
   use Phoenix.SocketClient.Privacy
-  require Logger
 
   # 5 minutes
   @default_idle_timeout 300_000

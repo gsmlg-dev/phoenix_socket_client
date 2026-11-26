@@ -35,7 +35,6 @@ defmodule Phoenix.SocketClient.PerformanceMonitor do
 
   use GenServer
   use Phoenix.SocketClient.Privacy
-  require Logger
 
   # 30 seconds
   @default_collection_interval 30_000

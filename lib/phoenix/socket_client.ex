@@ -9,8 +9,6 @@ defmodule Phoenix.SocketClient do
   > for Phoenix Channels.
   """
 
-  require Logger
-
   @doc """
   Starts the socket client supervisor.
 

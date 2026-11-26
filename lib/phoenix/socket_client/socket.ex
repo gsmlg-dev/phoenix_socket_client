@@ -4,7 +4,6 @@ defmodule Phoenix.SocketClient.Socket do
   """
   use GenServer
   use Phoenix.SocketClient.Privacy
-  require Logger
 
   alias Phoenix.SocketClient.ChannelManager
   alias Phoenix.SocketClient.Message
@@ -153,7 +152,7 @@ defmodule Phoenix.SocketClient.Socket do
               {:ok, transport_pid} ->
                 transport_ref = Process.monitor(transport_pid)
 
-                new_state = %__MODULE__{
+                new_state = %{
                   state
                   | transport_pid: transport_pid,
                     status: :connecting,
@@ -237,7 +236,7 @@ defmodule Phoenix.SocketClient.Socket do
     heartbeat_interval = get_state(sup_pid, :heartbeat_interval) || 30_000
     heartbeat_timer = Process.send_after(self(), :heartbeat, heartbeat_interval)
 
-    new_state = %__MODULE__{
+    new_state = %{
       state
       | status: :connected,
         last_error: nil,
@@ -303,7 +302,7 @@ defmodule Phoenix.SocketClient.Socket do
         transport_send(msg, acc_state)
       end)
 
-    {:noreply, %__MODULE__{state | to_send_r: [], to_send_count: 0}}
+    {:noreply, %{state | to_send_r: [], to_send_count: 0}}
   end
 
   @spec handle_info(:heartbeat, t()) :: {:noreply, t()}

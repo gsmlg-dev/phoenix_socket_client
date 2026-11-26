@@ -35,7 +35,6 @@ defmodule Phoenix.SocketClient.MessageProcessor do
 
   use GenServer
   use Phoenix.SocketClient.Privacy
-  require Logger
 
   alias Phoenix.SocketClient.Message
   alias Phoenix.SocketClient.Telemetry

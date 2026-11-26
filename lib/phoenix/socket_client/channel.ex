@@ -202,10 +202,7 @@ defmodule Phoenix.SocketClient.Channel do
       :exit, reason ->
         Phoenix.SocketClient.update_channel_status(sup_pid, pid, topic, :errored, params)
         GenServer.stop(pid, :normal)
-        {:error, exit_reason(reason)}
+        {:error, reason}
     end
   end
-
-  defp exit_reason({:timeout, _}), do: :timeout
-  defp exit_reason(reason), do: reason
 end

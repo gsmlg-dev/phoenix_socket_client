@@ -26,7 +26,6 @@ defmodule Phoenix.SocketClient.BinaryPool do
 
   use GenServer
   use Phoenix.SocketClient.Privacy
-  require Logger
 
   @default_pool_size 1000
   @cleanup_interval 30_000
